@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.Python
+venv/
+env/
+.venv/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Data (keep structure, ignore contents)
+data/images/*
+data/output/*
+data/automation/*.db
+!data/images/.gitkeep
+!data/output/.gitkeep
+!data/automation/.gitkeep
+
+# Logs
+*.log
+logs/
+
+# Tokens
+config/linkedin_token.json
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
