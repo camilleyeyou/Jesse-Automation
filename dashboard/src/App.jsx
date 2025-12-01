@@ -330,6 +330,14 @@ function QueueTab({ queue, onGenerate, onRemove, loading }) {
   const posts = queue?.posts || [];
   const [selectedImage, setSelectedImage] = useState(null);
 
+  // Helper to safely render the cultural reference
+  const renderCulturalReference = (ref) => {
+    if (!ref) return null;
+    if (typeof ref === 'string') return ref;
+    // The error indicated keys were: category, reference, context
+    return ref.reference || ref.source || ref.context || 'Unknown reference';
+  };
+
   return (
     <div className="space-y-6">
       {/* Image Modal */}
@@ -413,11 +421,13 @@ function QueueTab({ queue, onGenerate, onRemove, loading }) {
                         {post.hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' ')}
                       </p>
                     )}
+                    {/* --- THIS WAS THE BROKEN SECTION --- */}
                     {post.cultural_reference && (
                       <p className="text-purple-400 text-xs mt-2">
-                        📺 {post.cultural_reference.source || post.cultural_reference}
+                        📺 {renderCulturalReference(post.cultural_reference)}
                       </p>
                     )}
+                    {/* ----------------------------------- */}
                   </div>
 
                   {/* Actions */}
