@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Play, Square, Clock, Send, Sparkles, Calendar, 
   History, Settings, RefreshCw, AlertCircle, CheckCircle,
-  Linkedin, Image, FileText, Zap, BarChart3
+  Linkedin, Image, FileText, Zap, BarChart3, X, ZoomIn
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
@@ -29,6 +29,26 @@ const api = {
     if (!res.ok) throw new Error(`API error: ${res.status}`);
     return res.json();
   }
+};
+
+// Helper to get full image URL
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return null;
+  // If it's already a full URL, return as-is
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  // If it starts with /images, prepend API_BASE
+  if (imagePath.startsWith('/images')) {
+    return `${API_BASE}${imagePath}`;
+  }
+  // If it's a relative path like data/images/xxx.png, convert to /images/xxx.png
+  if (imagePath.includes('data/images/')) {
+    const filename = imagePath.split('/').pop();
+    return `${API_BASE}/images/${filename}`;
+  }
+  // Default: assume it's just a filename
+  return `${API_BASE}/images/${imagePath}`;
 };
 
 // ============== Components ==============
@@ -88,6 +108,33 @@ function StatCard({ icon: Icon, label, value, subtext }) {
         </div>
       </div>
     </Card>
+  );
+}
+
+// Image Preview Modal
+function ImageModal({ imageUrl, onClose }) {
+  if (!imageUrl) return null;
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div className="relative max-w-4xl max-h-[90vh]">
+        <button 
+          onClick={onClose}
+          className="absolute -top-10 right-0 text-white hover:text-amber-400 transition-colors"
+        >
+          <X className="w-8 h-8" />
+        </button>
+        <img 
+          src={imageUrl} 
+          alt="Post preview" 
+          className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -281,9 +328,18 @@ function ScheduleTab({ status, onSetSchedule, loading }) {
 
 function QueueTab({ queue, onGenerate, onRemove, loading }) {
   const posts = queue?.posts || [];
+  const [selectedImage, setSelectedImage] = useState(null);
 
   return (
     <div className="space-y-6">
+      {/* Image Modal */}
+      {selectedImage && (
+        <ImageModal 
+          imageUrl={selectedImage} 
+          onClose={() => setSelectedImage(null)} 
+        />
+      )}
+
       {/* Generate Button */}
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-white">Post Queue</h3>
@@ -303,36 +359,77 @@ function QueueTab({ queue, onGenerate, onRemove, loading }) {
         </Card>
       ) : (
         <div className="space-y-4">
-          {posts.map((post, index) => (
-            <Card key={post.id || index}>
-              <div className="flex justify-between items-start gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <StatusBadge active={post.status === 'pending'} label={post.status} />
-                    {post.image_url && (
-                      <span className="text-blue-400 text-sm flex items-center gap-1">
-                        <Image className="w-4 h-4" /> Has image
-                      </span>
+          {posts.map((post, index) => {
+            const imageUrl = getImageUrl(post.image_url);
+            
+            return (
+              <Card key={post.id || index}>
+                <div className="flex gap-4">
+                  {/* Image Preview */}
+                  {imageUrl && (
+                    <div 
+                      className="flex-shrink-0 w-32 h-32 md:w-40 md:h-40 relative group cursor-pointer"
+                      onClick={() => setSelectedImage(imageUrl)}
+                    >
+                      <img 
+                        src={imageUrl} 
+                        alt="Post image" 
+                        className="w-full h-full object-cover rounded-lg border border-white/10"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                      <div 
+                        className="hidden w-full h-full bg-white/5 rounded-lg border border-white/10 items-center justify-center"
+                      >
+                        <Image className="w-8 h-8 text-gray-500" />
+                      </div>
+                      {/* Zoom overlay */}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                        <ZoomIn className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <StatusBadge active={post.status === 'pending'} label={post.status} />
+                      {post.image_url && (
+                        <span className="text-blue-400 text-sm flex items-center gap-1">
+                          <Image className="w-4 h-4" /> Has image
+                        </span>
+                      )}
+                      {(post.validation_score || post.average_score) && (
+                        <span className="text-amber-400 text-sm">
+                          Score: {(post.validation_score || post.average_score).toFixed(1)}/10
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-300 leading-relaxed mb-2">{post.content}</p>
+                    {post.hashtags?.length > 0 && (
+                      <p className="text-amber-400 text-sm">
+                        {post.hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' ')}
+                      </p>
                     )}
-                    {post.validation_score && (
-                      <span className="text-amber-400 text-sm">
-                        Score: {post.validation_score.toFixed(1)}/10
-                      </span>
+                    {post.cultural_reference && (
+                      <p className="text-purple-400 text-xs mt-2">
+                        📺 {post.cultural_reference.source || post.cultural_reference}
+                      </p>
                     )}
                   </div>
-                  <p className="text-gray-300 leading-relaxed">{post.content}</p>
-                  {post.hashtags?.length > 0 && (
-                    <p className="text-amber-400 text-sm mt-2">
-                      {post.hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' ')}
-                    </p>
-                  )}
+
+                  {/* Actions */}
+                  <div className="flex-shrink-0">
+                    <Button onClick={() => onRemove(post.id)} variant="danger">
+                      Remove
+                    </Button>
+                  </div>
                 </div>
-                <Button onClick={() => onRemove(post.id)} variant="danger">
-                  Remove
-                </Button>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
@@ -341,9 +438,18 @@ function QueueTab({ queue, onGenerate, onRemove, loading }) {
 
 function HistoryTab({ history }) {
   const posts = history?.posts || [];
+  const [selectedImage, setSelectedImage] = useState(null);
 
   return (
     <div className="space-y-6">
+      {/* Image Modal */}
+      {selectedImage && (
+        <ImageModal 
+          imageUrl={selectedImage} 
+          onClose={() => setSelectedImage(null)} 
+        />
+      )}
+
       <h3 className="text-lg font-semibold text-white">Published Posts</h3>
 
       {posts.length === 0 ? (
@@ -355,33 +461,62 @@ function HistoryTab({ history }) {
         </Card>
       ) : (
         <div className="space-y-4">
-          {posts.map((post, index) => (
-            <Card key={post.id || index}>
-              <div className="flex items-start gap-3">
-                {post.status === 'success' ? (
-                  <CheckCircle className="w-5 h-5 text-green-400 mt-1" />
-                ) : (
-                  <AlertCircle className="w-5 h-5 text-red-400 mt-1" />
-                )}
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-gray-400 text-sm">
-                      {new Date(post.published_at).toLocaleString()}
-                    </span>
-                    {post.linkedin_post_id && (
-                      <span className="text-blue-400 text-sm">
-                        ID: {post.linkedin_post_id}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-gray-300">{post.content}</p>
-                  {post.error_message && (
-                    <p className="text-red-400 text-sm mt-2">{post.error_message}</p>
+          {posts.map((post, index) => {
+            const imageUrl = getImageUrl(post.image_url);
+            
+            return (
+              <Card key={post.id || index}>
+                <div className="flex gap-4">
+                  {/* Image Preview */}
+                  {imageUrl && (
+                    <div 
+                      className="flex-shrink-0 w-24 h-24 relative group cursor-pointer"
+                      onClick={() => setSelectedImage(imageUrl)}
+                    >
+                      <img 
+                        src={imageUrl} 
+                        alt="Post image" 
+                        className="w-full h-full object-cover rounded-lg border border-white/10"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                        <ZoomIn className="w-6 h-6 text-white" />
+                      </div>
+                    </div>
                   )}
+
+                  {/* Content */}
+                  <div className="flex-1">
+                    <div className="flex items-start gap-3">
+                      {post.status === 'success' ? (
+                        <CheckCircle className="w-5 h-5 text-green-400 mt-1 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5 text-red-400 mt-1 flex-shrink-0" />
+                      )}
+                      <div className="flex-1">
+                        <div className="flex flex-wrap items-center gap-3 mb-2">
+                          <span className="text-gray-400 text-sm">
+                            {new Date(post.published_at).toLocaleString()}
+                          </span>
+                          {post.linkedin_post_id && (
+                            <span className="text-blue-400 text-sm">
+                              ID: {post.linkedin_post_id}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-gray-300">{post.content}</p>
+                        {post.error_message && (
+                          <p className="text-red-400 text-sm mt-2">{post.error_message}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
