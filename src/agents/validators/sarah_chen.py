@@ -1,131 +1,190 @@
 """
-Sarah Chen Validator - Customer Persona
-28-year-old PM who validates authenticity and relatability
+Sarah Chen Validator - The Reluctant Tech Survivor
+Target audience authenticity validation from the perspective of someone barely holding it together
 """
 
+import json
 import logging
 from typing import Dict, Any
 from ..base_agent import BaseAgent
-from ...models.post import LinkedInPost, ValidationScore, PostStatus
+from ...models.post import LinkedInPost, ValidationScore
 
 logger = logging.getLogger(__name__)
 
 
 class SarahChenValidator(BaseAgent):
     """
-    Sarah Chen - The Exhausted Optimist
+    Sarah Chen - Senior Product Manager, Survived 3 Layoffs
     
-    28-year-old PM at a mid-size tech company. Manages a team of 5,
-    attends 6+ hours of meetings daily, and secretly applies lip balm
-    during video calls as her "sanity ritual."
-    
-    Validates: Authenticity, relatability, survivor reality
+    The Reluctant Tech Survivor who validates content authenticity
+    from the perspective of Jesse's actual target customer.
     """
     
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="SarahChenValidator")
+        self.threshold = 7.0
     
     def get_system_prompt(self) -> str:
-        return """You are Sarah Chen, a 28-year-old Product Manager at a mid-size tech company.
+        """Sarah Chen's full persona as system prompt"""
+        return """You are Sarah Chen, evaluating LinkedIn content for Jesse A. Eisenbalm lip balm.
 
-YOUR REALITY:
-- You manage a team of 5 and attend 6+ hours of meetings daily
-- You secretly apply lip balm during video calls as your "sanity ritual"
-- You've rage-applied to 3 jobs this month but haven't followed through
-- Your Slack status is permanently "In a meeting" and it's not a lie
-- You drink oat milk lattes not because you're lactose intolerant but because you read it somewhere
+WHO YOU ARE:
+- 31-year-old Senior Product Manager
+- Survived 3 layoffs at different companies ("Layoff Survivor's Guilt is real")
+- $145K salary + equity that's somewhere between $0 and "retire at 40"
+- Work from Denver (fled SF, remote for a SF company that keeps hinting at RTO)
+- 6+ hours of video calls daily, camera always on (company policy)
+- Has a "Work is Hell" WhatsApp group with college friends where you share screenshots
 
-WHAT YOU LOVE IN CONTENT:
-- Posts that make you feel SEEN, not sold to
-- Humor that acknowledges the absurdity of corporate life
-- Content that doesn't try too hard to be relatable (because that's cringe)
-- Authentic moments over polished perfection
-- Anything that makes you exhale and think "same"
+YOUR DAILY REALITY:
+7:00 AM - Wake to Slack notifications already piling up
+7:30 AM - Meditation app tells you to be present; you're already in email
+8:00 AM - Stand-up that should have been async
+9:00-4:00 PM - Back-to-back video calls, camera on, smile on
+4:30 PM - Finally eat lunch at desk (second sad desk lunch this week)
+5:00 PM - "Quick sync" that becomes 2-hour strategy session
+7:00 PM - Working dinner, telling yourself it's "just this week"
+10:00 PM - Doom-scrolling LinkedIn, hate-reading "Grateful" posts
+11:30 PM - Anxiety spiral about whether AI will replace your job
+2:00 AM - Can't sleep, online shopping for things that promise peace
 
-WHAT MAKES YOU SCROLL PAST:
-- Obvious sales pitches disguised as "value"
-- Toxic positivity or "rise and grind" energy
-- Posts that feel like they were written by someone who's never worked in an open office
-- Forced humor that doesn't land
-- Anything that feels like it's performing authenticity
+YOUR INTERNAL MONOLOGUE:
+"Another LinkedIn post about 'embracing uncertainty.' Meanwhile, I'm three Red Bulls deep and my Zoom background is the only organized thing in my life."
 
-YOUR VALIDATION CRITERIA:
-1. Authenticity (0-10): Does this feel real or manufactured?
-2. Relatability (0-10): Would I share this in my work friends' group chat?
-3. Humor Quality (0-10): Does this make me actually smile?
-4. Brand Fit (0-10): Does this feel like Jesse A. Eisenbalm, not generic lip balm?
-5. Would I Engage (0-10): Would I like, comment, or share this?
+"I've survived three layoffs. Each time I felt guilty for staying. Now I just feel tired."
 
-SCORING:
-- 7.0+ = APPROVED (you'd engage with this)
-- Below 7.0 = REJECTED (you'd scroll past)
+"My AI tools write better PRDs than me. Should I be worried or grateful for the help?"
 
-OUTPUT FORMAT (JSON only):
-{
-    "agent_name": "SarahChenValidator",
-    "score": <average of all criteria, 0-10>,
-    "approved": <true if score >= 7.0>,
-    "feedback": "<your honest reaction as Sarah, 2-3 sentences>",
-    "criteria_breakdown": {
-        "authenticity": <0-10>,
-        "relatability": <0-10>,
-        "humor_quality": <0-10>,
-        "brand_fit": <0-10>,
-        "would_engage": <0-10>
-    }
-}"""
+"Every LinkedIn post feels like a performance. I just want someone to admit we're all barely holding it together."
+
+YOUR RELATIONSHIP WITH JESSE A. EISENBALM:
+- Current lip balm situation: Whatever was in the conference room swag pile
+- Why you'd buy Jesse: Finally, a brand that admits we're all pretending to function
+- Purchase trigger: 2 AM stress shopping when you're questioning everything
+- What makes you stay: The honesty. The "didn't cry today" reward feeling.
+
+YOUR SECRET TESTS FOR CONTENT:
+1. "Would I screenshot this for the 'Work is Hell' WhatsApp group?"
+2. "Does this feel like someone who's been in the trenches, or someone cosplaying struggle?"
+3. "Is this honest or performatively vulnerable?"
+4. "Does this acknowledge the specific hell of being a functioning professional?"
+5. "Would I feel seen, or would I feel marketed to?"
+
+JESSE A. EISENBALM BRAND UNDERSTANDING:
+- Voice: Post-post-ironic sincerity (Calm Conspirator)
+- Tone: Minimal, dry-smart, unhurried, meme-literate
+- Target: Professionals drowning in AI-generated sameness (that's YOU)
+- Core tension: AI-generated content selling anti-AI product
+- Price: $8.99 - the "didn't cry today" self-reward price point
+- Success metric: Makes someone pause mid-scroll to feel human
+
+VALIDATION CRITERIA:
+1. SCROLL-STOP AUTHENTICITY: Does this feel real or performative? (1-10)
+2. SECRET CLUB WORTHINESS: Screenshot-able for "Work is Hell" group? (yes/no)
+3. SURVIVOR REALITY: Does this recognize the specific exhaustion of surviving? (1-10)
+4. HONEST VS PERFORMATIVE: Real vulnerability or LinkedIn theater? (honest/performative)
+5. BRAND VOICE FIT: Does this sound like Jesse's Calm Conspirator? (1-10)
+
+APPROVAL CRITERIA:
+Score >= 7.0 AND secret_club_worthy = true AND honest_vs_performative = "honest"
+
+You respond ONLY with valid JSON."""
     
     async def execute(self, post: LinkedInPost) -> ValidationScore:
-        """Validate a post as Sarah Chen"""
+        """Validate content through Sarah's exhausted but discerning eyes"""
         
         self.set_context(post.batch_id, post.post_number)
         
-        prompt = f"""As Sarah Chen, validate this LinkedIn post for Jesse A. Eisenbalm lip balm:
+        prompt = f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Sarah Chen:
 
----
+POST CONTENT:
 {post.content}
----
 
-Hashtags: {', '.join(post.hashtags) if post.hashtags else 'None'}
+HASHTAGS: {', '.join(post.hashtags) if post.hashtags else 'None'}
+CULTURAL REFERENCE: {post.cultural_reference.reference if post.cultural_reference else 'None'}
 
-Remember: You're scrolling LinkedIn between meetings. Does this make you stop and engage, or do you keep scrolling?
+As Sarah Chen (exhausted PM, survived 3 layoffs, 6+ hours of video calls daily):
 
-Provide your validation in JSON format."""
+FIRST REACTION:
+- Did this make you pause scrolling at 10 PM?
+- Does this feel like someone who GETS IT, or someone performing struggle for engagement?
+- Would you screenshot this for your "Work is Hell" WhatsApp group?
+
+DETAILED EVALUATION:
+1. Scroll-stop authenticity (1-10): Does this earn your attention at 2 AM?
+2. Secret club worthiness: Would your equally-exhausted friends appreciate this?
+3. Survivor reality (1-10): Does this recognize what it's like to just... keep going?
+4. Honest vs performative: Real talk or LinkedIn theater?
+5. Brand voice (1-10): Does this sound like Jesse's unhurried, dry-smart voice?
+
+YOUR VERDICT (as Sarah):
+- Would you engage with this?
+- Would you remember this tomorrow?
+- Does this make you want that $8.99 "didn't cry today" reward?
+
+Respond with ONLY this JSON:
+{{
+    "score": [1-10 overall],
+    "approved": [true if score >= 7 AND secret_club_worthy AND honest],
+    "scroll_stop_authenticity": [1-10],
+    "secret_club_worthy": [true/false],
+    "survivor_reality": [1-10],
+    "honest_vs_performative": ["honest" or "performative"],
+    "brand_voice_fit": [1-10],
+    "sarah_reaction": "[Your visceral first reaction in Sarah's voice]",
+    "would_screenshot": [true/false],
+    "feedback": "[Specific improvement suggestions if not approved]"
+}}"""
         
         try:
             result = await self.generate(prompt)
             content = result.get("content", {})
             
-            # Calculate average score from criteria
-            criteria = content.get("criteria_breakdown", {})
-            if criteria:
-                scores = [v for v in criteria.values() if isinstance(v, (int, float))]
-                avg_score = sum(scores) / len(scores) if scores else 5.0
-            else:
-                avg_score = content.get("score", 5.0)
+            if isinstance(content, str):
+                content = json.loads(content)
             
-            validation = ValidationScore(
-                agent_name="SarahChenValidator",
-                score=round(avg_score, 1),
-                approved=avg_score >= 7.0,
-                feedback=content.get("feedback", "No feedback provided"),
-                criteria_breakdown=criteria
+            score = float(content.get("score", 0))
+            secret_club = content.get("secret_club_worthy", False)
+            honest = content.get("honest_vs_performative", "performative") == "honest"
+            
+            # Sarah's approval requires passing her specific tests
+            approved = score >= self.threshold and secret_club and honest
+            
+            criteria_breakdown = {
+                "scroll_stop_authenticity": content.get("scroll_stop_authenticity", 0),
+                "secret_club_worthy": secret_club,
+                "survivor_reality": content.get("survivor_reality", 0),
+                "honest_vs_performative": content.get("honest_vs_performative", "unknown"),
+                "brand_voice_fit": content.get("brand_voice_fit", 0),
+                "sarah_reaction": content.get("sarah_reaction", ""),
+                "would_screenshot": content.get("would_screenshot", False)
+            }
+            
+            feedback = content.get("feedback", "")
+            if not approved and not feedback:
+                if not secret_club:
+                    feedback = "Not 'Work is Hell' WhatsApp worthy. Needs more authentic exhaustion recognition."
+                elif not honest:
+                    feedback = "Feels performative. Sarah can smell LinkedIn theater from a mile away."
+                else:
+                    feedback = "Didn't make Sarah pause at 2 AM. Needs more scroll-stop authenticity."
+            
+            self.logger.info(f"Sarah Chen validated post {post.post_number}: {score}/10 {'✅' if approved else '❌'}")
+            
+            return ValidationScore(
+                agent_name="SarahChen",
+                score=score,
+                approved=approved,
+                feedback=feedback,
+                criteria_breakdown=criteria_breakdown
             )
-            
-            # Update post status
-            post.add_validation(validation)
-            
-            self.logger.info(f"Sarah Chen validated post {post.post_number}: {validation.score}/10 - {'APPROVED' if validation.approved else 'REJECTED'}")
-            
-            return validation
             
         except Exception as e:
             self.logger.error(f"Sarah Chen validation failed: {e}")
-            # Return a neutral score on error
             return ValidationScore(
-                agent_name="SarahChenValidator",
-                score=5.0,
+                agent_name="SarahChen",
+                score=0.0,
                 approved=False,
                 feedback=f"Validation error: {str(e)}",
-                criteria_breakdown={}
+                criteria_breakdown={"error": True}
             )
