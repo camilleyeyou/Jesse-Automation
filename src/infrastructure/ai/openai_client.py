@@ -1,5 +1,6 @@
 """
-AI Client with OpenAI for text and Google Gemini for images
+AI Client with OpenAI for text and Google Imagen 3 for images
+Fixed to use production Imagen 3 model ($0.03/image) instead of preview model with quota limits
 """
 
 import asyncio
@@ -12,9 +13,10 @@ from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
-# Try to import Gemini
+# Try to import Gemini/Imagen
 try:
     from google import genai
+    from google.genai import types
     from PIL import Image
     from io import BytesIO
     GEMINI_AVAILABLE = True
@@ -24,7 +26,7 @@ except ImportError:
 
 
 class OpenAIClient:
-    """Async AI client with OpenAI (text) and Google Gemini (images)"""
+    """Async AI client with OpenAI (text) and Google Imagen 3 (images)"""
     
     def __init__(self, config):
         self.config = config
@@ -32,10 +34,10 @@ class OpenAIClient:
         # OpenAI client (for text generation)
         self.openai_client = AsyncOpenAI(api_key=config.openai.api_key)
         
-        # Google Gemini client (for image generation)
+        # Google client (for image generation with Imagen 3)
         self.gemini_client = None
         self.use_images = False
-        self.gemini_image_model = "gemini-2.0-flash-exp"  # Default model
+        self.image_model = "imagen-3.0-generate-002"  # Production paid model at $0.03/image
         
         if GEMINI_AVAILABLE:
             # Try config first, then environment variable
@@ -44,11 +46,16 @@ class OpenAIClient:
             if google_api_key:
                 try:
                     self.gemini_client = genai.Client(api_key=google_api_key)
-                    self.gemini_image_model = getattr(config.google, 'image_model', "gemini-2.0-flash-exp")
+                    
+                    # Check config for image model preference
+                    config_model = getattr(config.google, 'image_model', None)
+                    if config_model:
+                        self.image_model = config_model
+                    
                     self.use_images = getattr(config.google, 'use_images', True)
-                    logger.info(f"✅ Gemini client initialized - model: {self.gemini_image_model}")
+                    logger.info(f"✅ Google AI client initialized - image model: {self.image_model}")
                 except Exception as e:
-                    logger.error(f"❌ Failed to initialize Gemini client: {e}")
+                    logger.error(f"❌ Failed to initialize Google AI client: {e}")
             else:
                 logger.warning("⚠️ GOOGLE_API_KEY not found - image generation disabled")
         else:
@@ -168,71 +175,150 @@ class OpenAIClient:
     async def generate_image(self,
                            prompt: str,
                            base_image_path: Optional[str] = None) -> Dict[str, Any]:
-        """Generate image using Google Gemini 2.0 Flash"""
+        """
+        Generate image using Google Imagen 3 (Production model)
+        
+        Cost: $0.03 per image
+        Model: imagen-3.0-generate-002
+        
+        This is the production paid model - no free tier quota limits!
+        """
         
         if not self.use_images:
             logger.warning("Image generation disabled in config")
             return {"error": "Image generation disabled", "image_data": None}
         
         if not self.gemini_client:
-            logger.error("Gemini client not initialized - check GOOGLE_API_KEY")
-            return {"error": "Gemini client not available - GOOGLE_API_KEY missing", "image_data": None}
+            logger.error("Google AI client not initialized - check GOOGLE_API_KEY")
+            return {"error": "Google AI client not available - GOOGLE_API_KEY missing", "image_data": None}
         
         try:
             import time
             start_time = time.time()
             
-            logger.info(f"🎨 Generating image with Gemini {self.gemini_image_model}")
+            # Determine which API to use based on model
+            is_imagen = "imagen" in self.image_model.lower()
             
-            contents = [prompt]
-            
-            if base_image_path and os.path.exists(base_image_path):
-                try:
-                    base_image = Image.open(base_image_path)
-                    contents.append(base_image)
-                    logger.info(f"Added base image: {base_image_path}")
-                except Exception as e:
-                    logger.warning(f"Failed to load base image: {e}")
-            
-            response = self.gemini_client.models.generate_content(
-                model=self.gemini_image_model,
-                contents=contents,
-            )
-            
-            image_data = None
-            for part in response.candidates[0].content.parts:
-                if part.inline_data is not None:
-                    image_data = part.inline_data.data
-                    break
-            
-            if not image_data:
-                logger.error("No image data in Gemini response")
-                return {"error": "No image generated", "image_data": None}
-            
-            generation_time = time.time() - start_time
-            size_mb = len(image_data) / (1024 * 1024)
-            
-            result = {
-                "image_data": image_data,
-                "generation_time_seconds": round(generation_time, 2),
-                "size_mb": round(size_mb, 3),
-                "provider": "google_gemini",
-                "model": self.gemini_image_model,
-                "cost": 0.039
-            }
-            
-            logger.info(f"✅ Image generated in {result['generation_time_seconds']}s ({result['size_mb']}MB)")
-            
-            return result
+            if is_imagen:
+                # Use Imagen 3 API (generate_images)
+                return await self._generate_with_imagen(prompt, start_time)
+            else:
+                # Use Gemini Flash API (generate_content) - fallback for experimental models
+                return await self._generate_with_gemini(prompt, base_image_path, start_time)
             
         except Exception as e:
-            logger.error(f"❌ Gemini image generation failed: {str(e)}")
+            logger.error(f"❌ Image generation failed: {str(e)}")
             return {
                 "error": str(e),
                 "image_data": None,
-                "provider": "google_gemini",
-                "model": self.gemini_image_model
+                "provider": "google",
+                "model": self.image_model
             }
+    
+    async def _generate_with_imagen(self, prompt: str, start_time: float) -> Dict[str, Any]:
+        """Generate image using Imagen 3 API - Production paid model at $0.03/image"""
+        
+        logger.info(f"🎨 Generating image with Imagen 3 ({self.image_model})")
+        
+        try:
+            # Imagen 3 uses generate_images() method
+            response = self.gemini_client.models.generate_images(
+                model=self.image_model,
+                prompt=prompt,
+                config=types.GenerateImagesConfig(
+                    number_of_images=1,
+                    aspect_ratio="1:1",  # Options: "1:1", "3:4", "4:3", "9:16", "16:9"
+                )
+            )
+            
+            # Extract image bytes from Imagen response
+            if response.generated_images and len(response.generated_images) > 0:
+                image_data = response.generated_images[0].image.image_bytes
+                
+                generation_time = time.time() - start_time
+                size_mb = len(image_data) / (1024 * 1024)
+                
+                result = {
+                    "image_data": image_data,
+                    "generation_time_seconds": round(generation_time, 2),
+                    "size_mb": round(size_mb, 3),
+                    "provider": "google_imagen",
+                    "model": self.image_model,
+                    "cost": 0.03  # Imagen 3 costs $0.03 per image
+                }
+                
+                logger.info(f"✅ Imagen 3 image generated in {result['generation_time_seconds']}s ({result['size_mb']}MB) - Cost: $0.03")
+                
+                return result
+            else:
+                logger.error("No image data in Imagen 3 response")
+                return {"error": "No image generated by Imagen 3", "image_data": None}
+                
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"❌ Imagen 3 generation failed: {error_msg}")
+            
+            # Provide helpful error messages
+            if "RESOURCE_EXHAUSTED" in error_msg or "429" in error_msg:
+                logger.error("💡 Quota exceeded - check billing is enabled at https://console.cloud.google.com/billing")
+            elif "PERMISSION_DENIED" in error_msg or "403" in error_msg:
+                logger.error("💡 Permission denied - ensure Generative Language API is enabled")
+            elif "INVALID_ARGUMENT" in error_msg:
+                logger.error("💡 Invalid argument - check prompt doesn't violate content policies")
+            
+            return {
+                "error": error_msg,
+                "image_data": None,
+                "provider": "google_imagen",
+                "model": self.image_model
+            }
+    
+    async def _generate_with_gemini(self, prompt: str, base_image_path: Optional[str], start_time: float) -> Dict[str, Any]:
+        """Generate image using Gemini Flash experimental model (fallback)"""
+        
+        logger.info(f"🎨 Generating image with Gemini ({self.image_model})")
+        
+        contents = [prompt]
+        
+        # Add base image if provided (for image editing)
+        if base_image_path and os.path.exists(base_image_path):
+            try:
+                base_image = Image.open(base_image_path)
+                contents.append(base_image)
+                logger.info(f"Added base image: {base_image_path}")
+            except Exception as e:
+                logger.warning(f"Failed to load base image: {e}")
+        
+        response = self.gemini_client.models.generate_content(
+            model=self.image_model,
+            contents=contents,
+        )
+        
+        image_data = None
+        for part in response.candidates[0].content.parts:
+            if part.inline_data is not None:
+                image_data = part.inline_data.data
+                break
+        
+        if not image_data:
+            logger.error("No image data in Gemini response")
+            return {"error": "No image generated by Gemini", "image_data": None}
+        
+        generation_time = time.time() - start_time
+        size_mb = len(image_data) / (1024 * 1024)
+        
+        result = {
+            "image_data": image_data,
+            "generation_time_seconds": round(generation_time, 2),
+            "size_mb": round(size_mb, 3),
+            "provider": "google_gemini",
+            "model": self.image_model,
+            "cost": 0.039  # Gemini experimental - may be free or low cost
+        }
+        
+        logger.info(f"✅ Gemini image generated in {result['generation_time_seconds']}s ({result['size_mb']}MB)")
+        
+        return result
     
     def _extract_json_from_text(self, text: str) -> Optional[Dict]:
         """Try to extract JSON from text that may contain other content"""
@@ -252,3 +338,7 @@ class OpenAIClient:
     async def close(self):
         """Close the client"""
         await self.openai_client.close()
+
+
+# Need to import time at module level for the helper methods
+import time
