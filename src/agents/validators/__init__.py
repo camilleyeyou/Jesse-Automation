@@ -1,5 +1,6 @@
 """
-Validator Agents Package
+Jesse A. Eisenbalm Validators
+Three distinct personas who validate content from unique perspectives
 """
 
 from .sarah_chen import SarahChenValidator

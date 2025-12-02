@@ -89,12 +89,18 @@ class ContentOrchestrator:
         if self.config.google.use_images:
             image_result = await self.image_generator.execute(post)
             if image_result.get("success"):
-                logger.info(f"Post {post_number}: Image generated")
+                post.set_image(
+                    url=image_result.get("saved_path", ""),
+                    prompt=image_result.get("prompt", ""),
+                    provider="google_gemini",
+                    cost=image_result.get("cost", 0.039)
+                )
+                logger.info(f"Post {post_number}: Image generated at {post.image_url}")
             else:
                 logger.warning(f"Post {post_number}: Image generation failed - {image_result.get('error')}")
         
         # Step 3: Initial validation
-        await self._validate_post(post)
+        validation_scores = await self._validate_post(post)
         
         # Step 4: Revision loop if needed
         revision_attempt = 0
@@ -102,10 +108,10 @@ class ContentOrchestrator:
             revision_attempt += 1
             logger.info(f"Post {post_number}: Revision attempt {revision_attempt}")
             
-            # Aggregate feedback
-            feedback = await self.feedback_aggregator.execute(post)
+            # Aggregate feedback - pass both post AND validation_scores
+            feedback = await self.feedback_aggregator.execute(post, validation_scores)
             
-            if not feedback.get("success"):
+            if feedback.get("error"):
                 logger.warning(f"Feedback aggregation failed: {feedback.get('error')}")
                 break
             
@@ -113,7 +119,7 @@ class ContentOrchestrator:
             post = await self.revision_generator.execute(post, feedback)
             
             # Re-validate
-            await self._validate_post(post)
+            validation_scores = await self._validate_post(post)
         
         # Set final status
         if post.is_approved(self.min_approvals):
@@ -138,9 +144,17 @@ class ContentOrchestrator:
             validator.execute(post) for validator in self.validators
         ]
         
-        await asyncio.gather(*validation_tasks)
+        # FIXED: Capture and store the validation results!
+        validation_results = await asyncio.gather(*validation_tasks)
+        
+        # Store validation scores in the post
+        for score in validation_results:
+            post.validation_scores.append(score)
         
         logger.info(f"Post {post.post_number}: Validated - {post.approval_count}/{len(self.validators)} approvals, avg score: {post.average_score:.1f}")
+        
+        # Return validation scores for use in feedback aggregation
+        return validation_results
     
     async def generate_single_post(self) -> LinkedInPost:
         """Generate a single approved post (convenience method)"""
