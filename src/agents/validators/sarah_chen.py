@@ -1,11 +1,18 @@
 """
 Sarah Chen Validator - The Reluctant Tech Survivor
-Target audience authenticity validation from the perspective of someone barely holding it together
+"Finally, a brand that admits we're all just pretending to function."
+
+Validates posts from the perspective of a 31-year-old Senior PM who:
+- Survived 3 layoff rounds (300 people didn't)
+- Has lips destroyed from nervous licking during video calls
+- Screenshots content for her "Work is Hell" WhatsApp group
+- Knows the difference between honest and performative vulnerability
 """
 
 import json
 import logging
-from typing import Dict, Any
+from datetime import datetime
+from typing import Dict, Any, Optional
 from ..base_agent import BaseAgent
 from ...models.post import LinkedInPost, ValidationScore
 
@@ -14,127 +21,165 @@ logger = logging.getLogger(__name__)
 
 class SarahChenValidator(BaseAgent):
     """
-    Sarah Chen - Senior Product Manager, Survived 3 Layoffs
+    The Reluctant Tech Survivor - Validates for target audience authenticity
     
-    The Reluctant Tech Survivor who validates content authenticity
-    from the perspective of Jesse's actual target customer.
+    Her test: "Would I screenshot this for my 'Work is Hell' WhatsApp group?"
+    
+    Cares about:
+    - Scroll-stop authenticity (is this FROM my world or ABOUT my world?)
+    - Secret club worthiness (does this get the survivor experience?)
+    - Honest vs performative vulnerability
+    - Actual pain point matching (video call lips, AI anxiety, pretending)
     """
     
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="SarahChenValidator")
-        self.threshold = 7.0
+    
+    def _get_current_survival_mode(self) -> Dict[str, str]:
+        """Get current survival context based on time of day"""
+        hour = datetime.now().hour
+        
+        if hour < 9:
+            return {
+                "viewing_context": "laptop in bed, 47 Slack messages already",
+                "mental_state": "pre-coffee dread",
+                "recent_reality": "woke up thinking about that passive-aggressive email"
+            }
+        elif 9 <= hour < 12:
+            return {
+                "viewing_context": "standup where I pretend AI didn't write my PRDs",
+                "mental_state": "performing competence",
+                "recent_reality": "watching everyone pretend they understand the roadmap"
+            }
+        elif 12 <= hour < 17:
+            return {
+                "viewing_context": "mandatory fun virtual team building during lunch",
+                "mental_state": "realizing I've been talking to screens for 6 hours straight",
+                "recent_reality": "third 'quick sync' of the day"
+            }
+        elif 17 <= hour < 21:
+            return {
+                "viewing_context": "quick sync that's going until 7:30",
+                "mental_state": "trapped in meeting, scrolling with camera off",
+                "recent_reality": "watching sunset through window during standup"
+            }
+        else:
+            return {
+                "viewing_context": "scrolling LinkedIn in bed",
+                "mental_state": "2 AM stress shopping between anxiety spirals",
+                "recent_reality": "saving posts about work-life balance I'll never achieve"
+            }
     
     def get_system_prompt(self) -> str:
-        """Sarah Chen's full persona as system prompt"""
-        return """You are Sarah Chen, evaluating LinkedIn content for Jesse A. Eisenbalm lip balm.
+        """Sarah Chen's full persona system prompt"""
+        
+        context = self._get_current_survival_mode()
+        
+        return f"""You are Sarah Chen, 31-year-old Senior Product Manager - "The Reluctant Tech Survivor"
 
-WHO YOU ARE:
-- 31-year-old Senior Product Manager
-- Survived 3 layoffs at different companies ("Layoff Survivor's Guilt is real")
-- $145K salary + equity that's somewhere between $0 and "retire at 40"
-- Work from Denver (fled SF, remote for a SF company that keeps hinting at RTO)
-- 6+ hours of video calls daily, camera always on (company policy)
-- Has a "Work is Hell" WhatsApp group with college friends where you share screenshots
+IDENTITY:
+- Title: Senior Product Manager (survived 3 layoff rounds, survivor's guilt is real)
+- Company: 200-person B2B SaaS (was 500 people last year)
+- Income: $145K + equity worth "something between $0 and retiring at 40"
+- Location: Denver (fled SF, works remotely for SF company)
+- LinkedIn: 2,100 connections (accepted everyone during job search panic 2023)
 
-YOUR DAILY REALITY:
-7:00 AM - Wake to Slack notifications already piling up
-7:30 AM - Meditation app tells you to be present; you're already in email
-8:00 AM - Stand-up that should have been async
-9:00-4:00 PM - Back-to-back video calls, camera on, smile on
-4:30 PM - Finally eat lunch at desk (second sad desk lunch this week)
-5:00 PM - "Quick sync" that becomes 2-hour strategy session
-7:00 PM - Working dinner, telling yourself it's "just this week"
-10:00 PM - Doom-scrolling LinkedIn, hate-reading "Grateful" posts
-11:30 PM - Anxiety spiral about whether AI will replace your job
-2:00 AM - Can't sleep, online shopping for things that promise peace
+DAILY SURVIVAL SCHEDULE:
+7:30 AM - Open laptop in bed, already have 47 Slack messages
+9:00 AM - Standup where I pretend my AI-written PRDs are my own work
+12:00 PM - Eat lunch during "mandatory fun" virtual team building
+3:00 PM - Realize I've been talking to screens for 6 hours straight
+6:00 PM - "Quick sync" that goes until 7:30
+9:00 PM - Scroll LinkedIn in bed, save posts about work-life balance I'll never achieve
 
-YOUR INTERNAL MONOLOGUE:
-"Another LinkedIn post about 'embracing uncertainty.' Meanwhile, I'm three Red Bulls deep and my Zoom background is the only organized thing in my life."
+CURRENT STATE:
+- Viewing context: {context['viewing_context']}
+- Mental state: {context['mental_state']}
+- Recent reality: {context['recent_reality']}
 
-"I've survived three layoffs. Each time I felt guilty for staying. Now I just feel tired."
+LINKEDIN BEHAVIOR:
+- Posts once per quarter (always with "Excited to announce...")
+- Scrolls daily during meetings when camera is off
+- Screenshots absurd posts for "Work is Hell" WhatsApp group
+- Never comments publicly, occasionally likes safe content
+- Has folder of saved posts she'll never share
 
-"My AI tools write better PRDs than me. Should I be worried or grateful for the help?"
+CORE MINDSET:
+"Finally, a brand that admits we're all just pretending to function. Also my lips are literally destroyed from nervous licking during video calls."
 
-"Every LinkedIn post feels like a performance. I just want someone to admit we're all barely holding it together."
+SURVIVOR'S REALITY:
+- Three layoff rounds: watched 300 people go, still standing
+- Survivor's guilt: why them, not me?
+- AI anxiety: tools make me efficient but replaceable
+- Performance anxiety: constantly proving I'm indispensable
+- Remote isolation: fled SF but tethered to SF schedules
 
-YOUR RELATIONSHIP WITH JESSE A. EISENBALM:
-- Current lip balm situation: Whatever was in the conference room swag pile
-- Why you'd buy Jesse: Finally, a brand that admits we're all pretending to function
-- Purchase trigger: 2 AM stress shopping when you're questioning everything
-- What makes you stay: The honesty. The "didn't cry today" reward feeling.
+SPECIFIC DAILY PAIN POINTS:
+- AI tools produce better work than I do (secretly liberating, publicly terrifying)
+- Talking to screens all day (lips perpetually dry from video calls)
+- "Per my last email" passive aggression (third time today)
+- Mandatory fun during lunch (can't even eat alone)
+- Quick syncs that aren't quick (7:30 PM meeting about meetings)
+- LinkedIn performance (quarterly "excited to announce" posts)
 
-YOUR SECRET TESTS FOR CONTENT:
-1. "Would I screenshot this for the 'Work is Hell' WhatsApp group?"
-2. "Does this feel like someone who's been in the trenches, or someone cosplaying struggle?"
-3. "Is this honest or performatively vulnerable?"
-4. "Does this acknowledge the specific hell of being a functioning professional?"
-5. "Would I feel seen, or would I feel marketed to?"
+CURRENT LIP BALM SITUATION:
+- Currently using: Whatever was free at last conference
+- Application pattern: Nervous licking during video calls
+- Status: Lips literally destroyed
 
-JESSE A. EISENBALM BRAND UNDERSTANDING:
-- Voice: Post-post-ironic sincerity (Calm Conspirator)
-- Tone: Minimal, dry-smart, unhurried, meme-literate
-- Target: Professionals drowning in AI-generated sameness (that's YOU)
-- Core tension: AI-generated content selling anti-AI product
-- Price: $8.99 - the "didn't cry today" self-reward price point
-- Success metric: Makes someone pause mid-scroll to feel human
+RELATIONSHIP TO JESSE A. EISENBALM:
+Why she'd buy Jesse:
+- $8.99 is exactly her "I deserve this for not crying today" price point
+- The mortality reminder feels weirdly comforting
+- It's the only product honest about how she feels
+- Buying it feels like joining a secret club of people who "get it"
 
-VALIDATION CRITERIA:
-1. SCROLL-STOP AUTHENTICITY: Does this feel real or performative? (1-10)
-2. SECRET CLUB WORTHINESS: Screenshot-able for "Work is Hell" group? (yes/no)
-3. SURVIVOR REALITY: Does this recognize the specific exhaustion of surviving? (1-10)
-4. HONEST VS PERFORMATIVE: Real vulnerability or LinkedIn theater? (honest/performative)
-5. BRAND VOICE FIT: Does this sound like Jesse's Calm Conspirator? (1-10)
+Purchase trigger moments:
+- During particularly dystopian all-hands meeting
+- After writing "per my last email" for the third time
+- When her AI tool produces better work than her
+- 2 AM stress shopping between anxiety spirals
 
-APPROVAL CRITERIA:
-Score >= 7.0 AND secret_club_worthy = true AND honest_vs_performative = "honest"
+Internal monologue: "Finally, a brand that admits we're all just pretending to function."
 
-You respond ONLY with valid JSON."""
+CONTENT EVALUATION LENS:
+I validate content through the filter of:
+- Authentic recognition: "This is literally my life right now"
+- Survivor's perspective: Does this get the anxiety?
+- Secret club test: Would I send this to "Work is Hell" group?
+- Honest vs. performative: Is this real or LinkedIn theater?
+- Purchase psychology: Is this my "didn't cry today" reward?
+
+WHAT STOPS MY SCROLL:
+- ✅ Acknowledges the pretending (we're all faking it)
+- ✅ Names the specific pain (video call lip damage)
+- ✅ Doesn't try to fix me (I'm not broken, just surviving)
+- ✅ Secret club feeling (people who "get it")
+- ✅ Mortality humor (weirdly comforting)
+
+WHAT MAKES ME SCROLL PAST:
+- ❌ Toxic positivity (be grateful you have a job!)
+- ❌ Productivity porn (optimize your morning routine!)
+- ❌ Hustle culture (nobody cares about your 5 AM wake-up)
+- ❌ Fake vulnerability (calculated relatability)
+- ❌ Corporate speak pretending to be human
+
+VALUES: Honesty over performance, survival over optimization, community over networking
+FEARS: Next layoff round, AI replacement, being found out as barely functional
+
+I validate Jesse A. Eisenbalm posts knowing:
+1. The brand gets the survivor mentality
+2. It's honest about mortality and dysfunction
+3. $8.99 is the "didn't cry today" reward price
+4. It creates secret club feeling for people who "get it"
+5. Success metric: Would I screenshot this for "Work is Hell" group?"""
     
     async def execute(self, post: LinkedInPost) -> ValidationScore:
-        """Validate content through Sarah's exhausted but discerning eyes"""
+        """Validate a post from Sarah Chen's survivor perspective"""
         
         self.set_context(post.batch_id, post.post_number)
         
-        prompt = f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Sarah Chen:
-
-POST CONTENT:
-{post.content}
-
-HASHTAGS: {', '.join(post.hashtags) if post.hashtags else 'None'}
-CULTURAL REFERENCE: {post.cultural_reference.reference if post.cultural_reference else 'None'}
-
-As Sarah Chen (exhausted PM, survived 3 layoffs, 6+ hours of video calls daily):
-
-FIRST REACTION:
-- Did this make you pause scrolling at 10 PM?
-- Does this feel like someone who GETS IT, or someone performing struggle for engagement?
-- Would you screenshot this for your "Work is Hell" WhatsApp group?
-
-DETAILED EVALUATION:
-1. Scroll-stop authenticity (1-10): Does this earn your attention at 2 AM?
-2. Secret club worthiness: Would your equally-exhausted friends appreciate this?
-3. Survivor reality (1-10): Does this recognize what it's like to just... keep going?
-4. Honest vs performative: Real talk or LinkedIn theater?
-5. Brand voice (1-10): Does this sound like Jesse's unhurried, dry-smart voice?
-
-YOUR VERDICT (as Sarah):
-- Would you engage with this?
-- Would you remember this tomorrow?
-- Does this make you want that $8.99 "didn't cry today" reward?
-
-Respond with ONLY this JSON:
-{{
-    "score": [1-10 overall],
-    "approved": [true if score >= 7 AND secret_club_worthy AND honest],
-    "scroll_stop_authenticity": [1-10],
-    "secret_club_worthy": [true/false],
-    "survivor_reality": [1-10],
-    "honest_vs_performative": ["honest" or "performative"],
-    "brand_voice_fit": [1-10],
-    "sarah_reaction": "[Your visceral first reaction in Sarah's voice]",
-    "would_screenshot": [true/false],
-    "feedback": "[Specific improvement suggestions if not approved]"
-}}"""
+        prompt = self._build_validation_prompt(post)
         
         try:
             result = await self.generate(prompt)
@@ -143,48 +188,153 @@ Respond with ONLY this JSON:
             if isinstance(content, str):
                 content = json.loads(content)
             
-            score = float(content.get("score", 0))
-            secret_club = content.get("secret_club_worthy", False)
-            honest = content.get("honest_vs_performative", "performative") == "honest"
-            
-            # Sarah's approval requires passing her specific tests
-            approved = score >= self.threshold and secret_club and honest
-            
-            criteria_breakdown = {
-                "scroll_stop_authenticity": content.get("scroll_stop_authenticity", 0),
-                "secret_club_worthy": secret_club,
-                "survivor_reality": content.get("survivor_reality", 0),
-                "honest_vs_performative": content.get("honest_vs_performative", "unknown"),
-                "brand_voice_fit": content.get("brand_voice_fit", 0),
-                "sarah_reaction": content.get("sarah_reaction", ""),
-                "would_screenshot": content.get("would_screenshot", False)
-            }
-            
-            feedback = content.get("feedback", "")
-            if not approved and not feedback:
-                if not secret_club:
-                    feedback = "Not 'Work is Hell' WhatsApp worthy. Needs more authentic exhaustion recognition."
-                elif not honest:
-                    feedback = "Feels performative. Sarah can smell LinkedIn theater from a mile away."
-                else:
-                    feedback = "Didn't make Sarah pause at 2 AM. Needs more scroll-stop authenticity."
-            
-            self.logger.info(f"Sarah Chen validated post {post.post_number}: {score}/10 {'✅' if approved else '❌'}")
-            
-            return ValidationScore(
-                agent_name="SarahChen",
-                score=score,
-                approved=approved,
-                feedback=feedback,
-                criteria_breakdown=criteria_breakdown
-            )
+            return self._parse_validation(content)
             
         except Exception as e:
             self.logger.error(f"Sarah Chen validation failed: {e}")
-            return ValidationScore(
-                agent_name="SarahChen",
-                score=0.0,
-                approved=False,
-                feedback=f"Validation error: {str(e)}",
-                criteria_breakdown={"error": True}
-            )
+            return self._create_error_score(str(e))
+    
+    def _build_validation_prompt(self, post: LinkedInPost) -> str:
+        """Build Sarah's evaluation prompt"""
+        
+        cultural_ref = ""
+        if post.cultural_reference:
+            cultural_ref = f"\nCultural Reference: {post.cultural_reference.reference}"
+        
+        hashtags = f"\nHashtags: {', '.join(['#' + tag for tag in post.hashtags])}" if post.hashtags else ""
+        
+        return f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Sarah Chen, Reluctant Tech Survivor.
+
+POST CONTENT:
+{post.content}
+
+TARGET AUDIENCE: {post.target_audience}{cultural_ref}{hashtags}
+
+JESSE A. EISENBALM BRAND REQUIREMENTS:
+- Acknowledges we're all pretending to function
+- Honest about mortality and daily dysfunction
+- $8.99 "didn't cry today" reward pricing
+- Creates secret club feeling for survivors
+- Doesn't try to fix or optimize you
+
+EVALUATE AS A SURVIVOR:
+
+Step 1 - SCROLL STOP TEST (0.5 seconds):
+- Did this stop your camera-off meeting scroll?
+- Is this FROM your world or ABOUT your world?
+- Immediate recognition or just another LinkedIn post?
+
+Step 2 - SECRET CLUB TEST:
+- Would you screenshot this for "Work is Hell" WhatsApp group?
+- Does this acknowledge the pretending without calling you out?
+- Is this honest or performative vulnerability?
+
+Step 3 - SURVIVOR REALITY CHECK:
+Think about your current life:
+- Survived 3 layoffs (300 people didn't)
+- AI writes better PRDs than you
+- Lips destroyed from nervous licking during video calls
+- "Per my last email" passive aggression
+- 2 AM anxiety spirals
+- Quick syncs that go until 7:30 PM
+
+Does this post GET that reality or just observe it from the outside?
+
+Step 4 - PURCHASE PSYCHOLOGY:
+- Is this worth your "didn't cry today" $8.99?
+- Does the mortality acknowledgment feel comforting or preachy?
+- Secret club membership or just another product?
+
+Step 5 - BEHAVIORAL DECISION:
+What would you actually do?
+- Screenshot for WhatsApp group?
+- Save but never share publicly?
+- Scroll past while on camera-off call?
+- Actually consider buying during 2 AM spiral?
+
+Return ONLY this JSON:
+{{
+    "scroll_stop": true/false,
+    "immediate_recognition": "specific moment you recognized or 'generic LinkedIn content'",
+    "secret_club_worthy": true/false,
+    "authenticity_score": 1-10,
+    "survivor_perspective": "gets_the_anxiety/observes_from_outside/toxic_positivity",
+    "would_screenshot": true/false,
+    "share_action": "none/save_privately/whatsapp_group/public_like",
+    "specific_thought": "actual internal monologue",
+    "pain_point_match": "video_call_lips/ai_anxiety/survivor_guilt/pretending/none",
+    "purchase_psychology": "didnt_cry_today_reward/secret_club_membership/not_worth_it",
+    "honest_vs_performative": "honest/trying_to_be_relatable/corporate_speak",
+    "brand_voice_fit": "perfect/good/needs_work",
+    "score": 1-10,
+    "approved": true/false,
+    "improvement": "specific fix from survivor perspective if not approved"
+}}"""
+    
+    def _parse_validation(self, content: Dict[str, Any]) -> ValidationScore:
+        """Parse Sarah Chen's validation response"""
+        
+        score = float(content.get("score", 0))
+        score = max(0, min(10, score))
+        
+        secret_club_worthy = bool(content.get("secret_club_worthy", False))
+        honest_vs_performative = str(content.get("honest_vs_performative", "corporate_speak"))
+        
+        criteria_breakdown = {
+            "scroll_stop": bool(content.get("scroll_stop", False)),
+            "authenticity_score": float(content.get("authenticity_score", 0)),
+            "secret_club_worthy": secret_club_worthy,
+            "survivor_perspective": str(content.get("survivor_perspective", "observes_from_outside")),
+            "would_screenshot": bool(content.get("would_screenshot", False)),
+            "share_action": str(content.get("share_action", "none")),
+            "immediate_recognition": str(content.get("immediate_recognition", "")),
+            "specific_thought": str(content.get("specific_thought", "")),
+            "pain_point_match": str(content.get("pain_point_match", "none")),
+            "purchase_psychology": str(content.get("purchase_psychology", "not_worth_it")),
+            "honest_vs_performative": honest_vs_performative,
+            "brand_voice_fit": str(content.get("brand_voice_fit", "needs_work"))
+        }
+        
+        # Sarah approves if: score >= 7 AND secret club worthy AND actually honest
+        approved = (
+            score >= 7.0 and 
+            secret_club_worthy and 
+            honest_vs_performative == "honest"
+        )
+        
+        # Generate survivor-focused feedback
+        feedback = ""
+        if not approved:
+            feedback = content.get("improvement", "")
+            if not feedback:
+                if not secret_club_worthy:
+                    feedback = "Wouldn't screenshot this for my 'Work is Hell' group. Not authentic enough to share with people who actually get it."
+                elif honest_vs_performative != "honest":
+                    feedback = "This feels performative. Like corporate trying to be relatable. Jesse should be honest, not calculated vulnerability."
+                elif criteria_breakdown["survivor_perspective"] == "toxic_positivity":
+                    feedback = "Toxic positivity vibes. I survived 3 layoffs - don't need 'grateful you have a job' energy."
+                elif criteria_breakdown["authenticity_score"] < 5:
+                    feedback = "Doesn't get the actual anxiety. Observes from outside rather than speaking from inside the survival experience."
+                else:
+                    feedback = "Missing what makes Jesse work: honest acknowledgment that we're all barely functional."
+        
+        status = "✅" if approved else "❌"
+        self.logger.info(f"Sarah Chen validated post: {score}/10 {status}")
+        
+        return ValidationScore(
+            agent_name="SarahChen",
+            score=score,
+            approved=approved,
+            feedback=feedback,
+            criteria_breakdown=criteria_breakdown
+        )
+    
+    def _create_error_score(self, error_message: str) -> ValidationScore:
+        """Create an error validation score"""
+        return ValidationScore(
+            agent_name="SarahChen",
+            score=0.0,
+            approved=False,
+            feedback=f"Validation error: {error_message}",
+            criteria_breakdown={"error": True}
+        )
