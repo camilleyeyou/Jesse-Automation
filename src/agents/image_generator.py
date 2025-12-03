@@ -610,8 +610,8 @@ CRITICAL: Product tube MUST match the exact specification - cream/ivory tube, wh
             
             self.logger.info(f"Jesse A. Eisenbalm image saved: {filepath}")
             
-            # Return relative path for API serving
-            return f"/images/{filename}"
+            # Return actual filesystem path (will be converted to URL when serving)
+            return str(filepath)
             
         except Exception as e:
             self.logger.error(f"Failed to save image: {e}")
