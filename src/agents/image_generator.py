@@ -320,21 +320,44 @@ CRITICAL: The product tube MUST exactly match the specification provided above. 
 
 Create prompts that are 150-200 words with precise visual detail, emotional subtext, and that perfect tension between "premium product" and "we're all slowly dying." """
     
-    async def execute(self, post: LinkedInPost) -> Dict[str, Any]:
-        """Generate image for a LinkedIn post as the Visual Creative Director"""
+    async def execute(self, post: LinkedInPost, use_video: bool = False) -> Dict[str, Any]:
+        """
+        Generate media (image or video) for a LinkedIn post as the Visual Creative Director
+        
+        Args:
+            post: The LinkedIn post to create media for
+            use_video: If True, generate 8-second video (~$1.00) instead of image ($0.03)
+        """
         
         self.set_context(post.batch_id, post.post_number)
         
         try:
-            # Step 1: Analyze post mood for intelligent image matching
+            # Step 1: Analyze post mood for intelligent media matching
             post_mood = self._analyze_post_mood(post)
             
             # Step 2: Select visual elements (70% mood-matched, 30% surprise)
             use_mood_matching = random.random() < 0.7
             visual_elements = self._select_visual_elements(post_mood, use_mood_matching)
             
-            self.logger.info(f"Creating image for post {post.post_number}: mood={post_mood}, matching={use_mood_matching}")
+            media_type = "video" if use_video else "image"
+            self.logger.info(f"Creating {media_type} for post {post.post_number}: mood={post_mood}, matching={use_mood_matching}")
             
+            if use_video:
+                # VIDEO GENERATION PATH
+                return await self._generate_video(post, post_mood, visual_elements, use_mood_matching)
+            else:
+                # IMAGE GENERATION PATH (existing behavior)
+                return await self._generate_image(post, post_mood, visual_elements, use_mood_matching)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate media: {e}")
+            return {"success": False, "error": str(e), "media_type": "video" if use_video else "image"}
+    
+    async def _generate_image(self, post: LinkedInPost, post_mood: str, 
+                              visual_elements: Dict, use_mood_matching: bool) -> Dict[str, Any]:
+        """Generate image for post (existing behavior, refactored)"""
+        
+        try:
             # Step 3: Build the image prompt
             image_prompt = await self._create_image_prompt(post, visual_elements)
             
@@ -351,7 +374,8 @@ Create prompts that are 150-200 words with precise visual detail, emotional subt
                 return {
                     "success": False,
                     "error": image_result.get("error", "No image data"),
-                    "prompt": enhanced_prompt
+                    "prompt": enhanced_prompt,
+                    "media_type": "image"
                 }
             
             # Step 6: Save the image
@@ -361,7 +385,8 @@ Create prompts that are 150-200 words with precise visual detail, emotional subt
                 return {
                     "success": False,
                     "error": "Failed to save image",
-                    "prompt": enhanced_prompt
+                    "prompt": enhanced_prompt,
+                    "media_type": "image"
                 }
             
             # Calculate file size
@@ -382,12 +407,173 @@ Create prompts that are 150-200 words with precise visual detail, emotional subt
                 "size_mb": round(size_mb, 3),
                 "cost": image_result.get("cost", 0.039),
                 "brand_aesthetic": "what if Apple sold mortality?",
-                "visual_philosophy": "premium minimalism meets existential dread"
+                "visual_philosophy": "premium minimalism meets existential dread",
+                "media_type": "image"
             }
             
         except Exception as e:
             self.logger.error(f"Failed to generate image: {e}")
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": str(e), "media_type": "image"}
+    
+    async def _generate_video(self, post: LinkedInPost, post_mood: str,
+                              visual_elements: Dict, use_mood_matching: bool) -> Dict[str, Any]:
+        """
+        Generate 8-second video for post using Veo 3.1 Fast
+        
+        Cost: ~$0.80-1.20 per video (8 seconds)
+        """
+        
+        try:
+            # Step 3: Build video-specific prompt
+            video_prompt = await self._create_video_prompt(post, visual_elements, post_mood)
+            
+            # Step 4: Generate the video
+            start_time = time.time()
+            video_result = await self.ai_client.generate_video(
+                prompt=video_prompt,
+                duration_seconds=8,
+                aspect_ratio="1:1",  # Square for LinkedIn
+                include_audio=False  # Save costs, LinkedIn autoplay is muted anyway
+            )
+            generation_time = time.time() - start_time
+            
+            if video_result.get("error") or not video_result.get("video_data"):
+                self.logger.error(f"Video generation failed: {video_result.get('error')}")
+                return {
+                    "success": False,
+                    "error": video_result.get("error", "No video data"),
+                    "prompt": video_prompt,
+                    "media_type": "video"
+                }
+            
+            # Step 5: Save the video
+            saved_path = self._save_video(video_result["video_data"], post)
+            
+            if not saved_path:
+                return {
+                    "success": False,
+                    "error": "Failed to save video",
+                    "prompt": video_prompt,
+                    "media_type": "video"
+                }
+            
+            # Calculate file size
+            file_size = os.path.getsize(saved_path)
+            size_mb = file_size / (1024 * 1024)
+            
+            self.logger.info(f"🎬 Generated video for post {post.post_number}: {saved_path}")
+            
+            return {
+                "success": True,
+                "saved_path": saved_path,
+                "prompt": video_prompt,
+                "scene_category": visual_elements.get("scene_key", "custom"),
+                "post_mood": post_mood,
+                "mood_matched": use_mood_matching,
+                "generation_time": round(generation_time, 2),
+                "size_mb": round(size_mb, 3),
+                "duration_seconds": 8,
+                "cost": video_result.get("cost", 0.80),
+                "brand_aesthetic": "what if Apple sold mortality?",
+                "visual_philosophy": "premium minimalism meets existential dread",
+                "media_type": "video"
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate video: {e}")
+            return {"success": False, "error": str(e), "media_type": "video"}
+    
+    async def _create_video_prompt(self, post: LinkedInPost, visual_elements: Dict, mood: str) -> str:
+        """Create cinematic video prompt for Veo - Jesse's brand in motion"""
+        
+        # Video-specific scene concepts
+        video_scenes = {
+            "tech_anxiety": """
+                Slow, hypnotic shot of a Jesse A. Eisenbalm lip balm tube sitting on a desk.
+                In the background, laptop screen shows AI-generated text appearing.
+                A human hand slowly reaches for the lip balm, applies it deliberately.
+                Camera slowly pushes in on the product. Soft office ambient lighting.
+                The hand returns to the keyboard. Loop feels meditative yet unsettling.
+            """,
+            "meeting_exhaustion": """
+                Jesse A. Eisenbalm lip balm tube sits perfectly centered on a conference table.
+                Blurred figures in the background suggest endless meeting.
+                Time-lapse effect: shadows move across the table, but the tube remains still.
+                A hand reaches in, takes the tube, applies. Returns it to exact same spot.
+                Premium, minimal, the only constant in corporate chaos.
+            """,
+            "digital_overwhelm": """
+                Close-up of a desk surface. Notification sounds implied by flashing lights.
+                Jesse A. Eisenbalm tube slowly rotates into frame, catching light.
+                A hand picks it up. Moment of stillness. Application.
+                Camera pulls back to reveal cluttered desk, but tube glows with importance.
+                The calm in the storm.
+            """,
+            "burnout": """
+                Golden hour light streams through office window blinds.
+                Jesse A. Eisenbalm lip balm tube sits on windowsill.
+                Slow pan across dying succulent, empty coffee mug, resignation letter draft.
+                Hand reaches for the lip balm - the one act of self-care today.
+                Premium product as tiny rebellion against burnout.
+            """,
+            "humanity_seeking": """
+                Split composition: cold blue computer glow on left, warm light on right.
+                Jesse A. Eisenbalm tube sits at the boundary between worlds.
+                A hand emerges from the blue side, reaches for the product.
+                Application in slow motion. Human moment in digital existence.
+                The only business lip balm that keeps you human in an AI world.
+            """,
+            "existential_general": """
+                Floating product shot: Jesse A. Eisenbalm tube levitates against navy gradient.
+                Soft rotation reveals honeycomb pattern with Jesse photos.
+                Macro detail shots intercut: the texture, the cap, the label.
+                Returns to floating product. Premium. Minimal. Eternal.
+                What if Apple sold mortality?
+            """
+        }
+        
+        # Get base scene or default
+        base_scene = video_scenes.get(mood, video_scenes["existential_general"])
+        
+        # Build the complete video prompt
+        video_prompt = f"""
+CINEMATIC VIDEO PROMPT - Jesse A. Eisenbalm
+
+PRODUCT HERO:
+The Jesse A. Eisenbalm premium lip balm tube:
+- Cream/ivory white tube with matte finish
+- White ribbed cap with horizontal grip ridges  
+- "JESSE A. EISENBALM" in vertical black sans-serif text
+- Gold honeycomb pattern with small embedded photos of Jesse
+- Clean, minimal, professional premium aesthetic
+
+SCENE CONCEPT:
+{base_scene.strip()}
+
+VISUAL STYLE:
+- Cinematic 8-second loop
+- Slow, deliberate camera movement
+- Premium commercial aesthetic
+- Kinfolk magazine meets Black Mirror
+- Wes Anderson color grading
+- Soft, professional lighting
+- Matte textures, cream and navy tones with gold accents
+
+MOOD:
+The space between "everything is fine" and "nothing is fine"
+Premium minimalism meets existential dread
+What if Apple sold mortality?
+
+POST CONTEXT:
+{post.content[:200]}...
+
+TECHNICAL:
+8 seconds, square format (1:1), seamless loop preferred
+No text overlays - visual storytelling only
+Professional commercial quality
+"""
+        
+        return video_prompt.strip()
     
     def _analyze_post_mood(self, post: LinkedInPost) -> str:
         """Analyze post content to determine mood for intelligent image matching"""
@@ -615,6 +801,29 @@ CRITICAL: Product tube MUST match the exact specification - cream/ivory tube, wh
             
         except Exception as e:
             self.logger.error(f"Failed to save image: {e}")
+            return None
+    
+    def _save_video(self, video_data: bytes, post: LinkedInPost) -> Optional[str]:
+        """Save the generated video to file"""
+        try:
+            # Create videos subdirectory
+            video_dir = self.output_dir / "videos"
+            video_dir.mkdir(parents=True, exist_ok=True)
+            
+            filename = f"jesse_{post.batch_id[:8]}_{post.post_number}_{uuid.uuid4().hex[:8]}.mp4"
+            filepath = video_dir / filename
+            
+            # Write video bytes directly
+            with open(filepath, 'wb') as f:
+                f.write(video_data)
+            
+            self.logger.info(f"Jesse A. Eisenbalm video saved: {filepath}")
+            
+            # Return actual filesystem path
+            return str(filepath)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to save video: {e}")
             return None
     
     def get_stats(self) -> Dict[str, Any]:

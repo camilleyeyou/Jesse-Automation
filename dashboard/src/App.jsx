@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Play, Square, Clock, Send, Sparkles, Calendar, 
   History, Settings, RefreshCw, AlertCircle, CheckCircle,
-  Linkedin, Image, FileText, Zap, BarChart3, X, ZoomIn
+  Linkedin, Image, FileText, Zap, BarChart3, X, ZoomIn, Video
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
@@ -34,21 +34,33 @@ const api = {
 // Helper to get full image URL
 const getImageUrl = (imagePath) => {
   if (!imagePath) return null;
-  // If it's already a full URL, return as-is
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
     return imagePath;
   }
-  // If it starts with /images, prepend API_BASE
   if (imagePath.startsWith('/images')) {
     return `${API_BASE}${imagePath}`;
   }
-  // If it's a relative path like data/images/xxx.png, convert to /images/xxx.png
   if (imagePath.includes('data/images/')) {
     const filename = imagePath.split('/').pop();
     return `${API_BASE}/images/${filename}`;
   }
-  // Default: assume it's just a filename
   return `${API_BASE}/images/${imagePath}`;
+};
+
+// Helper to get full video URL
+const getVideoUrl = (videoPath) => {
+  if (!videoPath) return null;
+  if (videoPath.startsWith('http://') || videoPath.startsWith('https://')) {
+    return videoPath;
+  }
+  if (videoPath.startsWith('/videos')) {
+    return `${API_BASE}${videoPath}`;
+  }
+  if (videoPath.includes('data/images/videos/')) {
+    const filename = videoPath.split('/').pop();
+    return `${API_BASE}/videos/${filename}`;
+  }
+  return `${API_BASE}/videos/${videoPath}`;
 };
 
 // ============== Components ==============
@@ -111,9 +123,9 @@ function StatCard({ icon: Icon, label, value, subtext }) {
   );
 }
 
-// Image Preview Modal
-function ImageModal({ imageUrl, onClose }) {
-  if (!imageUrl) return null;
+// Media Preview Modal (supports both image and video)
+function MediaModal({ mediaUrl, mediaType, onClose }) {
+  if (!mediaUrl) return null;
 
   return (
     <div 
@@ -127,12 +139,23 @@ function ImageModal({ imageUrl, onClose }) {
         >
           <X className="w-8 h-8" />
         </button>
-        <img 
-          src={imageUrl} 
-          alt="Post preview" 
-          className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        />
+        {mediaType === 'video' ? (
+          <video 
+            src={mediaUrl}
+            controls
+            autoPlay
+            loop
+            className="max-w-full max-h-[85vh] rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <img 
+            src={mediaUrl} 
+            alt="Post preview" 
+            className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
       </div>
     </div>
   );
@@ -328,35 +351,120 @@ function ScheduleTab({ status, onSetSchedule, loading }) {
 
 function QueueTab({ queue, onGenerate, onRemove, loading }) {
   const posts = queue?.posts || [];
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedMedia, setSelectedMedia] = useState(null);
+  const [selectedMediaType, setSelectedMediaType] = useState('image');
+  const [useVideo, setUseVideo] = useState(false);
+  const [numPosts, setNumPosts] = useState(1);
 
   // Helper to safely render the cultural reference
   const renderCulturalReference = (ref) => {
     if (!ref) return null;
     if (typeof ref === 'string') return ref;
-    // The error indicated keys were: category, reference, context
     return ref.reference || ref.source || ref.context || 'Unknown reference';
   };
 
+  // Handle media preview click
+  const handleMediaClick = (post) => {
+    const isVideo = post.media_type === 'video' || post.image_url?.includes('/videos/') || post.image_url?.endsWith('.mp4');
+    if (isVideo) {
+      setSelectedMedia(getVideoUrl(post.image_url));
+      setSelectedMediaType('video');
+    } else {
+      setSelectedMedia(getImageUrl(post.image_url));
+      setSelectedMediaType('image');
+    }
+  };
+
+  // Calculate estimated cost
+  const estimatedCost = useVideo 
+    ? (numPosts * 1.05).toFixed(2)
+    : (numPosts * 0.08).toFixed(2);
+
   return (
     <div className="space-y-6">
-      {/* Image Modal */}
-      {selectedImage && (
-        <ImageModal 
-          imageUrl={selectedImage} 
-          onClose={() => setSelectedImage(null)} 
+      {/* Media Modal */}
+      {selectedMedia && (
+        <MediaModal 
+          mediaUrl={selectedMedia}
+          mediaType={selectedMediaType}
+          onClose={() => setSelectedMedia(null)} 
         />
       )}
 
-      {/* Generate Button */}
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-white">Post Queue</h3>
-        <Button onClick={onGenerate} variant="primary" loading={loading}>
-          <Sparkles className="w-4 h-4" /> Generate Content
-        </Button>
-      </div>
+      {/* Generate Controls */}
+      <Card>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h3 className="text-lg font-semibold text-white">Generate Content</h3>
+          
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            {/* Number of posts */}
+            <div className="flex items-center gap-2">
+              <label className="text-gray-400 text-sm">Posts:</label>
+              <select
+                value={numPosts}
+                onChange={(e) => setNumPosts(parseInt(e.target.value))}
+                className="bg-white/5 border border-white/20 rounded-lg px-3 py-1.5 text-white text-sm focus:border-amber-500 focus:outline-none"
+              >
+                {[1, 2, 3, 4, 5].map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Video toggle */}
+            <div className="flex items-center gap-3 px-3 py-2 bg-white/5 rounded-lg border border-white/10">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useVideo}
+                  onChange={(e) => setUseVideo(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-500 text-amber-500 focus:ring-amber-500 focus:ring-offset-0 bg-white/10"
+                />
+                <span className="text-sm text-gray-300 flex items-center gap-1.5">
+                  {useVideo ? <Video className="w-4 h-4 text-purple-400" /> : <Image className="w-4 h-4 text-blue-400" />}
+                  {useVideo ? 'Video' : 'Image'}
+                </span>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  useVideo 
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                    : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                }`}>
+                  {useVideo ? '~$1.00' : '$0.03'}
+                </span>
+              </label>
+            </div>
+
+            {/* Generate button */}
+            <Button 
+              onClick={() => onGenerate(numPosts, useVideo)} 
+              variant="primary" 
+              loading={loading}
+            >
+              <Sparkles className="w-4 h-4" /> 
+              Generate {useVideo ? 'Video' : 'Image'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Video info banner */}
+        {useVideo && (
+          <div className="mt-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+            <p className="text-purple-300 text-sm flex items-center gap-2">
+              <Video className="w-4 h-4" />
+              <span>
+                <strong>Video mode:</strong> 8-second cinematic video with Veo 3.1 Fast • 
+                Est. cost: <strong>${estimatedCost}</strong>
+              </span>
+            </p>
+          </div>
+        )}
+      </Card>
 
       {/* Queue List */}
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-white">Post Queue ({posts.length})</h3>
+      </div>
+
       {posts.length === 0 ? (
         <Card>
           <div className="text-center py-8">
@@ -368,31 +476,59 @@ function QueueTab({ queue, onGenerate, onRemove, loading }) {
       ) : (
         <div className="space-y-4">
           {posts.map((post, index) => {
-            const imageUrl = getImageUrl(post.image_url);
+            const isVideo = post.media_type === 'video' || post.image_url?.includes('/videos/') || post.image_url?.endsWith('.mp4');
+            const mediaUrl = isVideo ? getVideoUrl(post.image_url) : getImageUrl(post.image_url);
             
             return (
               <Card key={post.id || index}>
                 <div className="flex gap-4">
-                  {/* Image Preview */}
-                  {imageUrl && (
+                  {/* Media Preview */}
+                  {mediaUrl && (
                     <div 
                       className="flex-shrink-0 w-32 h-32 md:w-40 md:h-40 relative group cursor-pointer"
-                      onClick={() => setSelectedImage(imageUrl)}
+                      onClick={() => handleMediaClick(post)}
                     >
-                      <img 
-                        src={imageUrl} 
-                        alt="Post image" 
-                        className="w-full h-full object-cover rounded-lg border border-white/10"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.nextSibling.style.display = 'flex';
-                        }}
-                      />
-                      <div 
-                        className="hidden w-full h-full bg-white/5 rounded-lg border border-white/10 items-center justify-center"
-                      >
-                        <Image className="w-8 h-8 text-gray-500" />
-                      </div>
+                      {isVideo ? (
+                        <>
+                          <video 
+                            src={mediaUrl}
+                            className="w-full h-full object-cover rounded-lg border border-white/10"
+                            muted
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'flex';
+                            }}
+                          />
+                          <div 
+                            className="hidden w-full h-full bg-white/5 rounded-lg border border-white/10 items-center justify-center"
+                          >
+                            <Video className="w-8 h-8 text-gray-500" />
+                          </div>
+                          {/* Play icon overlay */}
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-12 h-12 bg-black/50 rounded-full flex items-center justify-center">
+                              <Play className="w-6 h-6 text-white ml-1" />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <img 
+                            src={mediaUrl} 
+                            alt="Post image" 
+                            className="w-full h-full object-cover rounded-lg border border-white/10"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'flex';
+                            }}
+                          />
+                          <div 
+                            className="hidden w-full h-full bg-white/5 rounded-lg border border-white/10 items-center justify-center"
+                          >
+                            <Image className="w-8 h-8 text-gray-500" />
+                          </div>
+                        </>
+                      )}
                       {/* Zoom overlay */}
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                         <ZoomIn className="w-8 h-8 text-white" />
@@ -405,8 +541,9 @@ function QueueTab({ queue, onGenerate, onRemove, loading }) {
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <StatusBadge active={post.status === 'pending'} label={post.status} />
                       {post.image_url && (
-                        <span className="text-blue-400 text-sm flex items-center gap-1">
-                          <Image className="w-4 h-4" /> Has image
+                        <span className={`text-sm flex items-center gap-1 ${isVideo ? 'text-purple-400' : 'text-blue-400'}`}>
+                          {isVideo ? <Video className="w-4 h-4" /> : <Image className="w-4 h-4" />}
+                          {isVideo ? 'Has video' : 'Has image'}
                         </span>
                       )}
                       {(post.validation_score || post.average_score) && (
@@ -421,13 +558,11 @@ function QueueTab({ queue, onGenerate, onRemove, loading }) {
                         {post.hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' ')}
                       </p>
                     )}
-                    {/* --- THIS WAS THE BROKEN SECTION --- */}
                     {post.cultural_reference && (
                       <p className="text-purple-400 text-xs mt-2">
                         📺 {renderCulturalReference(post.cultural_reference)}
                       </p>
                     )}
-                    {/* ----------------------------------- */}
                   </div>
 
                   {/* Actions */}
@@ -448,15 +583,28 @@ function QueueTab({ queue, onGenerate, onRemove, loading }) {
 
 function HistoryTab({ history }) {
   const posts = history?.posts || [];
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedMedia, setSelectedMedia] = useState(null);
+  const [selectedMediaType, setSelectedMediaType] = useState('image');
+
+  const handleMediaClick = (post) => {
+    const isVideo = post.media_type === 'video' || post.image_url?.includes('/videos/') || post.image_url?.endsWith('.mp4');
+    if (isVideo) {
+      setSelectedMedia(getVideoUrl(post.image_url));
+      setSelectedMediaType('video');
+    } else {
+      setSelectedMedia(getImageUrl(post.image_url));
+      setSelectedMediaType('image');
+    }
+  };
 
   return (
     <div className="space-y-6">
-      {/* Image Modal */}
-      {selectedImage && (
-        <ImageModal 
-          imageUrl={selectedImage} 
-          onClose={() => setSelectedImage(null)} 
+      {/* Media Modal */}
+      {selectedMedia && (
+        <MediaModal 
+          mediaUrl={selectedMedia}
+          mediaType={selectedMediaType}
+          onClose={() => setSelectedMedia(null)} 
         />
       )}
 
@@ -472,25 +620,40 @@ function HistoryTab({ history }) {
       ) : (
         <div className="space-y-4">
           {posts.map((post, index) => {
-            const imageUrl = getImageUrl(post.image_url);
+            const isVideo = post.media_type === 'video' || post.image_url?.includes('/videos/') || post.image_url?.endsWith('.mp4');
+            const mediaUrl = isVideo ? getVideoUrl(post.image_url) : getImageUrl(post.image_url);
             
             return (
               <Card key={post.id || index}>
                 <div className="flex gap-4">
-                  {/* Image Preview */}
-                  {imageUrl && (
+                  {/* Media Preview */}
+                  {mediaUrl && (
                     <div 
                       className="flex-shrink-0 w-24 h-24 relative group cursor-pointer"
-                      onClick={() => setSelectedImage(imageUrl)}
+                      onClick={() => handleMediaClick(post)}
                     >
-                      <img 
-                        src={imageUrl} 
-                        alt="Post image" 
-                        className="w-full h-full object-cover rounded-lg border border-white/10"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                        }}
-                      />
+                      {isVideo ? (
+                        <>
+                          <video 
+                            src={mediaUrl}
+                            className="w-full h-full object-cover rounded-lg border border-white/10"
+                            muted
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-8 h-8 bg-black/50 rounded-full flex items-center justify-center">
+                              <Play className="w-4 h-4 text-white ml-0.5" />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <img 
+                          src={mediaUrl} 
+                          alt="Post image" 
+                          className="w-full h-full object-cover rounded-lg border border-white/10"
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      )}
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                         <ZoomIn className="w-6 h-6 text-white" />
                       </div>
@@ -513,6 +676,11 @@ function HistoryTab({ history }) {
                           {post.linkedin_post_id && (
                             <span className="text-blue-400 text-sm">
                               ID: {post.linkedin_post_id}
+                            </span>
+                          )}
+                          {isVideo && (
+                            <span className="text-purple-400 text-sm flex items-center gap-1">
+                              <Video className="w-3 h-3" /> Video
                             </span>
                           )}
                         </div>
@@ -581,7 +749,7 @@ export default function App() {
 
   useEffect(() => {
     refresh();
-    const interval = setInterval(refresh, 30000); // Refresh every 30s
+    const interval = setInterval(refresh, 30000);
     return () => clearInterval(interval);
   }, [refresh]);
 
@@ -639,12 +807,18 @@ export default function App() {
     setLoading(false);
   };
 
-  const handleGenerate = async () => {
+  // Updated to accept numPosts and useVideo
+  const handleGenerate = async (numPosts = 1, useVideo = false) => {
     setLoading(true);
-    showMessage('🔄 Generating content...');
+    const mediaType = useVideo ? 'video' : 'image';
+    showMessage(`🔄 Generating ${numPosts} post${numPosts > 1 ? 's' : ''} with ${mediaType}...`);
     try {
-      const result = await api.post('/api/automation/generate-content', { num_posts: 1, add_to_queue: true });
-      showMessage(`✅ Generated ${result.approved_posts} approved posts`);
+      const result = await api.post('/api/automation/generate-content', { 
+        num_posts: numPosts, 
+        add_to_queue: true,
+        use_video: useVideo
+      });
+      showMessage(`✅ Generated ${result.approved_posts} approved posts (${result.media_type || mediaType})`);
       await fetchQueue();
     } catch (err) {
       showMessage(`❌ Failed: ${err.message}`);

@@ -45,18 +45,25 @@ class ContentOrchestrator:
         self.min_approvals = config.batch.min_approvals_required
         self.max_revisions = config.batch.max_revisions
     
-    async def generate_batch(self, num_posts: int = 1) -> Batch:
-        """Generate a batch of posts with validation and revision loops"""
+    async def generate_batch(self, num_posts: int = 1, use_video: bool = False) -> Batch:
+        """
+        Generate a batch of posts with validation and revision loops
+        
+        Args:
+            num_posts: Number of posts to generate
+            use_video: If True, generate video (~$1.00) instead of image ($0.03)
+        """
         
         batch = Batch()
         batch.status = "processing"
         
-        logger.info(f"Starting batch {batch.id} with {num_posts} posts")
+        media_type = "video" if use_video else "image"
+        logger.info(f"Starting batch {batch.id} with {num_posts} posts (media: {media_type})")
         start_time = time.time()
         
         try:
             for i in range(num_posts):
-                post = await self._process_single_post(i + 1, batch.id)
+                post = await self._process_single_post(i + 1, batch.id, use_video=use_video)
                 batch.add_post(post)
             
             batch.complete()
@@ -73,10 +80,11 @@ class ContentOrchestrator:
             logger.error(f"Batch {batch.id} failed: {e}")
             raise
     
-    async def _process_single_post(self, post_number: int, batch_id: str) -> LinkedInPost:
+    async def _process_single_post(self, post_number: int, batch_id: str, use_video: bool = False) -> LinkedInPost:
         """Process a single post through generation, validation, and revision"""
         
-        logger.info(f"Processing post {post_number}")
+        media_type = "video" if use_video else "image"
+        logger.info(f"Processing post {post_number} (media: {media_type})")
         start_time = time.time()
         
         # Step 1: Generate content
@@ -85,19 +93,22 @@ class ContentOrchestrator:
             batch_id=batch_id
         )
         
-        # Step 2: Generate image (if enabled)
-        if self.config.google.use_images:
-            image_result = await self.image_generator.execute(post)
-            if image_result.get("success"):
+        # Step 2: Generate media (image or video)
+        if self.config.google.use_images or use_video:
+            media_result = await self.image_generator.execute(post, use_video=use_video)
+            if media_result.get("success"):
+                # Store media info (works for both image and video)
                 post.set_image(
-                    url=image_result.get("saved_path", ""),
-                    prompt=image_result.get("prompt", ""),
-                    provider="google_gemini",
-                    cost=image_result.get("cost", 0.039)
+                    url=media_result.get("saved_path", ""),
+                    prompt=media_result.get("prompt", ""),
+                    provider="google_veo" if use_video else "google_gemini",
+                    cost=media_result.get("cost", 0.80 if use_video else 0.039)
                 )
-                logger.info(f"Post {post_number}: Image generated at {post.image_url}")
+                # Add media type to post metadata
+                post.media_type = media_result.get("media_type", "image")
+                logger.info(f"Post {post_number}: {media_type.title()} generated at {post.image_url}")
             else:
-                logger.warning(f"Post {post_number}: Image generation failed - {image_result.get('error')}")
+                logger.warning(f"Post {post_number}: {media_type.title()} generation failed - {media_result.get('error')}")
         
         # Step 3: Initial validation
         validation_scores = await self._validate_post(post)
@@ -156,10 +167,15 @@ class ContentOrchestrator:
         # Return validation scores for use in feedback aggregation
         return validation_results
     
-    async def generate_single_post(self) -> LinkedInPost:
-        """Generate a single approved post (convenience method)"""
+    async def generate_single_post(self, use_video: bool = False) -> LinkedInPost:
+        """
+        Generate a single approved post (convenience method)
         
-        batch = await self.generate_batch(num_posts=1)
+        Args:
+            use_video: If True, generate video (~$1.00) instead of image ($0.03)
+        """
+        
+        batch = await self.generate_batch(num_posts=1, use_video=use_video)
         approved = batch.get_approved_posts()
         
         if approved:

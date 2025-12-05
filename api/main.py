@@ -63,6 +63,7 @@ class QueuePostRequest(BaseModel):
 class GenerateRequest(BaseModel):
     num_posts: int = 1
     add_to_queue: bool = True
+    use_video: bool = False  # NEW: Generate video (~$1.00) instead of image ($0.03)
 
 
 # ============== Lifespan ==============
@@ -156,6 +157,14 @@ try:
 except Exception as e:
     logger.warning(f"Could not mount images directory: {e}")
 
+# Static files for videos
+videos_dir = Path("data/images/videos")
+videos_dir.mkdir(parents=True, exist_ok=True)
+try:
+    app.mount("/videos", StaticFiles(directory=str(videos_dir)), name="videos")
+except Exception as e:
+    logger.warning(f"Could not mount videos directory: {e}")
+
 
 # ============== Background Jobs ==============
 
@@ -170,7 +179,8 @@ async def daily_post_job():
         # If queue is empty and auto-generate is enabled, generate new content
         if not post_data and scheduler.settings.get("auto_generate", True):
             logger.info("Queue empty, generating new content...")
-            batch = await orchestrator.generate_batch(num_posts=1)
+            # Scheduler always uses images (not video) for cost efficiency
+            batch = await orchestrator.generate_batch(num_posts=1, use_video=False)
             approved = batch.get_approved_posts()
             if approved:
                 post = approved[0]
@@ -319,12 +329,23 @@ async def post_now(background_tasks: BackgroundTasks):
 
 @app.post("/api/automation/generate-content")
 async def generate_content(request: GenerateRequest):
-    """Generate new content"""
+    """
+    Generate new content
+    
+    Args:
+        num_posts: Number of posts to generate (default: 1)
+        add_to_queue: Whether to add approved posts to queue (default: True)
+        use_video: Generate 8-second video (~$1.00) instead of image ($0.03) (default: False)
+    """
     if not orchestrator:
         raise HTTPException(500, "Orchestrator not initialized")
     
     try:
-        batch = await orchestrator.generate_batch(num_posts=request.num_posts)
+        # Generate batch with optional video
+        batch = await orchestrator.generate_batch(
+            num_posts=request.num_posts,
+            use_video=request.use_video  # NEW: Pass video flag to orchestrator
+        )
         
         # Add approved posts to queue if requested
         added_to_queue = 0
@@ -339,6 +360,7 @@ async def generate_content(request: GenerateRequest):
             "total_posts": batch.metrics.total_posts,
             "approved_posts": batch.metrics.approved_posts,
             "added_to_queue": added_to_queue,
+            "media_type": "video" if request.use_video else "image",
             "posts": [p.to_dict() for p in batch.posts]
         }
         
