@@ -432,7 +432,7 @@ Create prompts that are 150-200 words with precise visual detail, emotional subt
             video_result = await self.ai_client.generate_video(
                 prompt=video_prompt,
                 duration_seconds=8,
-                aspect_ratio="1:1",  # Square for LinkedIn
+                aspect_ratio="16:9",  # Veo supports 16:9 or 9:16, not 1:1
                 include_audio=False  # Save costs, LinkedIn autoplay is muted anyway
             )
             generation_time = time.time() - start_time
@@ -568,7 +568,7 @@ POST CONTEXT:
 {post.content[:200]}...
 
 TECHNICAL:
-8 seconds, square format (1:1), seamless loop preferred
+8 seconds, landscape format (16:9), seamless loop preferred
 No text overlays - visual storytelling only
 Professional commercial quality
 """

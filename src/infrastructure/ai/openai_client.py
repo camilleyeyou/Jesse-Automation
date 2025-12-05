@@ -338,21 +338,21 @@ class OpenAIClient:
     async def generate_video(self,
                            prompt: str,
                            duration_seconds: int = 8,
-                           aspect_ratio: str = "1:1",
+                           aspect_ratio: str = "16:9",
                            include_audio: bool = False) -> Dict[str, Any]:
         """
-        Generate video using Google Veo 3.1 Fast (Production model)
+        Generate video using Google Veo 3.1 Fast
         
-        Cost: 
-        - With audio: $0.15/second ($1.20 for 8 seconds)
-        - Without audio: $0.10/second ($0.80 for 8 seconds)
+        Cost (after Sept 2025 price drop):
+        - Veo 3.1 Fast with audio: $0.15/second ($1.20 for 8 seconds)
+        - Veo 3.1 Fast without audio: $0.10/second ($0.80 for 8 seconds)
         
-        Model: veo-3.0-generate-preview (Veo 3 Fast)
+        Model: veo-3.1-fast-generate-preview
         
         Args:
             prompt: Text description of desired video
-            duration_seconds: Video length (default 8, max 8 per generation)
-            aspect_ratio: "1:1", "9:16" (vertical), "16:9" (horizontal)
+            duration_seconds: Video length (4, 6, or 8 seconds - default 8)
+            aspect_ratio: "16:9" (landscape), "9:16" (vertical/portrait)
             include_audio: Whether to generate synchronized audio
         """
         
@@ -363,67 +363,70 @@ class OpenAIClient:
         try:
             start_time = time.time()
             
-            # Use Veo 3 Fast for cost efficiency
-            video_model = "veo-3.0-generate-preview"
+            # Use Veo 3.1 Fast for cost efficiency ($0.10/sec without audio, $0.15/sec with audio)
+            # Standard Veo 3.1 is $0.20/sec without audio, $0.40/sec with audio
+            video_model = "veo-3.1-fast-generate-preview"
             
-            logger.info(f"🎬 Generating video with Veo 3 Fast ({video_model})")
+            logger.info(f"🎬 Generating video with Veo 3.1 Fast ({video_model})")
             logger.info(f"   Duration: {duration_seconds}s, Aspect: {aspect_ratio}, Audio: {include_audio}")
             
-            # Build config
+            # Build config - Veo uses specific parameters
             config_params = {
-                "number_of_videos": 1,
-                "duration_seconds": duration_seconds,
                 "aspect_ratio": aspect_ratio,
             }
             
-            # Add audio config if requested
+            # Add audio config if requested  
             if include_audio:
                 config_params["include_audio"] = True
             
-            # Generate video
-            response = self.gemini_client.models.generate_videos(
+            # Generate video - this returns a long-running operation
+            operation = self.gemini_client.models.generate_videos(
                 model=video_model,
                 prompt=prompt,
                 config=types.GenerateVideosConfig(**config_params)
             )
             
-            # Veo returns an operation that we need to poll for completion
-            # The response may be an operation or direct result depending on SDK version
+            # Veo returns a long-running operation that we need to poll for completion
             video_data = None
             
-            # Check if we got a direct response or need to poll
-            if hasattr(response, 'generated_videos') and response.generated_videos:
-                # Direct response
-                video_data = response.generated_videos[0].video.video_bytes
-            elif hasattr(response, 'result'):
-                # Operation result
-                result = response.result()
-                if result.generated_videos:
-                    video_data = result.generated_videos[0].video.video_bytes
-            else:
-                # May need to poll - wait for operation to complete
-                logger.info("   Waiting for video generation to complete...")
+            # Poll for completion - video generation typically takes 30-90 seconds
+            logger.info("   Waiting for video generation to complete...")
+            
+            max_wait = 180  # 3 minutes max
+            poll_interval = 10
+            waited = 0
+            
+            while waited < max_wait:
+                # Check if operation is done
+                if hasattr(operation, 'done'):
+                    if callable(operation.done):
+                        is_done = operation.done()
+                    else:
+                        is_done = operation.done
+                else:
+                    # If no done attribute, assume it's a direct response
+                    is_done = True
                 
-                # Poll with timeout (videos can take 30-60 seconds)
-                max_wait = 120  # 2 minutes max
-                poll_interval = 5
-                waited = 0
-                
-                while waited < max_wait:
-                    await asyncio.sleep(poll_interval)
-                    waited += poll_interval
-                    
-                    # Check if operation is done
-                    if hasattr(response, 'done') and response.done():
-                        result = response.result()
-                        if result.generated_videos:
+                if is_done:
+                    # Get the result
+                    if hasattr(operation, 'result'):
+                        if callable(operation.result):
+                            result = operation.result()
+                        else:
+                            result = operation.result
+                        if hasattr(result, 'generated_videos') and result.generated_videos:
                             video_data = result.generated_videos[0].video.video_bytes
-                        break
-                    
-                    logger.info(f"   Still generating... ({waited}s)")
+                    elif hasattr(operation, 'generated_videos') and operation.generated_videos:
+                        # Direct response
+                        video_data = operation.generated_videos[0].video.video_bytes
+                    break
                 
-                if not video_data and waited >= max_wait:
-                    return {"error": "Video generation timed out after 2 minutes", "video_data": None}
+                await asyncio.sleep(poll_interval)
+                waited += poll_interval
+                logger.info(f"   Still generating... ({waited}s)")
+            
+            if not video_data and waited >= max_wait:
+                return {"error": "Video generation timed out after 3 minutes", "video_data": None}
             
             if not video_data:
                 logger.error("No video data in Veo response")
