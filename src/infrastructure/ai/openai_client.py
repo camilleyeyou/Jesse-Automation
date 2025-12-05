@@ -389,44 +389,60 @@ class OpenAIClient:
             # Veo returns a long-running operation that we need to poll for completion
             video_data = None
             
-            # Poll for completion - video generation typically takes 30-90 seconds
             logger.info("   Waiting for video generation to complete...")
             
-            max_wait = 180  # 3 minutes max
-            poll_interval = 10
-            waited = 0
-            
-            while waited < max_wait:
-                # Check if operation is done
-                if hasattr(operation, 'done'):
-                    if callable(operation.done):
-                        is_done = operation.done()
-                    else:
-                        is_done = operation.done
-                else:
-                    # If no done attribute, assume it's a direct response
-                    is_done = True
+            try:
+                # The SDK's generate_videos returns an operation object
+                # We need to poll the operation status until it's done
                 
-                if is_done:
-                    # Get the result
-                    if hasattr(operation, 'result'):
-                        if callable(operation.result):
-                            result = operation.result()
-                        else:
-                            result = operation.result
-                        if hasattr(result, 'generated_videos') and result.generated_videos:
-                            video_data = result.generated_videos[0].video.video_bytes
-                    elif hasattr(operation, 'generated_videos') and operation.generated_videos:
-                        # Direct response
-                        video_data = operation.generated_videos[0].video.video_bytes
-                    break
+                max_wait = 300  # 5 minutes max
+                poll_interval = 10
+                waited = 0
                 
-                await asyncio.sleep(poll_interval)
-                waited += poll_interval
-                logger.info(f"   Still generating... ({waited}s)")
-            
-            if not video_data and waited >= max_wait:
-                return {"error": "Video generation timed out after 3 minutes", "video_data": None}
+                while waited < max_wait:
+                    # Check if operation is complete by refreshing from server
+                    if hasattr(operation, 'name') and operation.name:
+                        # Refresh operation status from server
+                        operation = self.gemini_client.operations.get(name=operation.name)
+                    
+                    # Check if done
+                    is_done = getattr(operation, 'done', False)
+                    
+                    if is_done:
+                        logger.info(f"   Video generation completed after {waited}s!")
+                        
+                        # Extract video from response
+                        if hasattr(operation, 'response') and operation.response:
+                            response = operation.response
+                            if hasattr(response, 'generated_videos') and response.generated_videos:
+                                video = response.generated_videos[0]
+                                if hasattr(video, 'video') and hasattr(video.video, 'video_bytes'):
+                                    video_data = video.video.video_bytes
+                                elif hasattr(video, 'video') and hasattr(video.video, 'uri'):
+                                    # Need to download from URI
+                                    video_uri = video.video.uri
+                                    logger.info(f"   Downloading video from {video_uri}")
+                                    video_data = await self._download_video(video_uri)
+                        break
+                    
+                    # Check for error
+                    if hasattr(operation, 'error') and operation.error:
+                        error_msg = str(operation.error)
+                        logger.error(f"   Video generation failed: {error_msg}")
+                        return {"error": f"Video generation failed: {error_msg}", "video_data": None}
+                    
+                    await asyncio.sleep(poll_interval)
+                    waited += poll_interval
+                    logger.info(f"   Still generating... ({waited}s)")
+                
+                if not video_data and waited >= max_wait:
+                    return {"error": "Video generation timed out after 5 minutes", "video_data": None}
+                    
+            except Exception as poll_error:
+                logger.error(f"   Error waiting for video: {poll_error}")
+                import traceback
+                traceback.print_exc()
+                return {"error": f"Error waiting for video: {poll_error}", "video_data": None}
             
             if not video_data:
                 logger.error("No video data in Veo response")
@@ -472,8 +488,28 @@ class OpenAIClient:
                 "error": error_msg,
                 "video_data": None,
                 "provider": "google_veo",
-                "model": "veo-3.0-generate-preview"
+                "model": "veo-3.1-fast-generate-preview"
             }
+    
+    async def _download_video(self, uri: str) -> Optional[bytes]:
+        """Download video from Google Cloud Storage URI"""
+        try:
+            import httpx
+            
+            # The URI might be a GCS URI or a direct download URL
+            if uri.startswith("gs://"):
+                # Convert GCS URI to download URL
+                # gs://bucket/path -> https://storage.googleapis.com/bucket/path
+                uri = uri.replace("gs://", "https://storage.googleapis.com/")
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(uri, timeout=60.0)
+                response.raise_for_status()
+                return response.content
+                
+        except Exception as e:
+            logger.error(f"Failed to download video from {uri}: {e}")
+            return None
     
     async def close(self):
         """Close the client"""
