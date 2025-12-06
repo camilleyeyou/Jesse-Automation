@@ -399,19 +399,31 @@ class OpenAIClient:
                 
                 while waited < max_wait:
                     try:
-                        # CRITICAL FIX: Fetch fresh operation status from server
-                        # Don't check the stale operation object, get a fresh one
-                        fresh_operation = self.gemini_client.operations.get(operation_name)
-                        is_done = getattr(fresh_operation, 'done', False)
+                        # CRITICAL FIX: Bypass buggy SDK - use REST API directly via httpx
+                        import httpx
+                        
+                        api_key = self.config.google.api_key or os.getenv("GOOGLE_API_KEY")
+                        headers = {"x-goog-api-key": api_key}
+                        
+                        # Call Google's REST API directly
+                        url = f"https://generativelanguage.googleapis.com/v1beta/{operation_name}"
+                        
+                        async with httpx.AsyncClient() as client:
+                            resp = await client.get(url, headers=headers, timeout=30.0)
+                            resp.raise_for_status()
+                            op_data = resp.json()
+                        
+                        is_done = op_data.get('done', False)
                         
                         if is_done:
                             logger.info(f"   Video generation completed after {waited}s!")
-                            operation = fresh_operation
+                            # Parse the response into an operation-like object
+                            operation = type('Operation', (), op_data)()
                             break
                         
                         # Check for error
-                        if hasattr(fresh_operation, 'error') and fresh_operation.error:
-                            error_msg = str(fresh_operation.error)
+                        if 'error' in op_data and op_data['error']:
+                            error_msg = str(op_data['error'])
                             logger.error(f"   Video generation error: {error_msg}")
                             return {"error": f"Video generation failed: {error_msg}", "video_data": None}
                         
@@ -420,21 +432,11 @@ class OpenAIClient:
                         waited += poll_interval
                         logger.info(f"   Still generating... ({waited}s)")
                         
-                    except TypeError as e:
-                        # If get() has issues with string argument, try alternative approach
-                        if "get() got an unexpected keyword argument" in str(e):
-                            logger.warning(f"   SDK operations.get() incompatible, using fallback wait method")
-                            try:
-                                operation = self.gemini_client.operations.wait(operation_name)
-                                is_done = getattr(operation, 'done', False)
-                                if is_done:
-                                    logger.info(f"   Video generation completed!")
-                                    break
-                            except Exception as wait_err:
-                                logger.error(f"   Fallback wait failed: {wait_err}")
-                                raise
-                        else:
-                            raise
+                    except Exception as poll_err:
+                        logger.error(f"   Error polling operation: {poll_err}")
+                        # Continue polling despite errors
+                        await asyncio.sleep(poll_interval)
+                        waited += poll_interval
                 
                 if not is_done and waited >= max_wait:
                     return {"error": "Video generation timed out after 5 minutes", "video_data": None}
