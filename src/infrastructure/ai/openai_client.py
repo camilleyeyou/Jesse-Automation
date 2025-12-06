@@ -403,7 +403,7 @@ class OpenAIClient:
                     # Check if operation is complete by refreshing from server
                     if hasattr(operation, 'name') and operation.name:
                         # Refresh operation status from server
-                        operation = self.gemini_client.operations.get(name=operation.name)
+                        operation = self.gemini_client.operations.get(operation.name)
                     
                     # Check if done
                     is_done = getattr(operation, 'done', False)
