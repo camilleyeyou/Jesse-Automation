@@ -399,31 +399,19 @@ class OpenAIClient:
                 
                 while waited < max_wait:
                     try:
-                        # CRITICAL FIX: Bypass buggy SDK - use REST API directly via httpx
-                        import httpx
-                        
-                        api_key = self.config.google.api_key or os.getenv("GOOGLE_API_KEY")
-                        headers = {"x-goog-api-key": api_key}
-                        
-                        # Call Google's REST API directly
-                        url = f"https://generativelanguage.googleapis.com/v1beta/{operation_name}"
-                        
-                        async with httpx.AsyncClient() as client:
-                            resp = await client.get(url, headers=headers, timeout=30.0)
-                            resp.raise_for_status()
-                            op_data = resp.json()
-                        
-                        is_done = op_data.get('done', False)
+                        # CRITICAL FIX: Fetch fresh operation status from server
+                        # Don't check the stale operation object, get a fresh one
+                        fresh_operation = self.gemini_client.operations.get(operation_name)
+                        is_done = getattr(fresh_operation, 'done', False)
                         
                         if is_done:
                             logger.info(f"   Video generation completed after {waited}s!")
-                            # Parse the response into an operation-like object
-                            operation = type('Operation', (), op_data)()
+                            operation = fresh_operation
                             break
                         
                         # Check for error
-                        if 'error' in op_data and op_data['error']:
-                            error_msg = str(op_data['error'])
+                        if hasattr(fresh_operation, 'error') and fresh_operation.error:
+                            error_msg = str(fresh_operation.error)
                             logger.error(f"   Video generation error: {error_msg}")
                             return {"error": f"Video generation failed: {error_msg}", "video_data": None}
                         
@@ -432,11 +420,21 @@ class OpenAIClient:
                         waited += poll_interval
                         logger.info(f"   Still generating... ({waited}s)")
                         
-                    except Exception as poll_err:
-                        logger.error(f"   Error polling operation: {poll_err}")
-                        # Continue polling despite errors
-                        await asyncio.sleep(poll_interval)
-                        waited += poll_interval
+                    except TypeError as e:
+                        # If get() has issues with string argument, try alternative approach
+                        if "get() got an unexpected keyword argument" in str(e):
+                            logger.warning(f"   SDK operations.get() incompatible, using fallback wait method")
+                            try:
+                                operation = self.gemini_client.operations.wait(operation_name)
+                                is_done = getattr(operation, 'done', False)
+                                if is_done:
+                                    logger.info(f"   Video generation completed!")
+                                    break
+                            except Exception as wait_err:
+                                logger.error(f"   Fallback wait failed: {wait_err}")
+                                raise
+                        else:
+                            raise
                 
                 if not is_done and waited >= max_wait:
                     return {"error": "Video generation timed out after 5 minutes", "video_data": None}
@@ -444,21 +442,35 @@ class OpenAIClient:
                 video_data = None
                 
                 # Extract video from completed operation response
+                logger.info(f"   Operation response type: {type(operation.response)}")
+                logger.info(f"   Operation response dir: {dir(operation.response) if operation.response else 'None'}")
+                
                 if hasattr(operation, 'response') and operation.response:
                     response = operation.response
+                    logger.info(f"   Response object: {response}")
+                    
+                    # Try different possible response structures
                     if hasattr(response, 'generated_videos') and response.generated_videos:
+                        logger.info(f"   Found generated_videos: {len(response.generated_videos)}")
                         video = response.generated_videos[0]
+                        
                         if hasattr(video, 'video'):
                             if hasattr(video.video, 'video_bytes'):
                                 video_data = video.video.video_bytes
+                                logger.info(f"   Extracted video_bytes: {len(video_data)} bytes")
                             elif hasattr(video.video, 'uri'):
-                                # Need to download from URI
                                 video_uri = video.video.uri
-                                logger.info(f"   Downloading video from {video_uri}")
+                                logger.info(f"   Found video URI: {video_uri}")
                                 video_data = await self._download_video(video_uri)
+                    else:
+                        logger.warning(f"   No generated_videos in response")
+                        logger.info(f"   Response attributes: {[attr for attr in dir(response) if not attr.startswith('_')]}")
+                else:
+                    logger.error(f"   No response in operation")
                 
                 if not video_data:
-                    logger.error("No video data in Veo response")
+                    logger.error("No video data extracted from Veo response")
+                    logger.info(f"   Full operation: {operation}")
                     return {"error": "No video generated by Veo", "video_data": None}
                     
             except Exception as gen_error:
