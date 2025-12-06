@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 import logging
+import time
 from pathlib import Path
 from typing import Dict, Any, Optional
 from openai import AsyncOpenAI
@@ -193,7 +194,6 @@ class OpenAIClient:
             return {"error": "Google AI client not available - GOOGLE_API_KEY missing", "image_data": None}
         
         try:
-            import time
             start_time = time.time()
             
             # Determine which API to use based on model
@@ -379,74 +379,39 @@ class OpenAIClient:
             if include_audio:
                 config_params["include_audio"] = True
             
-            # Generate video - this returns a long-running operation
-            operation = self.gemini_client.models.generate_videos(
-                model=video_model,
-                prompt=prompt,
-                config=types.GenerateVideosConfig(**config_params)
-            )
-            
-            # Veo returns a long-running operation that we need to poll for completion
-            video_data = None
-            
+            # Generate video - SDK blocks and waits for completion
             logger.info("   Waiting for video generation to complete...")
             
             try:
-                # The SDK's generate_videos returns an operation object
-                # We need to poll the operation status until it's done
+                response = self.gemini_client.models.generate_videos(
+                    model=video_model,
+                    prompt=prompt,
+                    config=types.GenerateVideosConfig(**config_params)
+                )
                 
-                max_wait = 300  # 5 minutes max
-                poll_interval = 10
-                waited = 0
+                video_data = None
                 
-                while waited < max_wait:
-                    # Check if operation is complete by refreshing from server
-                    if hasattr(operation, 'name') and operation.name:
-                        # Refresh operation status from server
-                        operation = self.gemini_client.operations.get(operation.name)
-                    
-                    # Check if done
-                    is_done = getattr(operation, 'done', False)
-                    
-                    if is_done:
-                        logger.info(f"   Video generation completed after {waited}s!")
-                        
-                        # Extract video from response
-                        if hasattr(operation, 'response') and operation.response:
-                            response = operation.response
-                            if hasattr(response, 'generated_videos') and response.generated_videos:
-                                video = response.generated_videos[0]
-                                if hasattr(video, 'video') and hasattr(video.video, 'video_bytes'):
-                                    video_data = video.video.video_bytes
-                                elif hasattr(video, 'video') and hasattr(video.video, 'uri'):
-                                    # Need to download from URI
-                                    video_uri = video.video.uri
-                                    logger.info(f"   Downloading video from {video_uri}")
-                                    video_data = await self._download_video(video_uri)
-                        break
-                    
-                    # Check for error
-                    if hasattr(operation, 'error') and operation.error:
-                        error_msg = str(operation.error)
-                        logger.error(f"   Video generation failed: {error_msg}")
-                        return {"error": f"Video generation failed: {error_msg}", "video_data": None}
-                    
-                    await asyncio.sleep(poll_interval)
-                    waited += poll_interval
-                    logger.info(f"   Still generating... ({waited}s)")
+                # Extract video from response
+                if hasattr(response, 'generated_videos') and response.generated_videos:
+                    video = response.generated_videos[0]
+                    if hasattr(video, 'video'):
+                        if hasattr(video.video, 'video_bytes'):
+                            video_data = video.video.video_bytes
+                        elif hasattr(video.video, 'uri'):
+                            # Need to download from URI
+                            video_uri = video.video.uri
+                            logger.info(f"   Downloading video from {video_uri}")
+                            video_data = await self._download_video(video_uri)
                 
-                if not video_data and waited >= max_wait:
-                    return {"error": "Video generation timed out after 5 minutes", "video_data": None}
+                if not video_data:
+                    logger.error("No video data in Veo response")
+                    return {"error": "No video generated by Veo", "video_data": None}
                     
-            except Exception as poll_error:
-                logger.error(f"   Error waiting for video: {poll_error}")
+            except Exception as gen_error:
+                logger.error(f"   Error generating video: {gen_error}")
                 import traceback
                 traceback.print_exc()
-                return {"error": f"Error waiting for video: {poll_error}", "video_data": None}
-            
-            if not video_data:
-                logger.error("No video data in Veo response")
-                return {"error": "No video generated by Veo", "video_data": None}
+                return {"error": f"Error generating video: {gen_error}", "video_data": None}
             
             generation_time = time.time() - start_time
             size_mb = len(video_data) / (1024 * 1024)
@@ -492,7 +457,7 @@ class OpenAIClient:
             }
     
     async def _download_video(self, uri: str) -> Optional[bytes]:
-        """Download video from Google Cloud Storage URI"""
+        """Download video from Google Cloud Storage URI with redirect support"""
         try:
             import httpx
             
@@ -507,6 +472,7 @@ class OpenAIClient:
                 response = await client.get(uri, timeout=60.0)
                 response.raise_for_status()
                 return response.content
+                
         except Exception as e:
             logger.error(f"Failed to download video from {uri}: {e}")
             return None
@@ -514,7 +480,3 @@ class OpenAIClient:
     async def close(self):
         """Close the client"""
         await self.openai_client.close()
-
-
-# Need to import time at module level for the helper methods
-import time
