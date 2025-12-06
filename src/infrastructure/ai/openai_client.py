@@ -414,8 +414,10 @@ class OpenAIClient:
                     logger.info(f"   Still generating... ({waited}s)")
                     
                     # Refresh operation status by getting it again
+                    # operation.name is already a string, pass it directly
                     if hasattr(operation, 'name') and operation.name:
-                        operation = self.gemini_client.operations.get(operation.name)
+                        op_name = operation.name if isinstance(operation.name, str) else str(operation.name)
+                        operation = self.gemini_client.operations.get(op_name)
                 
                 if not is_done and waited >= max_wait:
                     return {"error": "Video generation timed out after 5 minutes", "video_data": None}
