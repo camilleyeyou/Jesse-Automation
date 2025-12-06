@@ -413,11 +413,14 @@ class OpenAIClient:
                     waited += poll_interval
                     logger.info(f"   Still generating... ({waited}s)")
                     
-                    # Refresh operation status by getting it again
-                    # operation.name is already a string, pass it directly
-                    if hasattr(operation, 'name') and operation.name:
-                        op_name = operation.name if isinstance(operation.name, str) else str(operation.name)
-                        operation = self.gemini_client.operations.get(op_name)
+                    # Refresh operation status
+                    # Use wait() method if available, otherwise just re-check the same operation
+                    try:
+                        if hasattr(self.gemini_client.operations, 'wait'):
+                            operation = self.gemini_client.operations.wait(operation)
+                        # Otherwise the operation object updates in place, just continue polling
+                    except Exception as refresh_err:
+                        logger.debug(f"Could not refresh operation: {refresh_err}, continuing with current state")
                 
                 if not is_done and waited >= max_wait:
                     return {"error": "Video generation timed out after 5 minutes", "video_data": None}
