@@ -400,7 +400,12 @@ class OpenAIClient:
                 waited = 0
                 
                 while waited < max_wait:
-                    # Check if done first (before any polling delay on first iteration)
+                    # Check if operation is complete by refreshing from server
+                    if hasattr(operation, 'name') and operation.name:
+                        # Refresh operation status from server
+                        operation = self.gemini_client.operations.get(name=operation.name)
+                    
+                    # Check if done
                     is_done = getattr(operation, 'done', False)
                     
                     if is_done:
@@ -411,16 +416,13 @@ class OpenAIClient:
                             response = operation.response
                             if hasattr(response, 'generated_videos') and response.generated_videos:
                                 video = response.generated_videos[0]
-                                if hasattr(video, 'video'):
-                                    video_obj = video.video
-                                    # Try video_bytes first
-                                    if hasattr(video_obj, 'video_bytes') and video_obj.video_bytes:
-                                        video_data = video_obj.video_bytes
-                                    # Otherwise try URI download
-                                    elif hasattr(video_obj, 'uri') and video_obj.uri:
-                                        video_uri = video_obj.uri
-                                        logger.info(f"   Downloading video from {video_uri}")
-                                        video_data = await self._download_video(video_uri)
+                                if hasattr(video, 'video') and hasattr(video.video, 'video_bytes'):
+                                    video_data = video.video.video_bytes
+                                elif hasattr(video, 'video') and hasattr(video.video, 'uri'):
+                                    # Need to download from URI
+                                    video_uri = video.video.uri
+                                    logger.info(f"   Downloading video from {video_uri}")
+                                    video_data = await self._download_video(video_uri)
                         break
                     
                     # Check for error
@@ -429,14 +431,9 @@ class OpenAIClient:
                         logger.error(f"   Video generation failed: {error_msg}")
                         return {"error": f"Video generation failed: {error_msg}", "video_data": None}
                     
-                    # Sleep before polling again
                     await asyncio.sleep(poll_interval)
                     waited += poll_interval
                     logger.info(f"   Still generating... ({waited}s)")
-                    
-                    # Refresh operation status from server
-                    # Pass the operation object directly (not name=operation.name)
-                    operation = self.gemini_client.operations.get(operation)
                 
                 if not video_data and waited >= max_wait:
                     return {"error": "Video generation timed out after 5 minutes", "video_data": None}
@@ -505,11 +502,11 @@ class OpenAIClient:
                 # gs://bucket/path -> https://storage.googleapis.com/bucket/path
                 uri = uri.replace("gs://", "https://storage.googleapis.com/")
             
-            async with httpx.AsyncClient() as client:
+            # FIXED: Add follow_redirects=True to handle 302 responses
+            async with httpx.AsyncClient(follow_redirects=True) as client:
                 response = await client.get(uri, timeout=60.0)
                 response.raise_for_status()
                 return response.content
-                
         except Exception as e:
             logger.error(f"Failed to download video from {uri}: {e}")
             return None
