@@ -390,8 +390,8 @@ class OpenAIClient:
                 )
                 
                 # Poll the operation until complete
-                max_wait = 300  # 5 minutes
-                poll_interval = 10
+                max_wait = 600  # 10 minutes (Veo can take a while)
+                poll_interval = 5  # Check every 5 seconds instead of 10
                 waited = 0
                 
                 while waited < max_wait:
