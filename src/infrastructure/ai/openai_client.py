@@ -379,29 +379,62 @@ class OpenAIClient:
             if include_audio:
                 config_params["include_audio"] = True
             
-            # Generate video - SDK blocks and waits for completion
+            # Generate video - returns a long-running operation
             logger.info("   Waiting for video generation to complete...")
             
             try:
-                response = self.gemini_client.models.generate_videos(
+                operation = self.gemini_client.models.generate_videos(
                     model=video_model,
                     prompt=prompt,
                     config=types.GenerateVideosConfig(**config_params)
                 )
                 
+                # Poll the operation until complete
+                max_wait = 300  # 5 minutes
+                poll_interval = 10
+                waited = 0
+                
+                while waited < max_wait:
+                    # Check if operation is complete
+                    is_done = getattr(operation, 'done', False)
+                    
+                    if is_done:
+                        logger.info(f"   Video generation completed after {waited}s!")
+                        break
+                    
+                    # Check for error
+                    if hasattr(operation, 'error') and operation.error:
+                        error_msg = str(operation.error)
+                        logger.error(f"   Video generation error: {error_msg}")
+                        return {"error": f"Video generation failed: {error_msg}", "video_data": None}
+                    
+                    # Wait and poll again
+                    await asyncio.sleep(poll_interval)
+                    waited += poll_interval
+                    logger.info(f"   Still generating... ({waited}s)")
+                    
+                    # Refresh operation status by getting it again
+                    if hasattr(operation, 'name') and operation.name:
+                        operation = self.gemini_client.operations.get(operation.name)
+                
+                if not is_done and waited >= max_wait:
+                    return {"error": "Video generation timed out after 5 minutes", "video_data": None}
+                
                 video_data = None
                 
-                # Extract video from response
-                if hasattr(response, 'generated_videos') and response.generated_videos:
-                    video = response.generated_videos[0]
-                    if hasattr(video, 'video'):
-                        if hasattr(video.video, 'video_bytes'):
-                            video_data = video.video.video_bytes
-                        elif hasattr(video.video, 'uri'):
-                            # Need to download from URI
-                            video_uri = video.video.uri
-                            logger.info(f"   Downloading video from {video_uri}")
-                            video_data = await self._download_video(video_uri)
+                # Extract video from completed operation response
+                if hasattr(operation, 'response') and operation.response:
+                    response = operation.response
+                    if hasattr(response, 'generated_videos') and response.generated_videos:
+                        video = response.generated_videos[0]
+                        if hasattr(video, 'video'):
+                            if hasattr(video.video, 'video_bytes'):
+                                video_data = video.video.video_bytes
+                            elif hasattr(video.video, 'uri'):
+                                # Need to download from URI
+                                video_uri = video.video.uri
+                                logger.info(f"   Downloading video from {video_uri}")
+                                video_data = await self._download_video(video_uri)
                 
                 if not video_data:
                     logger.error("No video data in Veo response")
