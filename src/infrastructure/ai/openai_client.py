@@ -390,37 +390,51 @@ class OpenAIClient:
                 )
                 
                 # Poll the operation until complete
-                max_wait = 600  # 10 minutes (Veo can take a while)
-                poll_interval = 5  # Check every 5 seconds instead of 10
+                max_wait = 600  # 10 minutes
+                poll_interval = 5
                 waited = 0
+                operation_name = operation.name if hasattr(operation, 'name') else str(operation)
+                
+                logger.info(f"   Operation name: {operation_name}")
                 
                 while waited < max_wait:
-                    # Check if operation is complete
-                    is_done = getattr(operation, 'done', False)
-                    
-                    if is_done:
-                        logger.info(f"   Video generation completed after {waited}s!")
-                        break
-                    
-                    # Check for error
-                    if hasattr(operation, 'error') and operation.error:
-                        error_msg = str(operation.error)
-                        logger.error(f"   Video generation error: {error_msg}")
-                        return {"error": f"Video generation failed: {error_msg}", "video_data": None}
-                    
-                    # Wait and poll again
-                    await asyncio.sleep(poll_interval)
-                    waited += poll_interval
-                    logger.info(f"   Still generating... ({waited}s)")
-                    
-                    # Refresh operation status
-                    # Use wait() method if available, otherwise just re-check the same operation
                     try:
-                        if hasattr(self.gemini_client.operations, 'wait'):
-                            operation = self.gemini_client.operations.wait(operation)
-                        # Otherwise the operation object updates in place, just continue polling
-                    except Exception as refresh_err:
-                        logger.debug(f"Could not refresh operation: {refresh_err}, continuing with current state")
+                        # CRITICAL FIX: Fetch fresh operation status from server
+                        # Don't check the stale operation object, get a fresh one
+                        fresh_operation = self.gemini_client.operations.get(operation_name)
+                        is_done = getattr(fresh_operation, 'done', False)
+                        
+                        if is_done:
+                            logger.info(f"   Video generation completed after {waited}s!")
+                            operation = fresh_operation
+                            break
+                        
+                        # Check for error
+                        if hasattr(fresh_operation, 'error') and fresh_operation.error:
+                            error_msg = str(fresh_operation.error)
+                            logger.error(f"   Video generation error: {error_msg}")
+                            return {"error": f"Video generation failed: {error_msg}", "video_data": None}
+                        
+                        # Wait and poll again
+                        await asyncio.sleep(poll_interval)
+                        waited += poll_interval
+                        logger.info(f"   Still generating... ({waited}s)")
+                        
+                    except TypeError as e:
+                        # If get() has issues with string argument, try alternative approach
+                        if "get() got an unexpected keyword argument" in str(e):
+                            logger.warning(f"   SDK operations.get() incompatible, using fallback wait method")
+                            try:
+                                operation = self.gemini_client.operations.wait(operation_name)
+                                is_done = getattr(operation, 'done', False)
+                                if is_done:
+                                    logger.info(f"   Video generation completed!")
+                                    break
+                            except Exception as wait_err:
+                                logger.error(f"   Fallback wait failed: {wait_err}")
+                                raise
+                        else:
+                            raise
                 
                 if not is_done and waited >= max_wait:
                     return {"error": "Video generation timed out after 5 minutes", "video_data": None}
