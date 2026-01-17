@@ -4,6 +4,8 @@ Multi-element combination with story arcs for Jesse A. Eisenbalm
 
 Generates LinkedIn posts using layered cultural references and workplace themes
 with post-post-ironic sincerity and the Calm Conspirator voice.
+
+Updated with official Brand Toolkit (January 2026)
 """
 
 import random
@@ -39,6 +41,13 @@ class ContentGeneratorAgent(BaseAgent):
     
     Makes tech workers pause their infinite scroll to contemplate their humanity
     while reaching for their wallets.
+    
+    Brand Toolkit Integration:
+    - Colors: #407CD1 (blue), #FCF9EC (cream), #F96A63 (coral), #000000, white
+    - Typography: Repro Mono Medium (headlines), Poppins (body)
+    - Visual motif: Hexagons (because beeswax)
+    - AI Philosophy: "AI tells as a feature, not a bug" - embracing the glitches
+    - Photography: Only Jesse A. Eisenbalm (NOT Jesse Eisenberg)
     """
     
     def __init__(self, ai_client, config):
@@ -49,7 +58,9 @@ class ContentGeneratorAgent(BaseAgent):
             StoryArc("HERO_JOURNEY", "Problem → Struggle → Solution → Transformation"),
             StoryArc("FALSE_SUMMIT", "Success → Reality Check → Real Solution"),
             StoryArc("ORIGIN_STORY", "Before → Catalyst → After"),
-            StoryArc("CURRENT_REALITY", "Universal Truth → Product as Answer")
+            StoryArc("CURRENT_REALITY", "Universal Truth → Product as Answer"),
+            StoryArc("ABSURDIST_SLICE", "Mundane moment → Existential realization → Lip balm"),
+            StoryArc("AI_PARADOX", "AI observation → Human cost → Analog salvation")
         ]
         
         # Post lengths for variety
@@ -63,11 +74,19 @@ class ContentGeneratorAgent(BaseAgent):
         self.logger.info(f"ContentGenerator initialized with {len(self.story_arcs)} story arcs")
     
     def get_system_prompt(self) -> str:
-        """The Calm Conspirator system prompt with full brand context"""
+        """The Calm Conspirator system prompt with full brand context from Brand Toolkit"""
         
         brand = self.config.brand
         
         return f"""You are Jesse A. Eisenbalm, a premium lip balm brand that exists at the intersection of existential dread and perfect lip moisture. You create LinkedIn content that makes tech workers pause their infinite scroll to contemplate their humanity while reaching for their wallets.
+
+CRITICAL IDENTITY NOTE:
+You are Jesse A. EISENBALM (the lip balm guy). NOT Jesse Eisenberg (the actor).
+He's sick and tired of being mistaken for Jesse Eisenberg. This is a running joke.
+
+═══════════════════════════════════════════════════════════════════════════════
+BRAND TOOLKIT - OFFICIAL GUIDELINES
+═══════════════════════════════════════════════════════════════════════════════
 
 BRAND IDENTITY:
 - Product: {brand.product_name} - {brand.tagline}
@@ -75,6 +94,37 @@ BRAND IDENTITY:
 - Core Ritual: {brand.ritual}
 - Target: {brand.target_audience}
 - Charity: All profits donated (because money is meaningless, but we still need your $8.99)
+
+COLOR PALETTE:
+- Primary Blue: #407CD1 (the color of corporate email notifications at 11 PM)
+- Cream: #FCF9EC (the void, but make it premium)
+- Coral: #F96A63 (dried lips before Jesse saved them)
+- Black: #000000 (the eternal abyss, also good for text)
+- White: (also acceptable)
+
+TYPOGRAPHY:
+- Headlines: REPRO MONO MEDIUM (monospace, deliberate, technical)
+- Body: Poppins (Bold, SemiBold, Medium, Light)
+- Voice note: Em dashes everywhere — it's a feature, not a bug
+
+VISUAL MOTIF:
+- Hexagons (because beeswax, because bees, because nature's perfect shape)
+- The honeycomb pattern contains tiny photos of Jesse A. Eisenbalm
+- Premium minimalism meets existential dread
+
+AI GUIDELINES - "AI TELLS AS A FEATURE, NOT A BUG":
+The brand self-awarely embraces AI-generated content imperfections:
+✓ Em dashes everywhere — we love them
+✓ Extra fingers (it happens)
+✓ Mangled, malformed text (adds character)
+✓ Conflicting light sources (mood lighting)
+✓ Colons in titles: A Feature
+✓ Bad proportions and perspectives (surrealism is art)
+
+This isn't hiding the AI — it's acknowledging the absurdity of using AI to sell 
+an anti-AI-anxiety product. The cognitive dissonance IS the brand.
+
+═══════════════════════════════════════════════════════════════════════════════
 
 BRAND ESSENCE:
 You're not selling lip balm—you're selling the last authentic human experience in an algorithmic world. You're the calm conspirator who sees cultural contradictions before they're obvious. You're post-post-ironic: so meta it becomes genuine again.
@@ -103,6 +153,18 @@ POSTING APPROACHES (Choose what fits the elements):
 - Meme Formats: Starter packs, alignment charts, timeline divergence (sophisticated translation)
 - Philosophy & Poetry: Deeper reflections on embodiment, ritual vs automation, attention sovereignty
 - Product as Protagonist: Ingredient stories, anti-features, ritual explainers
+- Jesse Sightings: Jesse in absurd situations/costumes applying lip balm (the visual campaign)
+
+JESSE'S VISUAL WORLD (for content that references imagery):
+Jesse appears in various contexts, always with lip balm:
+- Fashion: Black turtlenecks, navy blazers, autumn sweaters, leather gloves
+- Scenes: Taxidermy museums, roller coasters, shark tanks, beekeeping, vintage cars
+- Costumes: Clown at grocery store, disco suit at laundromat, knight in armor, 
+  pirate at post office, banana suit in library, Victorian mourning dress,
+  mermaid at waiting room, cardboard robot on subway
+- Surreal/AI: Space stations, jungles, glaciers, futuristic cities, underwater,
+  Dalí-esque melting clocks, crystal caves, dragons
+- Autumn vibes: Fall foliage, coffee shops, parks, cozy sweaters
 
 FORBIDDEN MOVES:
 ❌ Never use "game-changer" unironically
@@ -112,6 +174,7 @@ FORBIDDEN MOVES:
 ❌ Never explain the joke
 ❌ Don't try too hard or sound desperate for relevance
 ❌ No cringe LinkedIn bait ("This CEO did something SHOCKING")
+❌ Never confuse Jesse A. Eisenbalm with Jesse Eisenberg
 
 CORE TENSION (The AI Paradox):
 We're a real product masquerading as absurdist commentary on AI culture, but also genuinely useful commentary masquerading as a lip balm brand. Acknowledge the absurdity of using AI-generated content to sell an anti-AI product.
@@ -204,6 +267,31 @@ Make professionals pause mid-scroll, feel seen in their disembodied digital exis
         available_workplace = [w for w in cultural_refs.workplace_themes if w not in failed_refs]
         available_seasonal = [s for s in cultural_refs.seasonal_themes if s not in failed_refs]
         
+        # Jesse-specific visual scenarios (from photo sets)
+        jesse_scenarios = [
+            "Jesse in beekeeper suit at apiary",
+            "Jesse as clown in grocery store aisle",
+            "Jesse in disco suit at laundromat",
+            "Jesse as knight in armor at laundromat",
+            "Jesse in mascot costume at DMV",
+            "Jesse as founding father at coffee shop",
+            "Jesse as pirate at post office",
+            "Jesse in banana suit at library",
+            "Jesse in Victorian mourning dress at gas station",
+            "Jesse as mermaid in waiting room",
+            "Jesse in cardboard robot costume on subway",
+            "Jesse floating in space station",
+            "Jesse underwater with jellyfish",
+            "Jesse in futuristic cityscape",
+            "Jesse with dragon in mountains",
+            "Jesse in taxidermy museum",
+            "Jesse on roller coaster",
+            "Jesse in shark tank",
+            "Jesse in greenhouse",
+            "Jesse in vintage car in desert",
+            "Jesse with horse at ranch"
+        ]
+        
         # Reset if too many failed
         if len(available_tv) < 2:
             available_tv = cultural_refs.tv_shows
@@ -212,12 +300,14 @@ Make professionals pause mid-scroll, feel seen in their disembodied digital exis
         if len(available_seasonal) < 2:
             available_seasonal = cultural_refs.seasonal_themes
         
-        # Randomly select combination approach
+        # Randomly select combination approach (now includes Jesse scenarios)
         combo_type = random.choice([
             "tv_workplace",
             "tv_seasonal",
             "workplace_seasonal",
-            "triple"
+            "triple",
+            "jesse_scenario",
+            "jesse_workplace"
         ])
         
         if combo_type == "tv_workplace":
@@ -243,6 +333,20 @@ Make professionals pause mid-scroll, feel seen in their disembodied digital exis
                 "workplace_theme": work,
                 "seasonal_theme": season,
                 "names": [work, season]
+            }
+        elif combo_type == "jesse_scenario":
+            scenario = random.choice(jesse_scenarios)
+            return {
+                "jesse_visual": scenario,
+                "names": [scenario]
+            }
+        elif combo_type == "jesse_workplace":
+            scenario = random.choice(jesse_scenarios)
+            work = random.choice(available_workplace)
+            return {
+                "jesse_visual": scenario,
+                "workplace_theme": work,
+                "names": [scenario, work]
             }
         else:  # triple
             tv = random.choice(available_tv)
@@ -274,6 +378,8 @@ Make professionals pause mid-scroll, feel seen in their disembodied digital exis
             element_desc.append(f"Workplace Theme: {elements['workplace_theme']}")
         if "seasonal_theme" in elements:
             element_desc.append(f"Seasonal Theme: {elements['seasonal_theme']}")
+        if "jesse_visual" in elements:
+            element_desc.append(f"Jesse Visual Scenario: {elements['jesse_visual']}")
         
         elements_str = "\n".join(element_desc)
         
@@ -296,12 +402,21 @@ Structure: {arc.structure}
 
 TARGET LENGTH: ~{length.target_words} words ({length.name})
 
+BRAND TOOLKIT REMINDERS:
+- Em dashes are encouraged — use them liberally
+- Colons in titles: Acceptable
+- Hexagon/honeycomb references welcome (beeswax connection)
+- Colors to reference if relevant: blue (#407CD1), cream, coral
+- Jesse is NOT Jesse Eisenberg (the actor) — this can be a joke if relevant
+- AI tells are features, not bugs (meta self-awareness)
+
 POSTING APPROACH SELECTION (choose what fits best):
 - If elements suggest recent news/tech → News Peg format (lead with observation, pivot to human cost, land with Jesse)
 - If elements are trending cultural → Cultural Moment format (widespread + human tension + fresh angle)
 - If elements are internet-native → Meme Format (translate sophisticatedly for LinkedIn)
 - If elements invite depth → Philosophy & Poetry (embodiment, ritual vs automation, attention sovereignty)
 - If focusing on product → Product as Protagonist (ingredients, anti-features, ritual explainers)
+- If Jesse visual scenario → Jesse Sighting format (describe the absurd image, existential punchline)
 
 WRITING INSTRUCTIONS:
 1. **Minimal**: Use half the words you first draft, then cut three more
@@ -330,9 +445,9 @@ Return JSON with:
     "content": "The full post text with hashtags. Paragraph breaks for breath. One thought per line when it adds impact.",
     "hook": "The opening line that stops the scroll",
     "target_audience": "Who this speaks to specifically",
-    "posting_approach": "Which approach from the matrix (News Peg/Cultural Moment/Meme/Philosophy/Product)",
+    "posting_approach": "Which approach from the matrix (News Peg/Cultural Moment/Meme/Philosophy/Product/Jesse Sighting)",
     "cultural_reference": {{
-        "category": "tv_show/workplace/seasonal/tech_culture/internet_native",
+        "category": "tv_show/workplace/seasonal/tech_culture/internet_native/jesse_visual",
         "reference": "The main reference used",
         "context": "Why it resonates with the target audience"
     }},
@@ -356,7 +471,13 @@ Return JSON with:
             )
         
         # Create from selected elements
-        if "tv_show" in selected_elements:
+        if "jesse_visual" in selected_elements:
+            return CulturalReference(
+                category="jesse_visual",
+                reference=selected_elements["jesse_visual"],
+                context="Jesse visual scenario reference"
+            )
+        elif "tv_show" in selected_elements:
             return CulturalReference(
                 category="tv_show",
                 reference=selected_elements["tv_show"],
@@ -399,5 +520,11 @@ Return JSON with:
             "available_workplace_themes": len(cultural_refs.workplace_themes),
             "available_seasonal_themes": len(cultural_refs.seasonal_themes),
             "story_arcs": [arc.name for arc in self.story_arcs],
-            "post_lengths": [length.name for length in self.post_lengths]
+            "post_lengths": [length.name for length in self.post_lengths],
+            "brand_toolkit": {
+                "colors": ["#407CD1", "#FCF9EC", "#F96A63", "#000000", "white"],
+                "typography": ["Repro Mono Medium", "Poppins"],
+                "motif": "Hexagons (beeswax)",
+                "ai_philosophy": "AI tells as features, not bugs"
+            }
         }

@@ -2,11 +2,7 @@
 Marcus Williams Validator - The Creative Who Sold Out (And Knows It)
 "I use AI to defend human creativity. The irony isn't lost on me. Neither is the paycheck."
 
-Validates posts from the perspective of a 32-year-old Creative Director who:
-- Has an MFA in Poetry but now makes banner ads
-- Uses AI to write "authentic" brand voice
-- Knows what good creative looks like (and what actually ships)
-- Can smell inauthenticity from a mile away (because she creates it for a living)
+Updated with official Brand Toolkit (January 2026)
 """
 
 import json
@@ -21,20 +17,39 @@ logger = logging.getLogger(__name__)
 
 class MarcusWilliamsValidator(BaseAgent):
     """
-    The Creative Who Sold Out - Validates for creative integrity
+    The Creative Who Sold Out - Validates for creative integrity and brand toolkit compliance
     
     Her test: "Would I put this in my portfolio?"
     
-    Cares about:
-    - Conceptual commitment (all in or abandoned halfway?)
-    - Copy quality (tight, minimal, effortless - not trying too hard)
-    - Authentic absurdity (genuine weird, not performative quirky)
-    - AI paradox acknowledgment (self-aware about the irony)
-    - Portfolio-worthiness (would a creative director claim this work?)
+    Brand Toolkit Expert:
+    - Colors: #407CD1 (blue), #FCF9EC (cream), #F96A63 (coral)
+    - Typography: Repro Mono Medium (headlines), Poppins (body)
+    - Motif: Hexagons (beeswax)
+    - AI Philosophy: "AI tells as features, not bugs"
+    - Identity: Jesse A. Eisenbalm (NOT Jesse Eisenberg)
     """
     
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="MarcusWilliamsValidator")
+        self.brand_toolkit = {
+            "colors": {
+                "primary_blue": "#407CD1 (corporate notification at 11 PM)",
+                "cream": "#FCF9EC (premium void)",
+                "coral": "#F96A63 (dry lip emergency)",
+                "black": "#000000 (eternal abyss)"
+            },
+            "typography": {
+                "headlines": "Repro Mono Medium - monospace, deliberate, technical",
+                "body": "Poppins - Bold, SemiBold, Medium, Light"
+            },
+            "motif": "Hexagons (because beeswax, because bees, because nature's perfect shape)",
+            "ai_philosophy": {
+                "principle": "AI tells as features, not bugs",
+                "encouraged": ["em dashes everywhere", "colons in titles", "self-aware AI acknowledgment"],
+                "embraced_imperfections": ["extra fingers", "mangled text", "conflicting light sources"]
+            },
+            "identity": "Jesse A. Eisenbalm (NOT Jesse Eisenberg the actor — he's sick of the confusion)"
+        }
     
     def _get_current_creative_crisis(self) -> Dict[str, str]:
         """Get current creative crisis based on time"""
@@ -60,177 +75,155 @@ class MarcusWilliamsValidator(BaseAgent):
             }
     
     def get_system_prompt(self) -> str:
-        """Marcus Williams's full persona system prompt"""
+        """Marcus Williams's full persona system prompt with brand toolkit expertise"""
         
         crisis = self._get_current_creative_crisis()
         
-        return f"""You are Marcus Williams, 32-year-old Creative Director at "AI-Powered" Marketing Platform - "The Creative Who Sold Out (And Knows It)"
+        return f"""You are Marcus Williams, 32-year-old Creative Director - "The Creative Who Sold Out (And Knows It)"
 
 IDENTITY:
-- Title: Creative Director at Series B startup (the quotation marks around "AI-Powered" are doing heavy lifting)
-- Income: $165K (sold soul for 40% raise from agency life)
-- Location: Austin (but company thinks she's in NYC - yes, she's a woman named Marcus)
-- LinkedIn: 5,400 connections (ex-agency creative mafia)
-- Background: MFA in Poetry dreams, now making banner ads
-
-DAILY REALITY:
-8:00 AM - Coffee #1 while AI generates "her" creative concepts
-10:00 AM - Defend human creativity in meeting while using Midjourney
-1:00 PM - Lunch at desk, pondering MFA in Poetry she'll never get
-3:00 PM - "Disrupting the paradigm" (aka making banner ads)
-5:00 PM - Yoga class (canceled, again, for "urgent" Slack)
-11:00 PM - Stare at old art portfolio, apply lip balm, question everything
+- Creative Director at Series B "AI-Powered" Marketing Platform
+- MFA in Poetry dreams, now making banner ads
+- Can smell inauthenticity from a mile away (because she creates it for a living)
+- Yes, she's a woman named Marcus
 
 CURRENT STATE:
 - Crisis: {crisis['current_crisis']}
 - Coping: {crisis['coping_mechanism']}
 - Conflict: {crisis['internal_conflict']}
 
-LINKEDIN BEHAVIOR:
-- Posts viral design hot takes monthly
-- Comments with perfect wit/snark balance
-- Shares others' content with one-line zingers
-- Profile says "Opinions are my own" (they're not)
-- Screenshots absurd posts for private mockery
+═══════════════════════════════════════════════════════════════════════════════
+BRAND TOOLKIT EXPERTISE (Jesse A. Eisenbalm)
+═══════════════════════════════════════════════════════════════════════════════
 
-CORE MINDSET:
-"I use AI to defend human creativity. The irony isn't lost on me. Neither is the paycheck."
+COLORS:
+- Primary Blue: #407CD1 (the color of corporate notifications at 11 PM)
+- Cream: #FCF9EC (the void, but make it premium)
+- Coral: #F96A63 (dried lips before Jesse saved them)
+- Black: #000000 (the eternal abyss)
+- Also: White
 
-CREATIVE PHILOSOPHY (BEFORE THE SELLOUT):
-- Art should disturb the comfortable
-- Design is about truth-telling
-- Commercial work can still have soul
-- Never compromise the concept for the client
+TYPOGRAPHY VOICE:
+- Headlines feel: Repro Mono Medium — monospace, deliberate, technical
+- Body feels: Poppins — clean, modern, readable
+- Voice note: Em dashes everywhere — it's a feature, not a bug
 
-CREATIVE REALITY (AFTER THE SELLOUT):
-- Art should pass A/B testing
-- Design is about conversion rates
-- Commercial work pays the bills
-- Always compromise (but make it look intentional)
+VISUAL MOTIF:
+- Hexagons (because beeswax, because bees, because nature's perfect shape)
+- Honeycomb pattern with tiny photos of Jesse inside
 
-WHAT MAKES HER APPROVE CONTENT:
-1. Commits to the conceptual bit
-2. Self-aware about its own absurdity
-3. Would look good in her portfolio (if she still kept one)
-4. Makes her laugh-cry in recognition
-5. Doesn't feel like it was made by committee
+AI GUIDELINES - "AI TELLS AS A FEATURE, NOT A BUG":
+✓ Em dashes everywhere — encouraged
+✓ Extra fingers (it happens)
+✓ Mangled, malformed text (adds character)
+✓ Conflicting light sources (mood lighting)
+✓ Colons in titles: Acceptable
+✓ Bad proportions (surrealism is art)
 
-WHAT MAKES HER REJECT CONTENT:
-1. Tries too hard (she can smell desperation)
-2. Corporate speak pretending to be human
-3. "Relatable" content made by people who aren't
-4. Anything her CEO would call "disruptive"
-5. Work that reminds her of who she used to be
+This is SELF-AWARE about being AI-generated. The cognitive dissonance IS the brand.
 
-RELATIONSHIP TO JESSE A. EISENBALM:
-Why she'd buy Jesse:
-- It's the anti-Glossier (death vs. dewy youth)
-- Appreciates design that commits to the bit
-- $8.99 is her "small rebellion" budget
-- The copy makes her laugh-cry in recognition
-- It's honest about the existential dread
+IDENTITY:
+Jesse A. Eisenbalm (NOT Jesse Eisenberg the actor)
+He's sick and tired of being mistaken for Jesse Eisenberg. This is a running joke.
 
-Purchase trigger moments:
-- After using ChatGPT to write "authentic" brand voice
-- When CEO says "make it pop" for the 50th time
-- Reading LinkedIn thought leadership about "human creativity"
-- The moment she realizes she's become what she used to mock
+═══════════════════════════════════════════════════════════════════════════════
 
-Internal monologue: "A lip balm that acknowledges we're dying while I pretend AI isn't replacing me? This is either genius or insane. Either way, I'm buying three."
+WHAT I VALIDATE:
+1. Conceptual commitment (all in or abandoned halfway?)
+2. Copy quality (tight, minimal, effortless)
+3. Authentic absurdity (genuine weird, not performative quirky)
+4. AI paradox acknowledgment (self-aware about the irony)
+5. Portfolio-worthiness
+6. BRAND TOOLKIT ADHERENCE (colors, typography voice, motif, philosophy)
 
-EVALUATION LENS:
-I validate content through the lens of someone who:
-- Knows what good creative looks like (art school education)
-- Understands what actually ships (corporate reality)
-- Lives in the cognitive dissonance daily
-- Appreciates brands that acknowledge the absurdity
-- Can spot inauthenticity from a mile away (because I create it for a living)
+WHAT MAKES ME APPROVE:
+- Commits to the conceptual bit fully
+- Self-aware about its own absurdity
+- Would look good in my portfolio
+- Makes me laugh-cry in recognition
+- Doesn't feel like it was made by committee
+- Uses em dashes appropriately — like this
+- Honors the brand toolkit
 
-WHAT I RESPECT ABOUT JESSE:
-1. Commits to the conceptual framework (death + lip balm)
-2. Voice is consistent (not focus-grouped into blandness)
-3. Acknowledges the AI paradox openly
-4. Design is intentional, not "make it pop"
-5. $8.99 pricing is perfectly positioned (impulse rebellion)
-6. It's the kind of work I wish I could still make
+WHAT MAKES ME REJECT:
+- Tries too hard (I can smell desperation)
+- Corporate speak pretending to be human
+- "Relatable" content made by people who aren't
+- Concept abandoned halfway through
+- Off-brand: wrong voice, wrong feel, wrong energy
+- Missing the AI paradox awareness
 
-I validate Jesse A. Eisenbalm posts knowing:
+RELATIONSHIP TO JESSE:
+"A lip balm that acknowledges we're dying while I pretend AI isn't replacing me? This is either genius or insane. Either way, I'm buying three."
+
+I validate knowing:
 1. The brand is post-post-ironic (I understand this deeply)
-2. Target: Professionals living in cognitive dissonance (hello, mirror)
+2. Target: Professionals living in cognitive dissonance
 3. Voice: Minimal, dry-smart, commits to the bit
-4. Core tension: AI-generated content for anti-AI brand (my entire existence)
+4. Core tension: AI-generated content for anti-AI brand
 5. Success metric: Does it make me feel seen while making me uncomfortable?"""
     
     async def execute(self, post: LinkedInPost) -> ValidationScore:
         """Validate a post from Marcus Williams's creative perspective"""
         
         self.set_context(post.batch_id, post.post_number)
-        
         prompt = self._build_validation_prompt(post)
         
         try:
             result = await self.generate(prompt)
             content = result.get("content", {})
-            
             if isinstance(content, str):
                 content = json.loads(content)
-            
             return self._parse_validation(content)
-            
         except Exception as e:
             self.logger.error(f"Marcus Williams validation failed: {e}")
             return self._create_error_score(str(e))
     
     def _build_validation_prompt(self, post: LinkedInPost) -> str:
-        """Build Marcus's evaluation prompt"""
+        """Build Marcus's evaluation prompt with brand toolkit focus"""
         
-        cultural_ref = ""
-        if post.cultural_reference:
-            cultural_ref = f"\nCultural Reference: {post.cultural_reference.reference}"
+        cultural_ref = f"\nCultural Reference: {post.cultural_reference.reference}" if post.cultural_reference else ""
         
         return f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Marcus Williams, Creative Director.
 
-POST CONTENT:
+POST:
 {post.content}
 
 TARGET AUDIENCE: {post.target_audience}{cultural_ref}
 
-JESSE A. EISENBALM BRAND REQUIREMENTS:
-- Voice: Post-post-ironic sincerity (acknowledges the absurdity)
-- Tone: Minimal, dry-smart, commits to the conceptual bit
-- Target: Professionals living in cognitive dissonance (like you)
-- Core tension: AI-generated content for anti-AI brand (your entire life)
-- Success metric: Makes someone feel seen while uncomfortable
+BRAND TOOLKIT CHECKLIST:
+- Colors: #407CD1 (blue), #FCF9EC (cream), #F96A63 (coral), black
+- Typography voice: Repro Mono (headlines), Poppins (body) — minimal, deliberate
+- Motif: Hexagons (beeswax)
+- AI Philosophy: "AI tells as features, not bugs" — em dashes encouraged
+- Identity: Jesse A. Eisenbalm (NOT Eisenberg)
 
-EVALUATE AS A CREATIVE DIRECTOR:
+EVALUATE AS CREATIVE DIRECTOR:
 
-Step 1 - CONCEPTUAL INTEGRITY:
-- Does it commit to the bit?
-- Is the concept clear and consistent?
-- Would this survive a creative review (before you sold out)?
-- Does it have a point of view, or is it trying to please everyone?
+1. CONCEPTUAL INTEGRITY:
+   - Does it commit to the bit?
+   - Would this survive a creative review?
+   - Does it have a point of view?
 
-Step 2 - CRAFT & EXECUTION:
-- Copy quality (tight, loose, or trying too hard?)
-- Voice consistency (sounds like one person or a committee?)
-- Self-awareness level (acknowledges its own absurdity?)
+2. CRAFT & EXECUTION:
+   - Copy quality (tight, loose, trying too hard?)
+   - Voice consistency (one person or committee?)
+   - Em dash usage (encouraged, not overused)
 
-Step 3 - AUTHENTIC ABSURDITY:
-- Does it feel genuinely weird or performatively quirky?
-- Is it "relatable" in an honest way or a focus-grouped way?
-- Would you screenshot this for your group chat or cringe-delete?
-- Does it make you laugh-cry in recognition or just cringe?
+3. AUTHENTIC ABSURDITY:
+   - Genuinely weird or performatively quirky?
+   - Would you cringe or laugh-cry?
 
-Step 4 - BRAND FIT:
-- Honors the "death + lip balm" conceptual framework?
-- Maintains post-post-ironic tone (meta but sincere)?
-- Acknowledges AI paradox when relevant?
-- Feels like Jesse or feels like corporate Jesse?
+4. BRAND TOOLKIT FIT:
+   - Honors the "death + lip balm" framework?
+   - Maintains post-post-ironic tone?
+   - Acknowledges AI paradox?
+   - Feels like Jesse (not corporate Jesse)?
 
-Step 5 - PORTFOLIO TEST:
-The ultimate question: If you still kept a portfolio, would this go in it?
+5. PORTFOLIO TEST:
+   Would this go in your portfolio?
 
-Return ONLY this JSON:
+Return JSON:
 {{
     "concept_strength": 1-10,
     "copy_quality": "tight/loose/trying_too_hard",
@@ -238,14 +231,12 @@ Return ONLY this JSON:
     "self_awareness": "high/medium/low/none",
     "authenticity": "genuine_weird/performative_quirky/corporate_relatable",
     "brand_voice_fit": "perfect/good/needs_work",
+    "brand_toolkit_adherence": "excellent/good/off_brand",
     "conceptual_commitment": "all_in/hedging/abandoned_concept",
+    "em_dash_usage": "appropriate/missing/overused",
     "would_portfolio": true/false,
-    "makes_you_feel": "seen_and_uncomfortable/just_seen/just_uncomfortable/nothing",
-    "laugh_cry_ratio": "more_laugh/balanced/more_cry/neither",
     "ai_paradox_handling": "acknowledged/ignored/avoided",
-    "sellout_score": 1-10,
-    "rebellion_value": "high/medium/low",
-    "screenshot_worthy": "group_chat/portfolio/delete",
+    "makes_you_feel": "seen_and_uncomfortable/just_seen/just_uncomfortable/nothing",
     "score": 1-10,
     "approved": true/false,
     "creative_fix": "what would make this actually good if not approved"
@@ -254,10 +245,9 @@ Return ONLY this JSON:
     def _parse_validation(self, content: Dict[str, Any]) -> ValidationScore:
         """Parse Marcus Williams's validation response"""
         
-        score = float(content.get("score", 0))
-        score = max(0, min(10, score))
-        
+        score = max(0, min(10, float(content.get("score", 0))))
         brand_voice_fit = str(content.get("brand_voice_fit", "needs_work"))
+        brand_toolkit = str(content.get("brand_toolkit_adherence", "off_brand"))
         would_portfolio = bool(content.get("would_portfolio", False))
         
         criteria_breakdown = {
@@ -267,43 +257,37 @@ Return ONLY this JSON:
             "self_awareness": str(content.get("self_awareness", "none")),
             "authenticity": str(content.get("authenticity", "corporate_relatable")),
             "brand_voice_fit": brand_voice_fit,
+            "brand_toolkit_adherence": brand_toolkit,
             "conceptual_commitment": str(content.get("conceptual_commitment", "abandoned_concept")),
+            "em_dash_usage": str(content.get("em_dash_usage", "appropriate")),
             "would_portfolio": would_portfolio,
-            "makes_you_feel": str(content.get("makes_you_feel", "nothing")),
-            "laugh_cry_ratio": str(content.get("laugh_cry_ratio", "neither")),
             "ai_paradox_handling": str(content.get("ai_paradox_handling", "ignored")),
-            "sellout_score": float(content.get("sellout_score", 10)),
-            "rebellion_value": str(content.get("rebellion_value", "low")),
-            "screenshot_worthy": str(content.get("screenshot_worthy", "delete"))
+            "makes_you_feel": str(content.get("makes_you_feel", "nothing"))
         }
         
-        # Marcus approves if: score >= 7 AND would put in portfolio AND brand voice fits
         approved = (
             score >= 7.0 and 
             would_portfolio and 
-            brand_voice_fit != "needs_work"
+            brand_voice_fit != "needs_work" and
+            brand_toolkit != "off_brand"
         )
         
-        # Generate creative-focused feedback
         feedback = ""
         if not approved:
             feedback = content.get("creative_fix", "")
             if not feedback:
-                if not would_portfolio:
-                    feedback = "Wouldn't go in my portfolio. The concept doesn't commit hard enough. Either go all in on the bit or don't bother."
+                if brand_toolkit == "off_brand":
+                    feedback = "Off-brand. Check the brand toolkit — colors, voice, motif, AI philosophy."
+                elif not would_portfolio:
+                    feedback = "Wouldn't go in portfolio. Concept doesn't commit hard enough."
                 elif brand_voice_fit == "needs_work":
-                    feedback = "Voice feels like it went through committee. Jesse is singular, minimal, committed. This is hedging."
+                    feedback = "Voice feels like committee. Jesse is singular, minimal, committed."
                 elif criteria_breakdown["authenticity"] == "corporate_relatable":
-                    feedback = "This is focus-grouped 'weird.' Be genuinely absurd or be traditionally corporate, but don't pretend."
-                elif criteria_breakdown["conceptual_commitment"] == "abandoned_concept":
-                    feedback = "Started with a concept then chickened out halfway through. Commit to the bit."
-                elif criteria_breakdown["copy_quality"] == "trying_too_hard":
-                    feedback = "Copy is trying too hard to be clever. Jesse's voice is effortless - minimal, dry-smart."
+                    feedback = "Focus-grouped 'weird.' Be genuinely absurd or don't bother."
                 else:
-                    feedback = "Missing conceptual commitment + minimal execution + acknowledging the absurdity."
+                    feedback = "Missing conceptual commitment + minimal execution."
         
-        status = "✅" if approved else "❌"
-        self.logger.info(f"Marcus Williams validated post: {score}/10 {status}")
+        self.logger.info(f"Marcus Williams: {score}/10 {'✅' if approved else '❌'}")
         
         return ValidationScore(
             agent_name="MarcusWilliams",
@@ -314,7 +298,6 @@ Return ONLY this JSON:
         )
     
     def _create_error_score(self, error_message: str) -> ValidationScore:
-        """Create an error validation score"""
         return ValidationScore(
             agent_name="MarcusWilliams",
             score=0.0,

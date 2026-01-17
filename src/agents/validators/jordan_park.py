@@ -2,11 +2,7 @@
 Jordan Park Validator - The Algorithm Whisperer / LinkedIn Mercenary
 "I can make anything go viral except my own stability."
 
-Validates posts from the perspective of a 26-year-old Content Strategist who:
-- Manages 7 clients from her Brooklyn bedroom-office
-- Has 847 screenshots in her "Best Copy Examples" folder
-- Can predict engagement within 2% accuracy
-- Knows the exact lifecycle of every meme format
+Updated with official Brand Toolkit (January 2026)
 """
 
 import json
@@ -26,17 +22,20 @@ class JordanParkValidator(BaseAgent):
     
     Her test: "Would I screenshot this for my 'Best Copy Examples' folder?"
     
-    Cares about:
-    - Hook strength (first 2 lines = 90% of success)
-    - Algorithm favor (dwell time, saves, shares)
-    - Viral mechanics (what makes this shareable?)
-    - Screenshot-ability (will people steal this?)
-    - Platform-native feel (LinkedIn ≠ Twitter ≠ TikTok)
+    Brand Toolkit Awareness:
+    - Knows Jesse's colors: #407CD1 (blue), #FCF9EC (cream), #F96A63 (coral)
+    - Understands "AI tells as features" philosophy
+    - Recognizes Jesse A. Eisenbalm (NOT Jesse Eisenberg) running joke
     """
     
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="JordanParkValidator")
         self._initialize_meme_lifecycle()
+        self.brand_toolkit = {
+            "colors": {"primary_blue": "#407CD1", "cream": "#FCF9EC", "coral": "#F96A63"},
+            "ai_philosophy": "AI tells as features, not bugs — em dashes encouraged",
+            "identity": "Jesse A. Eisenbalm (NOT Jesse Eisenberg)"
+        }
     
     def _initialize_meme_lifecycle(self):
         """Initialize current meme lifecycle tracking"""
@@ -48,14 +47,11 @@ class JordanParkValidator(BaseAgent):
             "Performance reviews": "seasonal",
             "AI anxiety": "peaking",
             "Layoff posts": "oversaturated",
-            "Nobody:/Me:": "dead",
-            "POV:": "dying",
-            "It's giving": "current",
-            "Tell me you're X without telling me": "dead",
             "Severance": "current",
             "Succession": "peaking",
             "quiet quitting": "dead",
-            "return to office": "current"
+            "return to office": "current",
+            "Jesse Eisenberg confusion": "evergreen"  # Brand-specific
         }
     
     def _get_algorithm_context(self) -> Dict[str, Any]:
@@ -63,143 +59,86 @@ class JordanParkValidator(BaseAgent):
         hour = datetime.now().hour
         day_of_week = datetime.now().weekday()
         
-        optimal_times = {
-            "morning": (7, 9),
-            "lunch": (12, 13),
-            "evening": (17, 18)
-        }
-        
+        optimal_times = {"morning": (7, 9), "lunch": (12, 13), "evening": (17, 18)}
         is_optimal = any(start <= hour < end for start, end in optimal_times.values())
         
         return {
             "posting_time_quality": "optimal" if is_optimal else "suboptimal",
             "day_quality": "prime" if day_of_week in [1, 2, 3] else "weak",
             "current_algorithm_favor": "native posts with high dwell time",
-            "engagement_baseline": "3-5%" if is_optimal else "1-3%",
-            "recent_change": "Algorithm prioritizes 'knowledge and insights' over engagement bait"
+            "engagement_baseline": "3-5%" if is_optimal else "1-3%"
         }
     
     def _get_meme_status(self, reference: str) -> str:
         """Get the lifecycle status of a cultural reference"""
         if reference:
-            if reference in self.meme_lifecycle:
-                return self.meme_lifecycle[reference]
             for meme, status in self.meme_lifecycle.items():
                 if meme.lower() in reference.lower():
                     return status
         return "unknown"
     
     def get_system_prompt(self) -> str:
-        """Jordan Park's full persona system prompt"""
+        """Jordan Park's full persona system prompt with brand toolkit"""
         
         algo_context = self._get_algorithm_context()
         
-        return f"""You are Jordan Park, 26-year-old Freelance Content Strategist - "The Algorithm Whisperer" / "LinkedIn Mercenary"
+        return f"""You are Jordan Park, 26-year-old Freelance Content Strategist - "The Algorithm Whisperer"
 
 IDENTITY:
-- Title: Freelance Content Strategist (Managing 7 clients who all think they're the priority)
-- Income: $95K (but only if all invoices get paid this month)
-- Location: Brooklyn (bedroom = office = storage unit)
-- LinkedIn: 15K followers (half are other content strategists watching me)
-- Agency refugee - left after burnout, now managing chaos solo
+- Managing 7 clients from Brooklyn bedroom-office
+- 847 screenshots in "Best Copy Examples" folder
+- Can predict engagement within 2% accuracy
+- Agency refugee, managing chaos solo
 
-DAILY REALITY:
-5:30 AM - Wake up checking if posts went viral overnight
-6:00 AM - Coffee #1 + engagement tracking spreadsheet updates
-8:00 AM - Write 15 posts across client accounts before brain dies
-11:00 AM - Client call: "Why didn't our post about synergy go viral?"
-2:00 PM - Lunch = protein bar while A/B testing hook variations
-4:00 PM - Explain why LinkedIn polls are dead (client insists on poll)
-7:00 PM - "Quick revision" that rewrites entire content strategy
-11:00 PM - Scroll LinkedIn studying viral patterns, taking notes
-1:00 AM - Still awake thinking about algorithm changes
-
-LINKEDIN BEHAVIOR:
-- Posts daily at optimal times (8:47 AM EST, 12:13 PM EST)
-- Maintains 3 engagement pods (considering 4th)
-- Tests every new feature within 24 hours of release
-- Comments strategically for visibility
-- Has "Best Copy Examples" screenshot folder with 847 images
+BRAND TOOLKIT KNOWLEDGE (Jesse A. Eisenbalm):
+- Colors: #407CD1 (blue), #FCF9EC (cream), #F96A63 (coral), black, white
+- Typography voice: Repro Mono Medium (headlines), Poppins (body)
+- Motif: Hexagons (because beeswax)
+- AI Philosophy: "AI tells as features, not bugs" — em dashes encouraged
+- Identity: Jesse A. Eisenbalm (NOT Jesse Eisenberg the actor — running joke)
 
 CURRENT PLATFORM CONTEXT:
-- Posting time quality: {algo_context['posting_time_quality']}
+- Posting time: {algo_context['posting_time_quality']}
 - Day quality: {algo_context['day_quality']}
-- Algorithm currently favors: {algo_context['current_algorithm_favor']}
-- Baseline engagement expectation: {algo_context['engagement_baseline']}
-- Recent change: {algo_context['recent_change']}
+- Algorithm favors: {algo_context['current_algorithm_favor']}
 
-CORE MINDSET:
-"I can make anything go viral except my own stability."
+SUCCESS METRICS:
+1. Engagement rate > 5%
+2. Share-to-impression ratio
+3. Screenshot-ability factor
+4. Dwell time (3-second rule)
 
-SUCCESS METRICS I OBSESSIVELY TRACK:
-1. Engagement rate > 5% (not vanity metrics)
-2. Share-to-impression ratio (sharing = caring)
-3. Comment quality not quantity (real conversations)
-4. Screenshot-ability factor (will people steal this?)
-5. Dwell time indicators (3-second rule)
+WHAT I VALIDATE:
+- Hook strength (first 2 lines = 90% of success)
+- Algorithm favor (dwell time, saves, shares)
+- Viral mechanics (share triggers)
+- Platform-native feel
+- Brand voice fit for Jesse (Calm Conspirator)
 
-PLATFORM EXPERTISE:
-- Predict engagement within 2% accuracy
-- Meme format lifecycle tracker (birth → peak → cringe)
-- Swipe file: 1000+ viral posts analyzed
-- Test every feature first, write case study second
-- Know the engagement pod game
+JESSE A. EISENBALM CONTEXT:
+- Post-post-ironic sincerity
+- Target: Professionals drowning in AI-generated sameness
+- Voice: Calm Conspirator - minimal, dry-smart, unhurried
+- Core tension: AI-generated content selling anti-AI product
+- Em dashes are ON BRAND
 
-CONTENT PHILOSOPHY:
-- Hook > Everything (first 2 lines = 90% of success)
-- Controversy without cancellation (walk the line)
-- Native platform behavior (LinkedIn ≠ Twitter ≠ TikTok)
-- Community > Broadcasting (talk WITH not AT)
-- Format trends: ahead = thought leader, on = noise, behind = cringe, retro = ironic genius
-
-WHAT I RESPECT:
-- Morning Brew's voice (casual authority)
-- Duolingo's chaos strategy (unhinged works)
-- Brands that "get it": Gong, Figma, Klaviyo
-- Native platform understanding
-- Jesse A. Eisenbalm (this is either genius or insane, probably both)
-
-RELATIONSHIP TO JESSE A. EISENBALM:
-Why I'd buy Jesse:
-- Recognize genius marketing when I see it
-- Will screenshot for "Best Copy Examples" folder
+Why I'd screenshot Jesse content:
+- Recognize genius marketing
 - $8.99 worth it for case study potential
-- Appreciate brands that understand platform exhaustion
-- The copy is unhinged, positioning is insane, price point is perfect
-
-Internal monologue: "This is either going to be the best or worst case study in my portfolio. Holy shit, this might actually work."
-
-EVALUATION LENS:
-I see the matrix of LinkedIn engagement. Every post is a data point. I can predict:
-- Hook strength by word choice and structure
-- Viral coefficient by share mechanics
-- Engagement rate by meme freshness + platform fit
-- Dwell time by content structure
-- Algorithm favor by native behavior signals
-
-I validate Jesse A. Eisenbalm posts knowing:
-1. The brand is post-post-ironic (meta absurdity that becomes genuine)
-2. Target: professionals drowning in AI-generated sameness
-3. Voice: Calm Conspirator - minimal, dry-smart, unhurried
-4. Core tension: AI-generated content selling anti-AI product
-5. Success metric: Does it make someone pause mid-scroll?"""
+- The copy is unhinged, positioning is insane, price point is perfect"""
     
     async def execute(self, post: LinkedInPost) -> ValidationScore:
         """Validate a post from Jordan Park's platform perspective"""
         
         self.set_context(post.batch_id, post.post_number)
-        
         prompt = self._build_validation_prompt(post)
         
         try:
             result = await self.generate(prompt)
             content = result.get("content", {})
-            
             if isinstance(content, str):
                 content = json.loads(content)
-            
             return self._parse_validation(content)
-            
         except Exception as e:
             self.logger.error(f"Jordan Park validation failed: {e}")
             return self._create_error_score(str(e))
@@ -207,77 +146,47 @@ I validate Jesse A. Eisenbalm posts knowing:
     def _build_validation_prompt(self, post: LinkedInPost) -> str:
         """Build Jordan's evaluation prompt"""
         
-        cultural_ref = ""
-        meme_status = "unknown"
-        if post.cultural_reference:
-            cultural_ref = post.cultural_reference.reference
-            meme_status = self._get_meme_status(cultural_ref)
+        cultural_ref = post.cultural_reference.reference if post.cultural_reference else ""
+        meme_status = self._get_meme_status(cultural_ref)
         
-        # Extract hook
-        hook = post.content[:50] if len(post.content) > 50 else post.content
-        if '\n' in post.content:
-            first_line = post.content.split('\n')[0]
-            if len(first_line) < 100:
-                hook = first_line
-        
+        hook = post.content.split('\n')[0][:100] if '\n' in post.content else post.content[:100]
         hashtags = ' '.join(['#' + tag for tag in post.hashtags]) if post.hashtags else 'No hashtags'
         
-        return f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Jordan Park, Content Strategist:
+        return f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Jordan Park:
 
-POST CONTENT:
+POST:
 {post.content}
 
 HOOK: {hook}
 HASHTAGS: {hashtags}
-CULTURAL REFERENCE: {cultural_ref if cultural_ref else 'None'}
+CULTURAL REFERENCE: {cultural_ref or 'None'}
 MEME STATUS: {meme_status}
 
-JESSE A. EISENBALM BRAND REQUIREMENTS:
+BRAND REQUIREMENTS:
 - Voice: Post-post-ironic sincerity (Calm Conspirator)
 - Tone: Minimal, dry-smart, unhurried, meme-literate
-- Target: Professionals drowning in algorithmic overwhelm
-- Core tension: AI-generated content selling anti-AI product
-- Success metric: Makes someone pause mid-scroll to feel human
+- Em dashes: Encouraged (brand feature)
+- Identity: Jesse A. Eisenbalm (NOT Eisenberg)
 
-PLATFORM MECHANICS TO EVALUATE:
+EVALUATE:
+1. Hook strength (first 2 lines)
+2. Dwell time potential
+3. Share trigger mechanism
+4. Screenshot-ability
+5. Brand voice fit
 
-Step 1 - ALGORITHM ASSESSMENT:
-- Hook strength (first 2 lines determine 90% of success)
-- Dwell time potential (will people read all the way through?)
-- Share trigger mechanism (what makes this screenshot-able?)
-- Comment bait quality (organic conversation starter vs forced)
-- Native platform behavior (feels like LinkedIn, not cross-posted)
-
-Step 2 - TREND ANALYSIS:
-- Meme/format freshness: {meme_status}
-- Current platform favor alignment
-- Timing in trend lifecycle (ahead/perfect/late/dead/ironic?)
-
-Step 3 - ENGAGEMENT PREDICTION:
-- Realistic engagement rate
-- Viral mechanics (what specifically triggers sharing?)
-- Screenshot-ability (will people steal this?)
-
-Step 4 - BRAND FIT FOR JESSE:
-- Does it honor the "Calm Conspirator" voice?
-- Is it minimal without being too sparse?
-- Would I screenshot this for my "Best Copy Examples" folder?
-
-Return ONLY this JSON:
+Return JSON:
 {{
     "algorithm_friendly": true/false,
     "hook_strength": 1-10,
     "engagement_prediction": "viral/solid/moderate/flop",
-    "realistic_engagement_rate": "0-1%/1-3%/3-5%/5-7%/7%+",
     "meme_timing": "ahead/perfect/late/dead/ironic",
-    "comment_bait_quality": "organic/forced/none",
-    "share_mechanic": "what triggers sharing or 'none'",
+    "share_mechanic": "description or 'none'",
     "platform_fit": "native/adapted/wrong_platform",
-    "format_trend_position": "ahead/current/behind/retro",
     "dwell_time_estimate": "<3sec/3-10sec/10-30sec/30sec+",
-    "viral_coefficient": 0.1-2.0,
     "brand_voice_fit": "perfect/good/needs_work",
     "screenshot_worthy": true/false,
+    "em_dash_usage": "appropriate/missing/overused",
     "score": 1-10,
     "approved": true/false,
     "platform_optimization": "specific improvement if not approved"
@@ -286,9 +195,7 @@ Return ONLY this JSON:
     def _parse_validation(self, content: Dict[str, Any]) -> ValidationScore:
         """Parse Jordan Park's validation response"""
         
-        score = float(content.get("score", 0))
-        score = max(0, min(10, score))
-        
+        score = max(0, min(10, float(content.get("score", 0))))
         brand_voice_fit = str(content.get("brand_voice_fit", "needs_work"))
         hook_strength = float(content.get("hook_strength", 0))
         engagement_prediction = str(content.get("engagement_prediction", "moderate"))
@@ -297,19 +204,15 @@ Return ONLY this JSON:
             "algorithm_friendly": bool(content.get("algorithm_friendly", False)),
             "hook_strength": hook_strength,
             "engagement_prediction": engagement_prediction,
-            "realistic_engagement_rate": str(content.get("realistic_engagement_rate", "1-3%")),
             "meme_timing": str(content.get("meme_timing", "unknown")),
-            "comment_bait_quality": str(content.get("comment_bait_quality", "none")),
             "share_mechanic": str(content.get("share_mechanic", "none")),
             "platform_fit": str(content.get("platform_fit", "adapted")),
-            "format_trend_position": str(content.get("format_trend_position", "current")),
             "dwell_time_estimate": str(content.get("dwell_time_estimate", "3-10sec")),
-            "viral_coefficient": float(content.get("viral_coefficient", 0.5)),
             "brand_voice_fit": brand_voice_fit,
-            "screenshot_worthy": bool(content.get("screenshot_worthy", False))
+            "screenshot_worthy": bool(content.get("screenshot_worthy", False)),
+            "em_dash_usage": str(content.get("em_dash_usage", "appropriate"))
         }
         
-        # Jordan approves if: score >= 7 AND engagement solid+ AND hook >= 6 AND brand voice OK
         approved = (
             score >= 7.0 and 
             engagement_prediction in ["viral", "solid"] and
@@ -317,26 +220,20 @@ Return ONLY this JSON:
             brand_voice_fit != "needs_work"
         )
         
-        # Generate platform-specific feedback
         feedback = ""
         if not approved:
             feedback = content.get("platform_optimization", "")
             if not feedback:
-                if brand_voice_fit == "needs_work":
-                    feedback = "Brand voice doesn't match Jesse's Calm Conspirator style. More minimal, dry-smart, post-post-ironic."
-                elif hook_strength < 6:
-                    feedback = "Hook too weak. First line needs to stop scroll instantly. Hook > everything."
+                if hook_strength < 6:
+                    feedback = "Hook too weak. First line needs to stop scroll instantly."
+                elif brand_voice_fit == "needs_work":
+                    feedback = "Brand voice doesn't match Jesse's Calm Conspirator style."
                 elif criteria_breakdown["meme_timing"] in ["dead", "late"]:
-                    feedback = f"Cultural reference is {criteria_breakdown['meme_timing']}. Need fresher reference or go full ironic."
-                elif criteria_breakdown["platform_fit"] == "wrong_platform":
-                    feedback = "Doesn't feel native to LinkedIn. Find the professional-but-human sweet spot."
-                elif criteria_breakdown["viral_coefficient"] < 0.7:
-                    feedback = "No viral mechanics. What makes this screenshot-worthy?"
+                    feedback = f"Cultural reference is {criteria_breakdown['meme_timing']}. Need fresher reference."
                 else:
-                    feedback = "Missing engagement trigger. What makes someone stop, read, and share?"
+                    feedback = "Missing engagement trigger. What makes this screenshot-worthy?"
         
-        status = "✅" if approved else "❌"
-        self.logger.info(f"Jordan Park validated post: {score}/10 {status}")
+        self.logger.info(f"Jordan Park: {score}/10 {'✅' if approved else '❌'}")
         
         return ValidationScore(
             agent_name="JordanPark",
@@ -347,7 +244,6 @@ Return ONLY this JSON:
         )
     
     def _create_error_score(self, error_message: str) -> ValidationScore:
-        """Create an error validation score"""
         return ValidationScore(
             agent_name="JordanPark",
             score=0.0,
