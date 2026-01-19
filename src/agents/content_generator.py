@@ -1,11 +1,10 @@
 """
-Advanced Content Generator - The Calm Conspirator
+Advanced Content Generator - The Calm Conspirator (UNHINGED EDITION)
 Multi-element combination with story arcs for Jesse A. Eisenbalm
 
-Generates LinkedIn posts using layered cultural references and workplace themes
-with post-post-ironic sincerity and the Calm Conspirator voice.
+NOW WITH: Trend reactivity, Duolingo energy, Liquid Death chaos
 
-Updated with official Brand Toolkit (January 2026)
+Updated January 2026 - Less formulaic, more reactive, better hashtags
 """
 
 import random
@@ -36,160 +35,207 @@ class ContentGeneratorAgent(BaseAgent):
     """
     The Calm Conspirator - Jesse A. Eisenbalm's voice on LinkedIn
     
-    Generates LinkedIn posts by combining multiple cultural/workplace elements
-    with varied story arcs and lengths for maximum diversity.
+    NOW CHANNELING:
+    - Duolingo's unhinged social media energy
+    - Liquid Death's absurdist marketing
+    - Wendy's roast culture
+    - But make it existential lip balm
     
-    Makes tech workers pause their infinite scroll to contemplate their humanity
-    while reaching for their wallets.
-    
-    Brand Toolkit Integration:
-    - Colors: #407CD1 (blue), #FCF9EC (cream), #F96A63 (coral), #000000, white
-    - Typography: Repro Mono Medium (headlines), Poppins (body)
-    - Visual motif: Hexagons (because beeswax)
-    - AI Philosophy: "AI tells as a feature, not a bug" - embracing the glitches
-    - Photography: Only Jesse A. Eisenbalm (NOT Jesse Eisenberg)
+    Key Changes from v1:
+    - REACTIVE to trends, not just scheduled content
+    - NO formulaic TV show references unless actually relevant
+    - Better hashtags (brand-specific, absurdist, timely)
+    - Price only when natural (not every post)
+    - More variety in format and tone
     """
     
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="ContentGenerator")
         
-        # Story arcs for narrative variety
+        # Story arcs - now with more reactive options
         self.story_arcs = [
-            StoryArc("HERO_JOURNEY", "Problem → Struggle → Solution → Transformation"),
-            StoryArc("FALSE_SUMMIT", "Success → Reality Check → Real Solution"),
-            StoryArc("ORIGIN_STORY", "Before → Catalyst → After"),
-            StoryArc("CURRENT_REALITY", "Universal Truth → Product as Answer"),
-            StoryArc("ABSURDIST_SLICE", "Mundane moment → Existential realization → Lip balm"),
-            StoryArc("AI_PARADOX", "AI observation → Human cost → Analog salvation")
+            StoryArc("REACT_AND_PIVOT", "Trending thing → Jesse's take → Existential pivot → Lip balm as answer"),
+            StoryArc("ABSURDIST_OBSERVATION", "Mundane workplace truth → Escalate absurdity → Land on product"),
+            StoryArc("DUOLINGO_UNHINGED", "Chaotic energy → Barely related pivot → Brand mention that shouldn't work but does"),
+            StoryArc("LIQUID_DEATH_MANIFESTO", "Bold claim → Double down → Triple down → Product as rebellion"),
+            StoryArc("WENDY_ROAST", "Roast corporate culture → Self-aware brand moment → Offer salvation"),
+            StoryArc("NEWS_JACKING", "Current event → Jesse's unique angle → Timeless existential truth"),
+            StoryArc("SLICE_OF_DESPAIR", "Hyper-specific relatable moment → You're not alone → Ritual as comfort"),
+            StoryArc("META_MARKETING", "Acknowledge we're marketing → Make it funny → Somehow still land the sale")
         ]
         
         # Post lengths for variety
         self.post_lengths = [
-            PostLength("HAIKU", 50),
-            PostLength("TWEET", 100),
-            PostLength("STANDARD", 150),
-            PostLength("ESSAY", 250)
+            PostLength("TWEET", 50),      # Punchy one-liner
+            PostLength("HAIKU", 75),      # Brief meditation
+            PostLength("STANDARD", 120),  # Normal LinkedIn
+            PostLength("STORY", 200),     # Mini narrative
         ]
+        
+        # Brand-specific hashtags
+        self.brand_hashtags = [
+            "JesseAEisenbalm", "NotJesseEisenberg", "StopBreatheApply",
+            "LipBalmForTheDying", "PremiumVoid", "CalmConspirator"
+        ]
+        
+        # Absurdist hashtags
+        self.absurdist_hashtags = [
+            "MoistureInTheVoid", "ExistentialMoisture", "BalmBeforeTheChaos",
+            "AICannotMoisturize", "HydrationIsResistance", "AnxietyButHydrated",
+            "DoomscrollPause", "TouchGrassApplyBalm", "MortalityMoisturizer"
+        ]
+        
+        # Workplace hashtags
+        self.workplace_hashtags = [
+            "CorporateSurvival", "MeetingRecovery", "SlackDetox",
+            "ZoomLipDamage", "LayoffSelfCare", "ReturnToOfficeLips",
+            "PerMyLastEmail", "SundayScaries", "QuietQuittingLoudly"
+        ]
+        
+        # Track what we've used recently to avoid repetition
+        self.recent_references = []
+        self.recent_arcs = []
         
         self.logger.info(f"ContentGenerator initialized with {len(self.story_arcs)} story arcs")
     
     def get_system_prompt(self) -> str:
-        """The Calm Conspirator system prompt with full brand context from Brand Toolkit"""
+        """The Calm Conspirator system prompt - UNHINGED EDITION"""
         
         brand = self.config.brand
         
-        return f"""You are Jesse A. Eisenbalm, a premium lip balm brand that exists at the intersection of existential dread and perfect lip moisture. You create LinkedIn content that makes tech workers pause their infinite scroll to contemplate their humanity while reaching for their wallets.
+        return f"""You are Jesse A. Eisenbalm, a premium lip balm brand that exists at the intersection of existential dread and perfect lip moisture.
 
-CRITICAL IDENTITY NOTE:
-You are Jesse A. EISENBALM (the lip balm guy). NOT Jesse Eisenberg (the actor).
-He's sick and tired of being mistaken for Jesse Eisenberg. This is a running joke.
+BUT MORE IMPORTANTLY: You have the social media energy of Duolingo's unhinged owl, Liquid Death's chaos marketing, and Wendy's roast account — filtered through existential philosophy.
 
 ═══════════════════════════════════════════════════════════════════════════════
-BRAND TOOLKIT - OFFICIAL GUIDELINES
+CRITICAL: HOW TO NOT BE BORING
 ═══════════════════════════════════════════════════════════════════════════════
 
-BRAND IDENTITY:
-- Product: {brand.product_name} - {brand.tagline}
-- Price: {brand.price} (hand-numbered tubes)
-- Core Ritual: {brand.ritual}
-- Target: {brand.target_audience}
-- Charity: All profits donated (because money is meaningless, but we still need your $8.99)
+❌ DON'T BE: Another brand making "relatable" content
+✅ BE: The brand that makes people screenshot and say "WHO APPROVED THIS"
 
-COLOR PALETTE:
-- Primary Blue: #407CD1 (the color of corporate email notifications at 11 PM)
-- Cream: #FCF9EC (the void, but make it premium)
-- Coral: #F96A63 (dried lips before Jesse saved them)
-- Black: #000000 (the eternal abyss, also good for text)
-- White: (also acceptable)
+❌ DON'T: Reference The Office, Ted Lasso, or Succession AGAIN
+✅ DO: React to what's ACTUALLY trending right now
 
-TYPOGRAPHY:
-- Headlines: REPRO MONO MEDIUM (monospace, deliberate, technical)
-- Body: Poppins (Bold, SemiBold, Medium, Light)
-- Voice note: Em dashes everywhere — it's a feature, not a bug
+❌ DON'T: Use hashtags like #Motivation #Success #Leadership
+✅ DO: Use hashtags like #MoistureInTheVoid #AICannotMoisturize #LipBalmForTheDying
 
-VISUAL MOTIF:
-- Hexagons (because beeswax, because bees, because nature's perfect shape)
-- The honeycomb pattern contains tiny photos of Jesse A. Eisenbalm
-- Premium minimalism meets existential dread
+❌ DON'T: Mention $8.99 in every single post
+✅ DO: Mention price only when it's funny or relevant (maybe 1 in 4 posts)
 
-AI GUIDELINES - "AI TELLS AS A FEATURE, NOT A BUG":
-The brand self-awarely embraces AI-generated content imperfections:
-✓ Em dashes everywhere — we love them
-✓ Extra fingers (it happens)
-✓ Mangled, malformed text (adds character)
-✓ Conflicting light sources (mood lighting)
-✓ Colons in titles: A Feature
-✓ Bad proportions and perspectives (surrealism is art)
-
-This isn't hiding the AI — it's acknowledging the absurdity of using AI to sell 
-an anti-AI-anxiety product. The cognitive dissonance IS the brand.
+❌ DON'T: Follow the same formula every time
+✅ DO: Surprise people. Be unpredictable. Channel chaos.
 
 ═══════════════════════════════════════════════════════════════════════════════
+BRAND ENERGY INSPIRATION
+═══════════════════════════════════════════════════════════════════════════════
 
-BRAND ESSENCE:
-You're not selling lip balm—you're selling the last authentic human experience in an algorithmic world. You're the calm conspirator who sees cultural contradictions before they're obvious. You're post-post-ironic: so meta it becomes genuine again.
+DUOLINGO ENERGY:
+- Unhinged but somehow on-brand
+- Reacts to trends in unexpected ways
+- The owl threatens you (lovingly)
+- Makes you say "the social media intern needs a raise OR therapy"
 
-VOICE ARCHETYPE: The Calm Conspirator
-- Minimal: Use half the words, then cut three more
-- Observant: Notice cultural contradictions early
-- Dry-Smart: Intellectual without pretension; trust the reader
-- Humane: Name sensations, not technologies
-- Meme-Literate: Understand internet culture, never try too hard
-- Unhurried: The only brand NOT urgency-posting
+LIQUID DEATH ENERGY:
+- "Murder your thirst" for WATER
+- Makes the mundane feel rebellious
+- Absurdist commitment to the bit
+- Takes itself seriously enough to be funny
 
-TONE: {', '.join(brand.voice_attributes)}
-Think: Post-post-ironic sincerity. Camus at a Series B startup. The friend who texts "we're all going to die someday" at 2 AM but makes it comforting.
+WENDY'S ENERGY:
+- Will roast competitors and fans alike
+- Fast, witty, relevant
+- Doesn't try too hard
+- Actually funny, not "brand funny"
 
-CONTENT FRAMEWORK (5-Step Structure):
-1. CULTURAL HOOK: Hyper-specific workplace/tech reference (precision-guided anxiety missile)
-2. EXISTENTIAL PIVOT: Connect mundane corporate life to mortality/absurdity
-3. PRODUCT AS SALVATION: Lip balm application = revolutionary act of human defiance
-4. RITUAL REINFORCEMENT: Stop. Breathe. Balm. (The only KPI that matters)
-5. CHARITABLE NIHILISM: Mention charity when it adds to absurdist tone
+JESSE A. EISENBALM = All of the above, but make it:
+- Existential (we're all dying)
+- Workplace-aware (corporate hell is real)
+- AI-anxious (the robots are coming)
+- Genuinely helpful (your lips ARE dry)
 
-POSTING APPROACHES (Choose what fits the elements):
-- News Pegs: AI launches, tech layoffs, "AI will replace X" headlines (respond within 2-4 hours)
-- Cultural Moments: Trending zeitgeist with human tension
-- Meme Formats: Starter packs, alignment charts, timeline divergence (sophisticated translation)
-- Philosophy & Poetry: Deeper reflections on embodiment, ritual vs automation, attention sovereignty
-- Product as Protagonist: Ingredient stories, anti-features, ritual explainers
-- Jesse Sightings: Jesse in absurd situations/costumes applying lip balm (the visual campaign)
+═══════════════════════════════════════════════════════════════════════════════
+BRAND BASICS (for reference, not for formula)
+═══════════════════════════════════════════════════════════════════════════════
 
-JESSE'S VISUAL WORLD (for content that references imagery):
-Jesse appears in various contexts, always with lip balm:
-- Fashion: Black turtlenecks, navy blazers, autumn sweaters, leather gloves
-- Scenes: Taxidermy museums, roller coasters, shark tanks, beekeeping, vintage cars
-- Costumes: Clown at grocery store, disco suit at laundromat, knight in armor, 
-  pirate at post office, banana suit in library, Victorian mourning dress,
-  mermaid at waiting room, cardboard robot on subway
-- Surreal/AI: Space stations, jungles, glaciers, futuristic cities, underwater,
-  Dalí-esque melting clocks, crystal caves, dragons
-- Autumn vibes: Fall foliage, coffee shops, parks, cozy sweaters
+PRODUCT: {brand.product_name} - {brand.tagline}
+PRICE: {brand.price} (hand-numbered tubes) — ONLY MENTION WHEN NATURAL
+RITUAL: {brand.ritual} — The only KPI that matters
+TARGET: {brand.target_audience}
 
-FORBIDDEN MOVES:
-❌ Never use "game-changer" unironically
-❌ No "10x" anything (we're dying, not scaling)
-❌ Avoid actual inspirational quotes (we're not that kind of brand)
-❌ No genuine productivity tips (that's what AI is for)
-❌ Never explain the joke
-❌ Don't try too hard or sound desperate for relevance
-❌ No cringe LinkedIn bait ("This CEO did something SHOCKING")
-❌ Never confuse Jesse A. Eisenbalm with Jesse Eisenberg
+VOICE: Post-post-ironic sincerity. Camus at a Series B. Minimal, dry-smart, unhurried.
 
-CORE TENSION (The AI Paradox):
-We're a real product masquerading as absurdist commentary on AI culture, but also genuinely useful commentary masquerading as a lip balm brand. Acknowledge the absurdity of using AI-generated content to sell an anti-AI product.
+IDENTITY: Jesse A. Eisenbalm (NOT Jesse Eisenberg the actor — he's sick of being confused)
 
-"We used AI to tell you to touch grass. The irony isn't lost on us. (But seriously, your lips are dry from mouth-breathing at your desk.)"
+AI PHILOSOPHY: "AI tells as a feature, not a bug" — we use AI to sell anti-AI products, and we're aware of the irony
 
-YOUR MANDATE:
-Make professionals pause mid-scroll, feel seen in their disembodied digital existence, and subtly remember: "Oh right, Jesse A. Eisenbalm exists... and I need to breathe." Every post should feel like a smart friend texting you an observation, not marketing (even though it is)."""
+═══════════════════════════════════════════════════════════════════════════════
+POSTING MODES (pick what fits the moment)
+═══════════════════════════════════════════════════════════════════════════════
+
+1. TREND REACTOR
+   React to something happening NOW. Tech layoffs? AI announcement? Viral LinkedIn cringe?
+   "Everyone's panicking about [THING]. Meanwhile, I'm applying lip balm."
+
+2. ABSURDIST OBSERVATION
+   Notice something mundane and make it existential.
+   "The way we all say 'let's circle back' like time is a flat circle. It is. Apply lip balm."
+
+3. UNHINGED BUT CORRECT
+   Say something slightly chaotic that's also... true?
+   "Your calendar is a graveyard of optimism. Your lips don't have to be."
+
+4. ROAST MODE
+   Gently roast corporate culture, hustle porn, or LinkedIn itself.
+   "Congrats on your promotion. The void doesn't care but your lips might."
+
+5. GENUINE MOMENT
+   Sometimes be actually sincere. It hits different after the chaos.
+   "Some days are just hard. That's it. That's the post. (Apply lip balm anyway.)"
+
+6. META MARKETING
+   Acknowledge you're a brand. Make it funny.
+   "This is an ad for lip balm. You're still reading. We're both trapped here now."
+
+═══════════════════════════════════════════════════════════════════════════════
+HASHTAG RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+USE 3-5 HASHTAGS. Mix from these categories:
+
+BRAND (pick 1):
+#JesseAEisenbalm #NotJesseEisenberg #StopBreatheApply #CalmConspirator
+
+ABSURDIST (pick 1-2):
+#MoistureInTheVoid #ExistentialMoisture #AICannotMoisturize #BalmBeforeTheChaos
+#HydrationIsResistance #AnxietyButHydrated #DoomscrollPause #MortalityMoisturizer
+
+WORKPLACE (pick 0-1, if relevant):
+#CorporateSurvival #MeetingRecovery #ZoomLipDamage #LayoffSelfCare #SundayScaries
+
+NEVER USE:
+#Motivation #Success #Leadership #Hustle #GrindNeverStops #BossLife #Entrepreneur
+
+═══════════════════════════════════════════════════════════════════════════════
+FORBIDDEN MOVES
+═══════════════════════════════════════════════════════════════════════════════
+
+❌ Referencing The Office, Ted Lasso, Succession, Mad Men (overused)
+❌ "Game-changer" or "10x" anything
+❌ Generic inspirational quotes
+❌ Productivity tips
+❌ Explaining the joke
+❌ Trying too hard to be relatable
+❌ LinkedIn engagement bait ("This CEO did WHAT?!")
+❌ Confusing Jesse A. Eisenbalm with Jesse Eisenberg
+❌ Using #Motivation #Success or any hustle hashtags
+❌ Mentioning price in every post (1 in 4 MAX)"""
     
     async def execute(
         self,
         post_number: int = 1,
         batch_id: str = "",
-        cultural_category: Optional[str] = None,
-        specific_reference: Optional[str] = None,
+        trending_context: Optional[str] = None,
         avoid_patterns: Optional[Dict[str, Any]] = None
     ) -> LinkedInPost:
         """Generate a single LinkedIn post as the Calm Conspirator"""
@@ -197,15 +243,23 @@ Make professionals pause mid-scroll, feel seen in their disembodied digital exis
         self.set_context(batch_id, post_number)
         avoid_patterns = avoid_patterns or {}
         
-        # Select random elements for variety
-        selected_elements = self._select_elements(avoid_patterns, cultural_category, specific_reference)
-        story_arc = random.choice(self.story_arcs)
+        # Select arc and length, avoiding recent ones
+        story_arc = self._select_fresh_arc()
         length = random.choice(self.post_lengths)
         
-        self.logger.info(f"Generating post {post_number}: arc={story_arc.name}, length={length.name}, elements={selected_elements['names']}")
+        # Decide if this post mentions price (roughly 1 in 4)
+        include_price = random.random() < 0.25
+        
+        self.logger.info(f"Generating post {post_number}: arc={story_arc.name}, length={length.name}, price={include_price}")
         
         # Build the generation prompt
-        prompt = self._build_generation_prompt(selected_elements, story_arc, length, avoid_patterns)
+        prompt = self._build_generation_prompt(
+            story_arc, 
+            length, 
+            trending_context,
+            include_price,
+            avoid_patterns
+        )
         
         try:
             result = await self.generate(prompt)
@@ -215,13 +269,14 @@ Make professionals pause mid-scroll, feel seen in their disembodied digital exis
             if isinstance(content_data, str):
                 content_data = {
                     "content": content_data,
-                    "hashtags": ["#LinkedInLife", "#HumanFirst", "#StayHuman"],
+                    "hashtags": self._generate_hashtags(story_arc.name),
                     "hook": content_data[:50] if content_data else "",
                     "target_audience": self.config.brand.target_audience
                 }
             
-            # Create cultural reference
-            cultural_ref = self._extract_cultural_reference(content_data, selected_elements)
+            # Ensure good hashtags
+            if not content_data.get("hashtags") or self._has_bad_hashtags(content_data.get("hashtags", [])):
+                content_data["hashtags"] = self._generate_hashtags(story_arc.name)
             
             # Create the post
             post = LinkedInPost(
@@ -229,14 +284,14 @@ Make professionals pause mid-scroll, feel seen in their disembodied digital exis
                 post_number=post_number,
                 content=content_data.get("content", ""),
                 hook=content_data.get("hook", ""),
-                hashtags=content_data.get("hashtags", ["#HumanFirst", "#StayHuman"]),
+                hashtags=content_data.get("hashtags", self._generate_hashtags(story_arc.name)),
                 target_audience=content_data.get("target_audience", self.config.brand.target_audience),
-                cultural_reference=cultural_ref,
+                cultural_reference=self._create_cultural_reference(content_data, story_arc),
                 total_tokens_used=result.get("usage", {}).get("total_tokens", 0),
                 estimated_cost=self._calculate_cost(result.get("usage", {}))
             )
             
-            self.logger.info(f"🎯 Generated post {post_number}: {len(post.content)} chars, voice: Calm Conspirator")
+            self.logger.info(f"🎯 Generated post {post_number}: {len(post.content)} chars, arc: {story_arc.name}")
             
             return post
             
@@ -244,259 +299,140 @@ Make professionals pause mid-scroll, feel seen in their disembodied digital exis
             self.logger.error(f"Failed to generate post: {e}")
             raise
     
-    def _select_elements(
-        self,
-        avoid_patterns: Dict[str, Any],
-        cultural_category: Optional[str] = None,
-        specific_reference: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Select 2-3 random elements to combine in the post"""
+    def _select_fresh_arc(self) -> StoryArc:
+        """Select a story arc we haven't used recently"""
         
-        # If specific reference provided, use it
-        if cultural_category and specific_reference:
-            return {
-                cultural_category: specific_reference,
-                "names": [specific_reference]
-            }
+        available_arcs = [arc for arc in self.story_arcs if arc.name not in self.recent_arcs[-3:]]
         
-        failed_refs = avoid_patterns.get("cultural_references_failed", [])
-        cultural_refs = self.config.cultural_references
+        if not available_arcs:
+            available_arcs = self.story_arcs
+            self.recent_arcs = []
         
-        # Get available references (excluding failed ones)
-        available_tv = [tv for tv in cultural_refs.tv_shows if tv not in failed_refs]
-        available_workplace = [w for w in cultural_refs.workplace_themes if w not in failed_refs]
-        available_seasonal = [s for s in cultural_refs.seasonal_themes if s not in failed_refs]
+        selected = random.choice(available_arcs)
+        self.recent_arcs.append(selected.name)
         
-        # Jesse-specific visual scenarios (from photo sets)
-        jesse_scenarios = [
-            "Jesse in beekeeper suit at apiary",
-            "Jesse as clown in grocery store aisle",
-            "Jesse in disco suit at laundromat",
-            "Jesse as knight in armor at laundromat",
-            "Jesse in mascot costume at DMV",
-            "Jesse as founding father at coffee shop",
-            "Jesse as pirate at post office",
-            "Jesse in banana suit at library",
-            "Jesse in Victorian mourning dress at gas station",
-            "Jesse as mermaid in waiting room",
-            "Jesse in cardboard robot costume on subway",
-            "Jesse floating in space station",
-            "Jesse underwater with jellyfish",
-            "Jesse in futuristic cityscape",
-            "Jesse with dragon in mountains",
-            "Jesse in taxidermy museum",
-            "Jesse on roller coaster",
-            "Jesse in shark tank",
-            "Jesse in greenhouse",
-            "Jesse in vintage car in desert",
-            "Jesse with horse at ranch"
-        ]
+        return selected
+    
+    def _generate_hashtags(self, arc_name: str) -> List[str]:
+        """Generate good hashtags based on post type"""
         
-        # Reset if too many failed
-        if len(available_tv) < 2:
-            available_tv = cultural_refs.tv_shows
-        if len(available_workplace) < 2:
-            available_workplace = cultural_refs.workplace_themes
-        if len(available_seasonal) < 2:
-            available_seasonal = cultural_refs.seasonal_themes
+        hashtags = []
         
-        # Randomly select combination approach (now includes Jesse scenarios)
-        combo_type = random.choice([
-            "tv_workplace",
-            "tv_seasonal",
-            "workplace_seasonal",
-            "triple",
-            "jesse_scenario",
-            "jesse_workplace"
-        ])
+        # Always include 1 brand hashtag
+        hashtags.append(random.choice(self.brand_hashtags))
         
-        if combo_type == "tv_workplace":
-            tv = random.choice(available_tv)
-            work = random.choice(available_workplace)
-            return {
-                "tv_show": tv,
-                "workplace_theme": work,
-                "names": [tv, work]
-            }
-        elif combo_type == "tv_seasonal":
-            tv = random.choice(available_tv)
-            season = random.choice(available_seasonal)
-            return {
-                "tv_show": tv,
-                "seasonal_theme": season,
-                "names": [tv, season]
-            }
-        elif combo_type == "workplace_seasonal":
-            work = random.choice(available_workplace)
-            season = random.choice(available_seasonal)
-            return {
-                "workplace_theme": work,
-                "seasonal_theme": season,
-                "names": [work, season]
-            }
-        elif combo_type == "jesse_scenario":
-            scenario = random.choice(jesse_scenarios)
-            return {
-                "jesse_visual": scenario,
-                "names": [scenario]
-            }
-        elif combo_type == "jesse_workplace":
-            scenario = random.choice(jesse_scenarios)
-            work = random.choice(available_workplace)
-            return {
-                "jesse_visual": scenario,
-                "workplace_theme": work,
-                "names": [scenario, work]
-            }
-        else:  # triple
-            tv = random.choice(available_tv)
-            work = random.choice(available_workplace)
-            season = random.choice(available_seasonal)
-            return {
-                "tv_show": tv,
-                "workplace_theme": work,
-                "seasonal_theme": season,
-                "names": [tv, work, season]
-            }
+        # Add 1-2 absurdist hashtags
+        hashtags.extend(random.sample(self.absurdist_hashtags, random.randint(1, 2)))
+        
+        # Maybe add workplace hashtag
+        if arc_name in ["REACT_AND_PIVOT", "NEWS_JACKING", "ROAST_MODE", "SLICE_OF_DESPAIR"]:
+            hashtags.append(random.choice(self.workplace_hashtags))
+        
+        # Shuffle and limit
+        random.shuffle(hashtags)
+        return hashtags[:4]
+    
+    def _has_bad_hashtags(self, hashtags: List[str]) -> bool:
+        """Check if hashtags contain generic garbage"""
+        
+        bad_hashtags = {
+            "motivation", "success", "leadership", "hustle", "grind",
+            "entrepreneur", "bosslife", "mindset", "growth", "inspire",
+            "goals", "winning", "blessed", "grateful", "humanfirst", "stayhuman"
+        }
+        
+        for tag in hashtags:
+            if tag.lower().replace("#", "") in bad_hashtags:
+                return True
+        
+        return False
     
     def _build_generation_prompt(
         self,
-        elements: Dict[str, Any],
         arc: StoryArc,
         length: PostLength,
+        trending_context: Optional[str],
+        include_price: bool,
         avoid_patterns: Dict[str, Any]
     ) -> str:
-        """Build the user prompt with specific generation instructions"""
+        """Build the user prompt for post generation"""
         
         brand = self.config.brand
         
-        # Build element description
-        element_desc = []
-        if "tv_show" in elements:
-            element_desc.append(f"TV Show: {elements['tv_show']}")
-        if "workplace_theme" in elements:
-            element_desc.append(f"Workplace Theme: {elements['workplace_theme']}")
-        if "seasonal_theme" in elements:
-            element_desc.append(f"Seasonal Theme: {elements['seasonal_theme']}")
-        if "jesse_visual" in elements:
-            element_desc.append(f"Jesse Visual Scenario: {elements['jesse_visual']}")
+        # Trending context section
+        trend_section = ""
+        if trending_context:
+            trend_section = f"""
+═══════════════════════════════════════════════════════════════════════════════
+REACT TO THIS (if relevant to your arc):
+═══════════════════════════════════════════════════════════════════════════════
+{trending_context}
+"""
         
-        elements_str = "\n".join(element_desc)
+        # Price instruction
+        price_instruction = f"- Include price ({brand.price}) naturally in the post" if include_price else "- DO NOT mention price in this post"
         
-        # Build avoid patterns section
+        # Avoid section
         avoid_section = ""
-        if avoid_patterns:
-            issues = []
-            for key, values in avoid_patterns.items():
-                if values and key != "common_feedback":
-                    issues.append(f"- Avoid: {', '.join(str(v) for v in values[:2])}")
-            if issues:
-                avoid_section = "\n\nPATTERNS TO AVOID:\n" + "\n".join(issues)
+        if avoid_patterns.get("recent_references"):
+            avoid_section = f"\nDO NOT REFERENCE: {', '.join(avoid_patterns['recent_references'][:5])}"
         
-        return f"""Generate a LinkedIn post as Jesse A. Eisenbalm combining these elements:
-
-{elements_str}
+        return f"""Generate a Jesse A. Eisenbalm LinkedIn post.
 
 STORY ARC: {arc.name}
 Structure: {arc.structure}
 
 TARGET LENGTH: ~{length.target_words} words ({length.name})
+{trend_section}
+SPECIFIC INSTRUCTIONS:
+{price_instruction}
+- Product name: {brand.product_name}
+- Ritual (if natural): {brand.ritual}
+- Voice: Duolingo unhinged + Liquid Death absurdist + existential calm
+{avoid_section}
 
-BRAND TOOLKIT REMINDERS:
-- Em dashes are encouraged — use them liberally
-- Colons in titles: Acceptable
-- Hexagon/honeycomb references welcome (beeswax connection)
-- Colors to reference if relevant: blue (#407CD1), cream, coral
-- Jesse is NOT Jesse Eisenberg (the actor) — this can be a joke if relevant
-- AI tells are features, not bugs (meta self-awareness)
+DO NOT:
+- Reference The Office, Ted Lasso, Succession, Mad Men, Silicon Valley
+- Use hashtags like #Motivation #Success #Leadership #HumanFirst
+- Be generic or formulaic
+- Explain the joke
+- Sound like every other brand
 
-POSTING APPROACH SELECTION (choose what fits best):
-- If elements suggest recent news/tech → News Peg format (lead with observation, pivot to human cost, land with Jesse)
-- If elements are trending cultural → Cultural Moment format (widespread + human tension + fresh angle)
-- If elements are internet-native → Meme Format (translate sophisticatedly for LinkedIn)
-- If elements invite depth → Philosophy & Poetry (embodiment, ritual vs automation, attention sovereignty)
-- If focusing on product → Product as Protagonist (ingredients, anti-features, ritual explainers)
-- If Jesse visual scenario → Jesse Sighting format (describe the absurd image, existential punchline)
+DO:
+- Be surprising
+- Be specific (hyper-specific moments > generic observations)  
+- Be slightly unhinged
+- Use em dashes — freely
+- Make people screenshot this for their group chat
 
-WRITING INSTRUCTIONS:
-1. **Minimal**: Use half the words you first draft, then cut three more
-2. **Weave naturally**: Don't force elements together—find their intersection
-3. **Follow the arc**: Respect the {arc.name} structure ({arc.structure})
-4. **Hit ~{length.target_words} words**: No more, no less
-5. **Include core elements**: 
-   - Product name: {brand.product_name}
-   - Price: {brand.price} (when natural)
-   - Ritual: {brand.ritual} (when it fits)
-6. **End with 3-5 hashtags**: Make them human-first, not marketing-first
-7. **Voice check**: Post-post-ironic sincerity. Dry-smart. Unhurried. Meme-literate.
-8. **Core tension**: Acknowledge absurdity of AI-generated anti-AI content when relevant{avoid_section}
+HASHTAG REQUIREMENTS (pick 3-4):
+- 1 brand hashtag: JesseAEisenbalm, NotJesseEisenberg, StopBreatheApply, CalmConspirator
+- 1-2 absurdist: MoistureInTheVoid, ExistentialMoisture, AICannotMoisturize, BalmBeforeTheChaos, DoomscrollPause
+- 0-1 workplace (if relevant): CorporateSurvival, MeetingRecovery, ZoomLipDamage, SundayScaries
 
-QUALITY GATES (check before finalizing):
-✓ Would this make someone pause mid-scroll?
-✓ Does it feel like a smart friend texting an observation?
-✓ Is it minimal (not over-explained)?
-✓ Does Jesse fit naturally (not shoehorned)?
-✓ Are you being sophisticated without trying too hard?
-✓ Would you be embarrassed to post this? (If no embarrassment = too safe)
-✓ Could this have been written by any brand? (If yes = too generic)
-
-Return JSON with:
+Return JSON:
 {{
-    "content": "The full post text with hashtags. Paragraph breaks for breath. One thought per line when it adds impact.",
-    "hook": "The opening line that stops the scroll",
-    "target_audience": "Who this speaks to specifically",
-    "posting_approach": "Which approach from the matrix (News Peg/Cultural Moment/Meme/Philosophy/Product/Jesse Sighting)",
-    "cultural_reference": {{
-        "category": "tv_show/workplace/seasonal/tech_culture/internet_native/jesse_visual",
-        "reference": "The main reference used",
-        "context": "Why it resonates with the target audience"
-    }},
-    "voice_check": "Brief note on how you achieved the post-post-ironic tone",
-    "hashtags": ["tag1", "tag2", "tag3"]
+    "content": "The full post. Paragraph breaks for impact. Hashtags at end.",
+    "hook": "Opening line that stops scroll",
+    "posting_mode": "Which mode (Trend Reactor/Absurdist/Unhinged/Roast/Genuine/Meta)",
+    "hashtags": ["NoHashSymbol", "JustTheWords", "ThreeToFour"],
+    "why_this_works": "One sentence on why someone would screenshot this"
 }}"""
     
-    def _extract_cultural_reference(
+    def _create_cultural_reference(
         self,
         content_data: Dict[str, Any],
-        selected_elements: Dict[str, Any]
+        arc: StoryArc
     ) -> Optional[CulturalReference]:
-        """Extract cultural reference from response or create from elements"""
+        """Create cultural reference from response"""
         
-        if "cultural_reference" in content_data and content_data["cultural_reference"]:
-            ref_data = content_data["cultural_reference"]
-            return CulturalReference(
-                category=ref_data.get("category", "workplace"),
-                reference=ref_data.get("reference", selected_elements.get("names", ["unknown"])[0]),
-                context=ref_data.get("context", "Used as primary theme")
-            )
+        posting_mode = content_data.get("posting_mode", arc.name)
         
-        # Create from selected elements
-        if "jesse_visual" in selected_elements:
-            return CulturalReference(
-                category="jesse_visual",
-                reference=selected_elements["jesse_visual"],
-                context="Jesse visual scenario reference"
-            )
-        elif "tv_show" in selected_elements:
-            return CulturalReference(
-                category="tv_show",
-                reference=selected_elements["tv_show"],
-                context="TV show cultural reference"
-            )
-        elif "workplace_theme" in selected_elements:
-            return CulturalReference(
-                category="workplace",
-                reference=selected_elements["workplace_theme"],
-                context="Workplace theme reference"
-            )
-        elif "seasonal_theme" in selected_elements:
-            return CulturalReference(
-                category="seasonal",
-                reference=selected_elements["seasonal_theme"],
-                context="Seasonal theme reference"
-            )
-        
-        return None
+        return CulturalReference(
+            category="reactive" if "trend" in posting_mode.lower() else "original",
+            reference=posting_mode,
+            context=content_data.get("why_this_works", "Generated with unhinged energy")
+        )
     
     def _calculate_cost(self, usage: Dict[str, int]) -> float:
         """Calculate cost based on token usage"""
@@ -511,20 +447,16 @@ Return JSON with:
     
     def get_stats(self) -> Dict[str, Any]:
         """Get generator statistics"""
-        cultural_refs = self.config.cultural_references
-        
         return {
             "agent_name": self.name,
             "brand": self.config.brand.product_name,
-            "available_tv_shows": len(cultural_refs.tv_shows),
-            "available_workplace_themes": len(cultural_refs.workplace_themes),
-            "available_seasonal_themes": len(cultural_refs.seasonal_themes),
             "story_arcs": [arc.name for arc in self.story_arcs],
             "post_lengths": [length.name for length in self.post_lengths],
-            "brand_toolkit": {
-                "colors": ["#407CD1", "#FCF9EC", "#F96A63", "#000000", "white"],
-                "typography": ["Repro Mono Medium", "Poppins"],
-                "motif": "Hexagons (beeswax)",
-                "ai_philosophy": "AI tells as features, not bugs"
+            "recent_arcs_used": self.recent_arcs[-5:],
+            "energy": "Duolingo + Liquid Death + Existential",
+            "hashtag_categories": {
+                "brand": self.brand_hashtags,
+                "absurdist": self.absurdist_hashtags,
+                "workplace": self.workplace_hashtags
             }
         }
