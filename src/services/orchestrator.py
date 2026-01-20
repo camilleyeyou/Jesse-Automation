@@ -3,6 +3,8 @@ Content Orchestrator - The Master Controller for Jesse A. Eisenbalm
 Coordinates all agents: Trend Scout → Content Generator → Validators → Queue
 
 NOW WITH: Real-time trend integration for reactive, non-clichéd content
+
+FIXED: Return format compatibility with main.py
 """
 
 import asyncio
@@ -27,6 +29,47 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+class BatchResult:
+    """Result object for batch generation - compatible with main.py expectations"""
+    
+    def __init__(self, batch_id: str, posts: List[LinkedInPost], media_type: str = "image"):
+        self.batch_id = batch_id
+        self.posts = posts
+        self.media_type = media_type
+        self.approved_posts = [p for p in posts if getattr(p, 'approved', True)]
+        self.rejected_posts = [p for p in posts if not getattr(p, 'approved', True)]
+    
+    def get_approved_posts(self) -> List[LinkedInPost]:
+        """Get list of approved posts"""
+        return self.approved_posts
+    
+    def get_rejected_posts(self) -> List[LinkedInPost]:
+        """Get list of rejected posts"""
+        return self.rejected_posts
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            "batch_id": self.batch_id,
+            "approved": len(self.approved_posts),
+            "rejected": len(self.rejected_posts),
+            "media_type": self.media_type,
+            "posts": [self._post_to_dict(p) for p in self.posts]
+        }
+    
+    def _post_to_dict(self, post: LinkedInPost) -> Dict[str, Any]:
+        """Convert post to dictionary"""
+        return {
+            "id": getattr(post, 'id', str(uuid.uuid4())),
+            "content": post.content,
+            "hashtags": post.hashtags,
+            "image_path": getattr(post, 'image_path', None),
+            "media_type": getattr(post, 'media_type', 'image'),
+            "approved": getattr(post, 'approved', True),
+            "score": getattr(post, 'validation_score', 0)
+        }
+
+
 class ContentOrchestrator:
     """
     Master orchestrator for Jesse A. Eisenbalm content generation
@@ -37,8 +80,6 @@ class ContentOrchestrator:
     3. Validate with Sarah, Marcus, Jordan
     4. Revise if needed
     5. Queue approved posts
-    
-    Key improvement: Content is now REACTIVE to real news, not formulaic
     """
     
     def __init__(self, ai_client, config, image_generator=None, queue_manager=None):
@@ -78,14 +119,11 @@ class ContentOrchestrator:
         num_posts: int = 1, 
         use_video: bool = False,
         force_trend_refresh: bool = False
-    ) -> Dict[str, Any]:
+    ) -> BatchResult:
         """
         Generate a batch of posts
         
-        Args:
-            num_posts: Number of posts to generate
-            use_video: Use video generation instead of images
-            force_trend_refresh: Force refresh of trending news cache
+        Returns BatchResult object compatible with main.py
         """
         
         batch_id = str(uuid.uuid4())
@@ -113,49 +151,31 @@ class ContentOrchestrator:
                 logger.warning(f"Failed to fetch trends: {e}")
         
         # Step 2: Generate posts
-        results = {
-            "batch_id": batch_id,
-            "requested": num_posts,
-            "approved": 0,
-            "rejected": 0,
-            "posts": [],
-            "media_type": media_type,
-            "trending_topics_used": []
-        }
+        approved_posts = []
         
         for i in range(num_posts):
             post_number = i + 1
             logger.info(f"Processing post {post_number} (media: {media_type})")
             
             try:
-                post_result = await self._process_single_post(
+                post = await self._process_single_post(
                     post_number=post_number,
                     batch_id=batch_id,
                     trending_context=trending_context,
                     use_video=use_video
                 )
                 
-                if post_result["approved"]:
-                    results["approved"] += 1
-                    if post_result.get("trend_used"):
-                        results["trending_topics_used"].append(post_result["trend_used"])
-                else:
-                    results["rejected"] += 1
-                
-                results["posts"].append(post_result)
-                
+                if post and getattr(post, 'approved', False):
+                    approved_posts.append(post)
+                    
             except Exception as e:
                 logger.error(f"Post {post_number} failed: {e}")
-                results["rejected"] += 1
-                results["posts"].append({
-                    "post_number": post_number,
-                    "approved": False,
-                    "error": str(e)
-                })
+                import traceback
+                traceback.print_exc()
         
-        logger.info(f"Batch {batch_id} completed: {results['approved']}/{num_posts} approved")
+        logger.info(f"Batch {batch_id} completed: {len(approved_posts)}/{num_posts} approved")
         
-        return results
+        return BatchResult(batch_id=batch_id, posts=approved_posts, media_type=media_type)
     
     async def _process_single_post(
         self,
@@ -163,7 +183,7 @@ class ContentOrchestrator:
         batch_id: str,
         trending_context: Optional[str] = None,
         use_video: bool = False
-    ) -> Dict[str, Any]:
+    ) -> Optional[LinkedInPost]:
         """Process a single post through the full pipeline"""
         
         # Build avoid patterns from recent content
@@ -180,6 +200,16 @@ class ContentOrchestrator:
             avoid_patterns=avoid_patterns
         )
         
+        # Ensure post has image_path attribute
+        if not hasattr(post, 'image_path'):
+            post.image_path = None
+        if not hasattr(post, 'media_type'):
+            post.media_type = 'image'
+        if not hasattr(post, 'approved'):
+            post.approved = False
+        if not hasattr(post, 'validation_score'):
+            post.validation_score = 0
+        
         # Track this topic
         if post.cultural_reference:
             self.recent_topics.append(post.cultural_reference.reference)
@@ -194,8 +224,10 @@ class ContentOrchestrator:
                     post.media_type = media_result.get("media_type", "image")
                 else:
                     logger.warning(f"Post {post_number}: Media generation failed - {media_result.get('error')}")
+                    post.image_path = None
             except Exception as e:
                 logger.warning(f"Post {post_number}: Media generation failed - {e}")
+                post.image_path = None
         
         # Step 3: Validate with all validators
         validation_scores = await self._validate_post(post)
@@ -205,7 +237,7 @@ class ContentOrchestrator:
         
         # Step 5: Check if approved (need 2/3 validators)
         approvals = sum(1 for v in validation_scores if v.approved)
-        avg_score = sum(v.score for v in validation_scores) / len(validation_scores)
+        avg_score = sum(v.score for v in validation_scores) / len(validation_scores) if validation_scores else 0
         
         logger.info(f"Post {post_number}: Validated - {approvals}/3 approvals, avg score: {avg_score:.1f}")
         
@@ -219,35 +251,28 @@ class ContentOrchestrator:
             # Re-validate
             validation_scores = await self._validate_post(post)
             approvals = sum(1 for v in validation_scores if v.approved)
-            avg_score = sum(v.score for v in validation_scores) / len(validation_scores)
+            avg_score = sum(v.score for v in validation_scores) / len(validation_scores) if validation_scores else 0
             approved = approvals >= 2
             
             logger.info(f"Post {post_number}: After revision - {approvals}/3 approvals")
+        
+        # Set final approval status
+        post.approved = approved
+        post.validation_score = avg_score
         
         if approved:
             logger.info(f"Post {post_number}: APPROVED with score {avg_score:.1f}")
             
             # Add to queue if available
             if self.queue_manager:
-                await self.queue_manager.add_post(post)
+                try:
+                    await self.queue_manager.add_post(post)
+                except Exception as e:
+                    logger.error(f"Failed to add post to queue: {e}")
         else:
             logger.warning(f"Post {post_number}: REJECTED with score {avg_score:.1f}")
         
-        return {
-            "post_number": post_number,
-            "approved": approved,
-            "score": avg_score,
-            "approvals": approvals,
-            "content": post.content,
-            "hashtags": post.hashtags,
-            "image_path": post.image_path,
-            "media_type": getattr(post, 'media_type', 'image'),
-            "validation_breakdown": {
-                v.agent_name: {"score": v.score, "approved": v.approved, "feedback": v.feedback}
-                for v in validation_scores
-            },
-            "trend_used": post.cultural_reference.reference if post.cultural_reference else None
-        }
+        return post
     
     async def _validate_post(self, post: LinkedInPost) -> List[ValidationScore]:
         """Run all validators in parallel"""
