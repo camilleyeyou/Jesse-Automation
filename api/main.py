@@ -357,8 +357,8 @@ async def generate_content(request: GenerateRequest):
         return {
             "success": True,
             "batch_id": batch.id,
-            "total_posts": batch.metrics.total_posts,
-            "approved_posts": batch.metrics.approved_posts,
+            "total_posts": len(batch.posts) + len(batch.rejected_posts),
+            "approved_posts": len(batch.approved_posts),
             "added_to_queue": added_to_queue,
             "media_type": "video" if request.use_video else "image",
             "posts": [p.to_dict() for p in batch.posts]
