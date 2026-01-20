@@ -1,37 +1,54 @@
 """
-Content Generation Orchestrator
-Coordinates all agents to generate, validate, and approve posts
+Content Orchestrator - The Master Controller for Jesse A. Eisenbalm
+Coordinates all agents: Trend Scout → Content Generator → Validators → Queue
+
+NOW WITH: Real-time trend integration for reactive, non-clichéd content
 """
 
 import asyncio
 import logging
-import time
-from typing import List, Dict, Any, Optional
+import uuid
 from datetime import datetime
+from typing import Dict, Any, List, Optional, Tuple
 
-from ..models.post import LinkedInPost, PostStatus
-from ..models.batch import Batch, BatchMetrics
+from ..models.post import LinkedInPost, ValidationScore
 from ..agents.content_generator import ContentGeneratorAgent
-from ..agents.image_generator import ImageGeneratorAgent
 from ..agents.feedback_aggregator import FeedbackAggregatorAgent
 from ..agents.revision_generator import RevisionGeneratorAgent
-from ..agents.validators.sarah_chen import SarahChenValidator
-from ..agents.validators.marcus_williams import MarcusWilliamsValidator
-from ..agents.validators.jordan_park import JordanParkValidator
+from ..agents.validators import SarahChenValidator, MarcusWilliamsValidator, JordanParkValidator
+
+# Import trend service
+try:
+    from ..infrastructure.trend_service import get_trend_service, TrendService
+    TREND_SERVICE_AVAILABLE = True
+except ImportError:
+    TREND_SERVICE_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
 
 class ContentOrchestrator:
-    """Orchestrates the complete content generation and validation pipeline"""
+    """
+    Master orchestrator for Jesse A. Eisenbalm content generation
     
-    def __init__(self, ai_client, config):
+    Flow:
+    1. Fetch trending news (NEW!)
+    2. Generate content reacting to trends
+    3. Validate with Sarah, Marcus, Jordan
+    4. Revise if needed
+    5. Queue approved posts
+    
+    Key improvement: Content is now REACTIVE to real news, not formulaic
+    """
+    
+    def __init__(self, ai_client, config, image_generator=None, queue_manager=None):
         self.ai_client = ai_client
         self.config = config
+        self.image_generator = image_generator
+        self.queue_manager = queue_manager
         
         # Initialize agents
         self.content_generator = ContentGeneratorAgent(ai_client, config)
-        self.image_generator = ImageGeneratorAgent(ai_client, config)
         self.feedback_aggregator = FeedbackAggregatorAgent(ai_client, config)
         self.revision_generator = RevisionGeneratorAgent(ai_client, config)
         
@@ -42,145 +59,226 @@ class ContentOrchestrator:
             JordanParkValidator(ai_client, config)
         ]
         
-        self.min_approvals = config.batch.min_approvals_required
-        self.max_revisions = config.batch.max_revisions
+        # Initialize trend service
+        self.trend_service = None
+        if TREND_SERVICE_AVAILABLE:
+            self.trend_service = get_trend_service()
+            logger.info("✅ Trend service initialized - content will react to real news")
+        else:
+            logger.warning("⚠️ Trend service not available - using standard generation")
+        
+        # Track recent content to avoid repetition
+        self.recent_topics = []
+        self.recent_headlines = []
+        
+        logger.info("ContentOrchestrator initialized with trend-reactive generation")
     
-    async def generate_batch(self, num_posts: int = 1, use_video: bool = False) -> Batch:
+    async def generate_batch(
+        self, 
+        num_posts: int = 1, 
+        use_video: bool = False,
+        force_trend_refresh: bool = False
+    ) -> Dict[str, Any]:
         """
-        Generate a batch of posts with validation and revision loops
+        Generate a batch of posts
         
         Args:
             num_posts: Number of posts to generate
-            use_video: If True, generate video (~$1.00) instead of image ($0.03)
+            use_video: Use video generation instead of images
+            force_trend_refresh: Force refresh of trending news cache
         """
         
-        batch = Batch()
-        batch.status = "processing"
-        
+        batch_id = str(uuid.uuid4())
         media_type = "video" if use_video else "image"
-        logger.info(f"Starting batch {batch.id} with {num_posts} posts (media: {media_type})")
-        start_time = time.time()
         
-        try:
-            for i in range(num_posts):
-                post = await self._process_single_post(i + 1, batch.id, use_video=use_video)
-                batch.add_post(post)
+        logger.info(f"Starting batch {batch_id} with {num_posts} posts (media: {media_type})")
+        
+        # Step 1: Fetch trending news for reactive content
+        trending_context = None
+        if self.trend_service:
+            try:
+                news = await self.trend_service.get_trending_news(force_refresh=force_trend_refresh)
+                trending_context = self.trend_service.format_for_content_generator(news)
+                
+                # Track headlines to avoid repetition
+                for item in news:
+                    if item.headline not in self.recent_headlines:
+                        self.recent_headlines.append(item.headline)
+                
+                # Keep only last 20 headlines
+                self.recent_headlines = self.recent_headlines[-20:]
+                
+                logger.info(f"Fetched {len(news)} trending news items for content generation")
+            except Exception as e:
+                logger.warning(f"Failed to fetch trends: {e}")
+        
+        # Step 2: Generate posts
+        results = {
+            "batch_id": batch_id,
+            "requested": num_posts,
+            "approved": 0,
+            "rejected": 0,
+            "posts": [],
+            "media_type": media_type,
+            "trending_topics_used": []
+        }
+        
+        for i in range(num_posts):
+            post_number = i + 1
+            logger.info(f"Processing post {post_number} (media: {media_type})")
             
-            batch.complete()
-            
-            processing_time = time.time() - start_time
-            logger.info(f"Batch {batch.id} completed in {processing_time:.1f}s")
-            logger.info(f"Results: {batch.metrics.approved_posts}/{batch.metrics.total_posts} approved")
-            
-            return batch
-            
-        except Exception as e:
-            batch.status = "failed"
-            batch.error = str(e)
-            logger.error(f"Batch {batch.id} failed: {e}")
-            raise
+            try:
+                post_result = await self._process_single_post(
+                    post_number=post_number,
+                    batch_id=batch_id,
+                    trending_context=trending_context,
+                    use_video=use_video
+                )
+                
+                if post_result["approved"]:
+                    results["approved"] += 1
+                    if post_result.get("trend_used"):
+                        results["trending_topics_used"].append(post_result["trend_used"])
+                else:
+                    results["rejected"] += 1
+                
+                results["posts"].append(post_result)
+                
+            except Exception as e:
+                logger.error(f"Post {post_number} failed: {e}")
+                results["rejected"] += 1
+                results["posts"].append({
+                    "post_number": post_number,
+                    "approved": False,
+                    "error": str(e)
+                })
+        
+        logger.info(f"Batch {batch_id} completed: {results['approved']}/{num_posts} approved")
+        
+        return results
     
-    async def _process_single_post(self, post_number: int, batch_id: str, use_video: bool = False) -> LinkedInPost:
-        """Process a single post through generation, validation, and revision"""
+    async def _process_single_post(
+        self,
+        post_number: int,
+        batch_id: str,
+        trending_context: Optional[str] = None,
+        use_video: bool = False
+    ) -> Dict[str, Any]:
+        """Process a single post through the full pipeline"""
         
-        media_type = "video" if use_video else "image"
-        logger.info(f"Processing post {post_number} (media: {media_type})")
-        start_time = time.time()
+        # Build avoid patterns from recent content
+        avoid_patterns = {
+            "recent_topics": self.recent_topics[-10:],
+            "recent_headlines": self.recent_headlines[-5:]
+        }
         
-        # Step 1: Generate content
+        # Step 1: Generate content with trending context
         post = await self.content_generator.execute(
             post_number=post_number,
-            batch_id=batch_id
+            batch_id=batch_id,
+            trending_context=trending_context,
+            avoid_patterns=avoid_patterns
         )
         
-        # Step 2: Generate media (image or video)
-        if self.config.google.use_images or use_video:
-            media_result = await self.image_generator.execute(post, use_video=use_video)
-            if media_result.get("success"):
-                # Store media info (works for both image and video)
-                post.set_image(
-                    url=media_result.get("saved_path", ""),
-                    prompt=media_result.get("prompt", ""),
-                    provider="google_veo" if use_video else "google_gemini",
-                    cost=media_result.get("cost", 0.80 if use_video else 0.039)
-                )
-                # Add media type to post metadata
-                post.media_type = media_result.get("media_type", "image")
-                logger.info(f"Post {post_number}: {media_type.title()} generated at {post.image_url}")
-            else:
-                logger.warning(f"Post {post_number}: {media_type.title()} generation failed - {media_result.get('error')}")
+        # Track this topic
+        if post.cultural_reference:
+            self.recent_topics.append(post.cultural_reference.reference)
+        self.recent_topics = self.recent_topics[-20:]  # Keep last 20
         
-        # Step 3: Initial validation
+        # Step 2: Generate image/video
+        if self.image_generator:
+            try:
+                media_result = await self.image_generator.execute(post, use_video=use_video)
+                if media_result.get("success"):
+                    post.image_path = media_result.get("path")
+                    post.media_type = media_result.get("media_type", "image")
+                else:
+                    logger.warning(f"Post {post_number}: Media generation failed - {media_result.get('error')}")
+            except Exception as e:
+                logger.warning(f"Post {post_number}: Media generation failed - {e}")
+        
+        # Step 3: Validate with all validators
         validation_scores = await self._validate_post(post)
         
-        # Step 4: Revision loop if needed
-        revision_attempt = 0
-        while not post.is_approved(self.min_approvals) and post.can_revise():
-            revision_attempt += 1
-            logger.info(f"Post {post_number}: Revision attempt {revision_attempt}")
-            
-            # Aggregate feedback - pass both post AND validation_scores
-            feedback = await self.feedback_aggregator.execute(post, validation_scores)
-            
-            if feedback.get("error"):
-                logger.warning(f"Feedback aggregation failed: {feedback.get('error')}")
-                break
-            
-            # Generate revision
-            post = await self.revision_generator.execute(post, feedback)
+        # Step 4: Aggregate feedback
+        aggregated = await self.feedback_aggregator.execute(post, validation_scores)
+        
+        # Step 5: Check if approved (need 2/3 validators)
+        approvals = sum(1 for v in validation_scores if v.approved)
+        avg_score = sum(v.score for v in validation_scores) / len(validation_scores)
+        
+        logger.info(f"Post {post_number}: Validated - {approvals}/3 approvals, avg score: {avg_score:.1f}")
+        
+        approved = approvals >= 2
+        
+        # Step 6: Revise if needed (one attempt)
+        if not approved and approvals >= 1:
+            logger.info(f"Post {post_number}: Attempting revision")
+            post = await self.revision_generator.execute(post, aggregated)
             
             # Re-validate
             validation_scores = await self._validate_post(post)
-        
-        # Set final status
-        if post.is_approved(self.min_approvals):
-            post.status = PostStatus.APPROVED
-            logger.info(f"Post {post_number}: APPROVED with score {post.average_score:.1f}")
-        else:
-            post.status = PostStatus.REJECTED
-            logger.info(f"Post {post_number}: REJECTED with score {post.average_score:.1f}")
-        
-        post.processing_time_seconds = time.time() - start_time
-        
-        return post
-    
-    async def _validate_post(self, post: LinkedInPost):
-        """Run all validators on a post in parallel"""
-        
-        post.status = PostStatus.VALIDATING
-        post.validation_scores = []  # Clear previous validations
-        
-        # Run validators in parallel
-        validation_tasks = [
-            validator.execute(post) for validator in self.validators
-        ]
-        
-        # FIXED: Capture and store the validation results!
-        validation_results = await asyncio.gather(*validation_tasks)
-        
-        # Store validation scores in the post
-        for score in validation_results:
-            post.validation_scores.append(score)
-        
-        logger.info(f"Post {post.post_number}: Validated - {post.approval_count}/{len(self.validators)} approvals, avg score: {post.average_score:.1f}")
-        
-        # Return validation scores for use in feedback aggregation
-        return validation_results
-    
-    async def generate_single_post(self, use_video: bool = False) -> LinkedInPost:
-        """
-        Generate a single approved post (convenience method)
-        
-        Args:
-            use_video: If True, generate video (~$1.00) instead of image ($0.03)
-        """
-        
-        batch = await self.generate_batch(num_posts=1, use_video=use_video)
-        approved = batch.get_approved_posts()
+            approvals = sum(1 for v in validation_scores if v.approved)
+            avg_score = sum(v.score for v in validation_scores) / len(validation_scores)
+            approved = approvals >= 2
+            
+            logger.info(f"Post {post_number}: After revision - {approvals}/3 approvals")
         
         if approved:
-            return approved[0]
-        elif batch.posts:
-            return batch.posts[0]
+            logger.info(f"Post {post_number}: APPROVED with score {avg_score:.1f}")
+            
+            # Add to queue if available
+            if self.queue_manager:
+                await self.queue_manager.add_post(post)
         else:
-            raise Exception("Failed to generate any posts")
+            logger.warning(f"Post {post_number}: REJECTED with score {avg_score:.1f}")
+        
+        return {
+            "post_number": post_number,
+            "approved": approved,
+            "score": avg_score,
+            "approvals": approvals,
+            "content": post.content,
+            "hashtags": post.hashtags,
+            "image_path": post.image_path,
+            "media_type": getattr(post, 'media_type', 'image'),
+            "validation_breakdown": {
+                v.agent_name: {"score": v.score, "approved": v.approved, "feedback": v.feedback}
+                for v in validation_scores
+            },
+            "trend_used": post.cultural_reference.reference if post.cultural_reference else None
+        }
+    
+    async def _validate_post(self, post: LinkedInPost) -> List[ValidationScore]:
+        """Run all validators in parallel"""
+        
+        tasks = [validator.execute(post) for validator in self.validators]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        scores = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(f"Validator {self.validators[i].name} failed: {result}")
+                # Create a failing score for the error
+                scores.append(ValidationScore(
+                    agent_name=self.validators[i].name,
+                    score=0,
+                    approved=False,
+                    feedback=f"Validation error: {result}",
+                    criteria_breakdown={"error": True}
+                ))
+            else:
+                scores.append(result)
+        
+        return scores
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get orchestrator statistics"""
+        
+        return {
+            "content_generator": self.content_generator.get_stats(),
+            "validators": [v.name for v in self.validators],
+            "trend_service_active": self.trend_service is not None,
+            "recent_topics_tracked": len(self.recent_topics),
+            "recent_headlines_tracked": len(self.recent_headlines)
+        }
