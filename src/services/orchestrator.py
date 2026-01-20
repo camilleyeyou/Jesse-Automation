@@ -4,7 +4,9 @@ Coordinates all agents: Trend Scout → Content Generator → Validators → Que
 
 NOW WITH: Real-time trend integration for reactive, non-clichéd content
 
-FIXED: Return format compatibility with main.py
+FIXED: 
+- Use correct Pydantic field names (image_url, not image_path)
+- Return BatchResult compatible with main.py
 """
 
 import asyncio
@@ -34,10 +36,11 @@ class BatchResult:
     
     def __init__(self, batch_id: str, posts: List[LinkedInPost], media_type: str = "image"):
         self.batch_id = batch_id
+        self.id = batch_id  # Alias for compatibility
         self.posts = posts
         self.media_type = media_type
-        self.approved_posts = [p for p in posts if getattr(p, 'approved', True)]
-        self.rejected_posts = [p for p in posts if not getattr(p, 'approved', True)]
+        self.approved_posts = [p for p in posts]  # All posts in list are approved
+        self.rejected_posts = []
     
     def get_approved_posts(self) -> List[LinkedInPost]:
         """Get list of approved posts"""
@@ -51,22 +54,11 @@ class BatchResult:
         """Convert to dictionary"""
         return {
             "batch_id": self.batch_id,
+            "id": self.batch_id,
             "approved": len(self.approved_posts),
             "rejected": len(self.rejected_posts),
             "media_type": self.media_type,
-            "posts": [self._post_to_dict(p) for p in self.posts]
-        }
-    
-    def _post_to_dict(self, post: LinkedInPost) -> Dict[str, Any]:
-        """Convert post to dictionary"""
-        return {
-            "id": getattr(post, 'id', str(uuid.uuid4())),
-            "content": post.content,
-            "hashtags": post.hashtags,
-            "image_path": getattr(post, 'image_path', None),
-            "media_type": getattr(post, 'media_type', 'image'),
-            "approved": getattr(post, 'approved', True),
-            "score": getattr(post, 'validation_score', 0)
+            "posts": self.posts
         }
 
 
@@ -165,7 +157,7 @@ class ContentOrchestrator:
                     use_video=use_video
                 )
                 
-                if post and getattr(post, 'approved', False):
+                if post:
                     approved_posts.append(post)
                     
             except Exception as e:
@@ -200,16 +192,6 @@ class ContentOrchestrator:
             avoid_patterns=avoid_patterns
         )
         
-        # Ensure post has image_path attribute
-        if not hasattr(post, 'image_path'):
-            post.image_path = None
-        if not hasattr(post, 'media_type'):
-            post.media_type = 'image'
-        if not hasattr(post, 'approved'):
-            post.approved = False
-        if not hasattr(post, 'validation_score'):
-            post.validation_score = 0
-        
         # Track this topic
         if post.cultural_reference:
             self.recent_topics.append(post.cultural_reference.reference)
@@ -220,14 +202,18 @@ class ContentOrchestrator:
             try:
                 media_result = await self.image_generator.execute(post, use_video=use_video)
                 if media_result.get("success"):
-                    post.image_path = media_result.get("path")
-                    post.media_type = media_result.get("media_type", "image")
+                    # Use the correct Pydantic field names
+                    # The LinkedInPost model has: image_url, video_url, media_type
+                    if use_video or media_result.get("media_type") == "video":
+                        post.video_url = media_result.get("path") or media_result.get("url")
+                        post.media_type = "video"
+                    else:
+                        post.image_url = media_result.get("path") or media_result.get("url")
+                        post.media_type = "image"
                 else:
                     logger.warning(f"Post {post_number}: Media generation failed - {media_result.get('error')}")
-                    post.image_path = None
             except Exception as e:
                 logger.warning(f"Post {post_number}: Media generation failed - {e}")
-                post.image_path = None
         
         # Step 3: Validate with all validators
         validation_scores = await self._validate_post(post)
@@ -256,10 +242,6 @@ class ContentOrchestrator:
             
             logger.info(f"Post {post_number}: After revision - {approvals}/3 approvals")
         
-        # Set final approval status
-        post.approved = approved
-        post.validation_score = avg_score
-        
         if approved:
             logger.info(f"Post {post_number}: APPROVED with score {avg_score:.1f}")
             
@@ -269,10 +251,11 @@ class ContentOrchestrator:
                     await self.queue_manager.add_post(post)
                 except Exception as e:
                     logger.error(f"Failed to add post to queue: {e}")
+            
+            return post
         else:
             logger.warning(f"Post {post_number}: REJECTED with score {avg_score:.1f}")
-        
-        return post
+            return None
     
     async def _validate_post(self, post: LinkedInPost) -> List[ValidationScore]:
         """Run all validators in parallel"""
