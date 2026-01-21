@@ -29,6 +29,8 @@ from src.services.orchestrator import ContentOrchestrator
 from src.services.queue_manager import get_queue_manager
 from src.services.scheduler import get_scheduler
 from src.services.linkedin_poster import LinkedInPoster, MockLinkedInPoster
+# NEW: Import ImageGeneratorAgent
+from src.agents.image_generator import ImageGeneratorAgent
 
 # Configure logging
 logging.basicConfig(
@@ -44,6 +46,7 @@ orchestrator: ContentOrchestrator = None
 queue_manager = None
 scheduler = None
 linkedin_poster = None
+image_generator = None  # NEW: Add image generator global
 
 
 # ============== Pydantic Models ==============
@@ -63,7 +66,7 @@ class QueuePostRequest(BaseModel):
 class GenerateRequest(BaseModel):
     num_posts: int = 1
     add_to_queue: bool = True
-    use_video: bool = False  # NEW: Generate video (~$1.00) instead of image ($0.03)
+    use_video: bool = False  # Generate video (~$1.00) instead of image ($0.03)
 
 
 # ============== Lifespan ==============
@@ -71,7 +74,7 @@ class GenerateRequest(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
-    global config, ai_client, orchestrator, queue_manager, scheduler, linkedin_poster
+    global config, ai_client, orchestrator, queue_manager, scheduler, linkedin_poster, image_generator
     
     logger.info("Starting Jesse A. Eisenbalm Automation API...")
     
@@ -81,8 +84,18 @@ async def lifespan(app: FastAPI):
     # Initialize AI client
     ai_client = OpenAIClient(config)
     
-    # Initialize orchestrator
-    orchestrator = ContentOrchestrator(ai_client, config)
+    # NEW: Initialize image generator
+    image_generator = ImageGeneratorAgent(ai_client, config)
+    logger.info("✅ ImageGeneratorAgent initialized")
+    
+    # Initialize orchestrator WITH image generator
+    orchestrator = ContentOrchestrator(
+        ai_client, 
+        config, 
+        image_generator=image_generator,  # NEW: Pass image generator
+        queue_manager=None  # We'll set this after queue_manager is created if needed
+    )
+    logger.info("✅ ContentOrchestrator initialized with image generator")
     
     # Initialize queue manager
     queue_manager = get_queue_manager()
@@ -231,7 +244,8 @@ async def root():
     return {
         "service": "Jesse A. Eisenbalm Automation API",
         "version": "2.0.0",
-        "status": "running"
+        "status": "running",
+        "image_generation": "enabled" if image_generator else "disabled"
     }
 
 
@@ -242,7 +256,8 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
         "scheduler_running": scheduler.is_running if scheduler else False,
-        "queue_size": queue_manager.get_queue_stats()["pending"] if queue_manager else 0
+        "queue_size": queue_manager.get_queue_stats()["pending"] if queue_manager else 0,
+        "image_generator": "ready" if image_generator else "not initialized"
     }
 
 
@@ -257,6 +272,10 @@ async def get_automation_status():
         "linkedin": {
             "configured": linkedin_poster.is_configured() if linkedin_poster else False,
             "mock": isinstance(linkedin_poster, MockLinkedInPoster)
+        },
+        "image_generation": {
+            "enabled": image_generator is not None,
+            "provider": "google_imagen" if image_generator else None
         }
     }
 
@@ -344,7 +363,7 @@ async def generate_content(request: GenerateRequest):
         # Generate batch with optional video
         batch = await orchestrator.generate_batch(
             num_posts=request.num_posts,
-            use_video=request.use_video  # NEW: Pass video flag to orchestrator
+            use_video=request.use_video
         )
         
         # Add approved posts to queue if requested
@@ -366,6 +385,8 @@ async def generate_content(request: GenerateRequest):
         
     except Exception as e:
         logger.error(f"Content generation failed: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(500, f"Generation failed: {str(e)}")
 
 

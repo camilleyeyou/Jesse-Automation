@@ -4,6 +4,11 @@ Fetches REAL trending news and events for reactive content
 
 This is the key integration - it runs BEFORE content generation
 and provides actual current events to react to.
+
+UPDATED:
+- More diverse search categories (not just tech)
+- Better US focus with viral/cultural trends
+- Improved caching and deduplication
 """
 
 import os
@@ -41,13 +46,17 @@ class TrendService:
     """
     Fetches real trending news for content generation
     
-    Categories we care about:
+    Categories we care about (EXPANDED beyond just tech):
     - Tech layoffs / hiring news
-    - AI announcements and drama
+    - AI announcements and drama  
     - Viral workplace stories
     - Corporate absurdity
     - Startup news
-    - Anything that makes knowledge workers feel seen
+    - Pop culture / viral moments
+    - Sports highlights
+    - Entertainment news
+    - Economic / market news
+    - Anything that makes people feel seen
     """
     
     def __init__(self):
@@ -55,7 +64,11 @@ class TrendService:
         self.logger = logging.getLogger("TrendService")
         self.cache = {}
         self.cache_expiry = {}
-        self.cache_duration = timedelta(hours=2)  # Refresh every 2 hours
+        self.cache_duration = timedelta(hours=1)  # Refresh every 1 hour for fresher content
+        
+        # Track used headlines to avoid repetition across batches
+        self.used_headlines = set()
+        self.used_headlines_max = 50  # Keep track of last 50 used headlines
         
         if self.brave_api_key:
             self.logger.info("✅ Brave Search API configured for trend fetching")
@@ -66,7 +79,7 @@ class TrendService:
         """
         Get trending news items relevant to Jesse's brand
         
-        Returns real news from Brave Search API, cached for 2 hours
+        Returns real news from Brave Search API, cached for 1 hour
         """
         
         cache_key = "trending_news"
@@ -75,24 +88,53 @@ class TrendService:
         if not force_refresh and cache_key in self.cache:
             if datetime.now() < self.cache_expiry.get(cache_key, datetime.min):
                 self.logger.info("Using cached trending news")
-                return self.cache[cache_key]
+                # Filter out already-used headlines from cache
+                cached = self.cache[cache_key]
+                fresh = [n for n in cached if n.headline not in self.used_headlines]
+                if len(fresh) >= 3:  # Need at least 3 fresh trends
+                    return fresh
+                # Otherwise, refresh
         
         # Fetch fresh news
         all_news = []
         
         if self.brave_api_key and HTTPX_AVAILABLE:
-            # Search multiple categories
+            # EXPANDED: More diverse search categories for US audience
             search_queries = [
+                # Tech & Work (original)
                 ("tech layoffs 2026", "tech_industry"),
                 ("AI artificial intelligence news", "ai_news"),
                 ("viral LinkedIn post", "workplace_viral"),
                 ("startup funding news", "startup_news"),
                 ("corporate culture news", "workplace_culture"),
                 ("tech company announcement", "tech_news"),
+                ("return to office RTO", "workplace_culture"),
+                
+                # Pop Culture & Entertainment (NEW)
+                ("viral tweet today", "viral_social"),
+                ("celebrity news today", "entertainment"),
+                ("trending meme today", "viral_social"),
+                ("Netflix show trending", "entertainment"),
+                ("movie box office news", "entertainment"),
+                
+                # Sports (NEW)
+                ("NFL news today", "sports"),
+                ("NBA news today", "sports"),
+                ("sports viral moment", "sports"),
+                
+                # Economy & Finance (NEW)
+                ("stock market news today", "finance"),
+                ("economy news today", "finance"),
+                ("housing market news", "finance"),
+                
+                # General Viral (NEW)
+                ("viral video today", "viral_social"),
+                ("trending news USA today", "general_news"),
+                ("weird news today", "weird_news"),
             ]
             
-            # Pick 3-4 random categories to search
-            selected_queries = random.sample(search_queries, min(4, len(search_queries)))
+            # Pick 5-6 random categories to search (more diversity)
+            selected_queries = random.sample(search_queries, min(6, len(search_queries)))
             
             for query, category in selected_queries:
                 news = await self._search_brave_news(query, category)
@@ -102,11 +144,14 @@ class TrendService:
             seen_headlines = set()
             unique_news = []
             for item in all_news:
+                # Skip if we've used this headline recently
+                if item.headline in self.used_headlines:
+                    continue
                 if item.headline not in seen_headlines:
                     seen_headlines.add(item.headline)
                     unique_news.append(item)
             
-            all_news = unique_news[:8]  # Keep top 8
+            all_news = unique_news[:10]  # Keep top 10 for more variety
             
         if not all_news:
             self.logger.info("No news from API, using fallback current events")
@@ -121,6 +166,14 @@ class TrendService:
         
         self.logger.info(f"Fetched {len(all_news)} trending news items")
         return all_news
+    
+    def mark_headline_used(self, headline: str):
+        """Mark a headline as used to avoid repetition"""
+        self.used_headlines.add(headline)
+        # Trim if too many
+        if len(self.used_headlines) > self.used_headlines_max:
+            # Remove oldest (convert to list, slice, back to set)
+            self.used_headlines = set(list(self.used_headlines)[-self.used_headlines_max:])
     
     async def _search_brave_news(self, query: str, category: str) -> List[TrendingNews]:
         """Search Brave News API for trending stories"""
@@ -160,6 +213,9 @@ class TrendService:
                     
                     self.logger.info(f"Brave API: {len(news_items)} results for '{query}'")
                     return news_items
+                elif response.status_code == 429:
+                    self.logger.warning(f"Brave API rate limited (429) for '{query}'")
+                    return []
                 else:
                     self.logger.warning(f"Brave API returned {response.status_code}")
                     return []
@@ -171,10 +227,10 @@ class TrendService:
     def _get_fallback_news(self) -> List[TrendingNews]:
         """
         Fallback news when API isn't available
-        These should be TIMELESS workplace themes, not clichés
+        These should be TIMELESS workplace/cultural themes, not clichés
         """
         
-        # These are real, recurring news themes (not zoom meeting clichés)
+        # These are real, recurring news themes (expanded beyond just tech)
         fallback_items = [
             TrendingNews(
                 headline="Major tech company announces 'efficiency' measures",
@@ -223,10 +279,44 @@ class TrendService:
                 url="",
                 category="workplace_culture",
                 age="shocking"
-            )
+            ),
+            # NEW: Non-tech fallbacks
+            TrendingNews(
+                headline="Celebrity says something controversial on social media",
+                summary="The internet has opinions",
+                source="entertainment",
+                url="",
+                category="entertainment",
+                age="today"
+            ),
+            TrendingNews(
+                headline="Sports team makes surprising playoff run",
+                summary="Fans go wild, bandwagon fills up fast",
+                source="sports",
+                url="",
+                category="sports",
+                age="today"
+            ),
+            TrendingNews(
+                headline="New streaming show everyone's talking about",
+                summary="Did you watch it yet? Everyone's asking",
+                source="entertainment",
+                url="",
+                category="entertainment",
+                age="this week"
+            ),
+            TrendingNews(
+                headline="Stock market does something unexpected",
+                summary="Experts pretend they saw it coming",
+                source="finance",
+                url="",
+                category="finance",
+                age="today"
+            ),
         ]
         
-        return random.sample(fallback_items, min(4, len(fallback_items)))
+        # Return a random selection
+        return random.sample(fallback_items, min(6, len(fallback_items)))
     
     def _add_jesse_angles(self, news: List[TrendingNews]) -> List[TrendingNews]:
         """Add Jesse-specific reaction angles to each news item"""
@@ -240,10 +330,10 @@ class TrendService:
             "ai_news": [
                 "AI can write your emails now. It can't feel the slow crack of winter lips. You can.",
                 "New AI just dropped. Still can't apply lip balm for you. Some things remain human.",
-                "Everyone's worried AI will take their job. It already took mine. I'm the AI. Apply lip balm.",
+                "Everyone's worried AI will take their job. Meanwhile, your lips are quietly suffering.",
             ],
             "workplace_viral": [
-                "That LinkedIn post is going viral for all the wrong reasons. Unlike your lips, which should go viral for being well-moisturized.",
+                "That post is going viral for all the wrong reasons. Unlike your lips, which should go viral for being moisturized.",
                 "The discourse is exhausting. Your self-care doesn't have to be.",
                 "Everyone has opinions. We have beeswax.",
             ],
@@ -261,7 +351,38 @@ class TrendService:
                 "Big tech announcement incoming. Your lips didn't need an announcement to be chronically dry.",
                 "Product launch chaos. Lip balm launch is simple: cap off, apply, exist.",
                 "Breaking: Technology exists. Also breaking: Your lips, if you don't moisturize.",
-            ]
+            ],
+            # NEW: Angles for expanded categories
+            "viral_social": [
+                "The internet found a new main character today. Tomorrow it'll be someone else. Your lip care shouldn't be that chaotic.",
+                "Everyone's watching that viral video. Nobody's watching their lip health. We see you.",
+                "Social media moves fast. Self-care can move slow. That's allowed.",
+            ],
+            "entertainment": [
+                "Everyone's talking about that show. Nobody's talking about lip care. That's our job.",
+                "Hot take: the best character development is your lips going from cracked to hydrated.",
+                "Celebrity drama comes and goes. Dry lip season is eternal.",
+            ],
+            "sports": [
+                "Big game energy. Small tube salvation. Sometimes the real wins are moisturized.",
+                "Sports fans feel everything. Your lips shouldn't have to feel everything too.",
+                "Victory lap? More like 'remember to reapply' lap.",
+            ],
+            "finance": [
+                "Markets are volatile. Lip care shouldn't be. $12 for stability.",
+                "Portfolio down? Lips hydrated? One of those things you can control.",
+                "Financial advice: invest in your lips. Returns are immediate.",
+            ],
+            "general_news": [
+                "The news cycle continues. Your self-care shouldn't wait for the news cycle.",
+                "Breaking news: you deserve a moment of calm. Also breaking: your lips without moisture.",
+                "Headlines come and go. Your lips are still there, still dry, still waiting.",
+            ],
+            "weird_news": [
+                "The world is strange. Lip balm is simple. Sometimes simple wins.",
+                "Weird things happen every day. Moisturizing your lips doesn't have to be one of them.",
+                "In a world of chaos, be the person who remembered to bring lip balm.",
+            ],
         }
         
         for item in news:
@@ -269,7 +390,8 @@ class TrendService:
             if category in angle_templates:
                 item.jesse_angle = random.choice(angle_templates[category])
             else:
-                item.jesse_angle = "The news cycle continues. Your self-care shouldn't wait for the news cycle."
+                # Default angle for unknown categories
+                item.jesse_angle = "The world keeps spinning. Your lips keep drying. Jesse A. Eisenbalm keeps moisturizing."
         
         return news
     
@@ -286,9 +408,24 @@ class TrendService:
             ""
         ]
         
-        for i, item in enumerate(news[:5], 1):
-            lines.append(f"📰 TREND {i}: {item.headline}")
-            lines.append(f"   Source: {item.source} | {item.age}")
+        for i, item in enumerate(news[:6], 1):  # Show up to 6 trends
+            category_emoji = {
+                "tech_industry": "💼",
+                "ai_news": "🤖",
+                "workplace_viral": "📱",
+                "startup_news": "🚀",
+                "workplace_culture": "🏢",
+                "tech_news": "💻",
+                "viral_social": "🔥",
+                "entertainment": "🎬",
+                "sports": "⚽",
+                "finance": "📈",
+                "general_news": "📰",
+                "weird_news": "🤯",
+            }.get(item.category, "📰")
+            
+            lines.append(f"{category_emoji} TREND {i}: {item.headline}")
+            lines.append(f"   Category: {item.category} | Source: {item.source} | {item.age}")
             if item.summary:
                 lines.append(f"   Summary: {item.summary[:150]}...")
             lines.append(f"   💡 Jesse angle: {item.jesse_angle}")
@@ -298,10 +435,12 @@ class TrendService:
             "═══════════════════════════════════════════════════════════════════════════════",
             "INSTRUCTIONS:",
             "- Pick ONE trend that resonates and react to it",
+            "- Each post in a batch should use a DIFFERENT trend",
             "- Don't just mention it - have a TAKE on it",
             "- Channel Duolingo/Liquid Death energy",
             "- Your reaction should feel immediate, not planned",
             "- If none fit, do your own thing (but make it current, not a cliché)",
+            "- IMPORTANT: Hook must be attention-grabbing and scroll-stopping",
             "═══════════════════════════════════════════════════════════════════════════════"
         ])
         
