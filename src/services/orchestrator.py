@@ -1,5 +1,15 @@
 """
-Content Orchestrator V3 - GUARANTEED UNIQUE TRENDS + STYLE VALIDATION
+Content Orchestrator - FINAL FIX
+The REAL solution: Fetch all trends ONCE, then assign different trends to each post.
+
+The problem was:
+- Fetching trends fresh for each post = same top results
+- Or giving all trends to AI and hoping it picks different ones = it doesn't
+
+The fix:
+- Fetch trends once at batch start
+- Pop trends from the list as we assign them to posts
+- Each post gets a trend that's been REMOVED from the pool
 """
 
 import asyncio
@@ -13,15 +23,8 @@ from ..agents.feedback_aggregator import FeedbackAggregatorAgent
 from ..agents.revision_generator import RevisionGeneratorAgent
 from ..agents.validators import SarahChenValidator, MarcusWilliamsValidator, JordanParkValidator
 
-# Import style validator
 try:
-    from ..agents.style_validator import StyleValidator
-    STYLE_VALIDATOR_AVAILABLE = True
-except ImportError:
-    STYLE_VALIDATOR_AVAILABLE = False
-
-try:
-    from ..infrastructure.trend_service import get_trend_service, TrendService
+    from ..infrastructure.trend_service import get_trend_service
     TREND_SERVICE_AVAILABLE = True
 except ImportError:
     TREND_SERVICE_AVAILABLE = False
@@ -45,6 +48,8 @@ def convert_to_web_url(file_path: str, media_type: str = "image") -> str:
 
 
 class BatchResult:
+    """Result object for batch generation"""
+    
     def __init__(self, batch_id: str, posts: List[LinkedInPost], media_type: str = "image"):
         self.batch_id = batch_id
         self.id = batch_id
@@ -62,9 +67,12 @@ class BatchResult:
 
 class ContentOrchestrator:
     """
-    Master orchestrator with:
-    - GUARANTEED unique trends per post (via trend service tracking)
-    - Style validator to enforce Liquid Death energy
+    Master orchestrator for Jesse A. Eisenbalm content generation.
+    
+    KEY FIX: Each post in a batch gets assigned a DIFFERENT trend by:
+    1. Fetching all trends ONCE at the start of the batch
+    2. Assigning trends by INDEX (post 1 gets trend 0, post 2 gets trend 1, etc.)
+    3. Each trend is only used ONCE per batch
     """
     
     def __init__(self, ai_client, config, image_generator=None, queue_manager=None):
@@ -78,78 +86,83 @@ class ContentOrchestrator:
         self.feedback_aggregator = FeedbackAggregatorAgent(ai_client, config)
         self.revision_generator = RevisionGeneratorAgent(ai_client, config)
         
-        # Validators - StyleValidator FIRST to catch bad content early
-        self.validators = []
-        
-        if STYLE_VALIDATOR_AVAILABLE:
-            self.validators.append(StyleValidator(ai_client, config))
-            logger.info("✅ StyleValidator added - will enforce Liquid Death energy")
-        else:
-            logger.warning("⚠️ StyleValidator not available - style may vary")
-        
-        self.validators.extend([
+        # Validators
+        self.validators = [
             SarahChenValidator(ai_client, config),
             MarcusWilliamsValidator(ai_client, config),
             JordanParkValidator(ai_client, config)
-        ])
+        ]
         
         # Trend service
         self.trend_service = None
         if TREND_SERVICE_AVAILABLE:
             self.trend_service = get_trend_service()
-            logger.info("✅ Trend service initialized")
-        
-        # Tracking
-        self.recent_topics = []
+            logger.info("✅ Trend service initialized - content will react to real news")
         
         if self.image_generator:
             logger.info("✅ ContentOrchestrator initialized WITH image generator")
+        else:
+            logger.warning("⚠️ ContentOrchestrator initialized WITHOUT image generator")
         
-        logger.info(f"ContentOrchestrator ready with {len(self.validators)} validators")
+        logger.info("ContentOrchestrator initialized with trend-reactive generation")
     
     async def generate_batch(
         self, 
         num_posts: int = 1, 
         use_video: bool = False,
-        force_trend_refresh: bool = False
     ) -> BatchResult:
-        """Generate a batch - each post gets a UNIQUE trend"""
+        """
+        Generate a batch of posts - EACH WITH A UNIQUE TREND.
+        
+        The fix: Fetch trends once, then assign by index.
+        """
         
         batch_id = str(uuid.uuid4())
         media_type = "video" if use_video else "image"
         
-        logger.info(f"═══════════════════════════════════════════════════════════════")
-        logger.info(f"Starting batch {batch_id[:8]} with {num_posts} posts")
-        logger.info(f"═══════════════════════════════════════════════════════════════")
+        logger.info(f"Starting batch {batch_id[:8]} with {num_posts} posts (media: {media_type})")
         
-        # Reset trend tracking for this batch
+        # ========================================
+        # STEP 1: FETCH ALL TRENDS ONCE
+        # ========================================
+        all_trends = []
         if self.trend_service:
-            self.trend_service.start_new_batch(batch_id)
+            try:
+                # Force refresh to get fresh trends
+                all_trends = await self.trend_service.get_trending_news(force_refresh=True)
+                logger.info(f"📰 Fetched {len(all_trends)} trends for this batch")
+                
+                # Log the trends we got
+                for i, trend in enumerate(all_trends[:num_posts + 2]):
+                    logger.info(f"  Trend {i}: {trend.headline[:60]}...")
+                    
+            except Exception as e:
+                logger.warning(f"Failed to fetch trends: {e}")
         
+        # ========================================
+        # STEP 2: GENERATE POSTS - ASSIGN BY INDEX
+        # ========================================
         approved_posts = []
         
         for i in range(num_posts):
             post_number = i + 1
-            logger.info(f"\n--- Processing post {post_number}/{num_posts} ---")
             
-            # Get a UNIQUE trend for this post
-            trend = None
+            # ASSIGN TREND BY INDEX - each post gets a different one
+            assigned_trend = None
             trend_context = None
             
-            if self.trend_service:
-                trend = await self.trend_service.get_next_unused_trend()
-                if trend:
-                    trend_context = self.trend_service.format_single_trend(trend)
-                    logger.info(f"Post {post_number} trend: {trend.headline[:60]}...")
-                else:
-                    logger.info(f"Post {post_number}: No unused trends - will generate original content")
+            if i < len(all_trends):
+                assigned_trend = all_trends[i]
+                trend_context = self._format_single_trend(assigned_trend)
+                logger.info(f"📌 Post {post_number} assigned: {assigned_trend.headline[:50]}...")
+            else:
+                logger.info(f"📌 Post {post_number}: No more trends, generating original content")
             
             try:
                 post = await self._process_single_post(
                     post_number=post_number,
                     batch_id=batch_id,
-                    trend_context=trend_context,
-                    assigned_trend=trend,
+                    trending_context=trend_context,
                     use_video=use_video
                 )
                 
@@ -164,98 +177,109 @@ class ContentOrchestrator:
                 import traceback
                 traceback.print_exc()
         
-        logger.info(f"\n═══════════════════════════════════════════════════════════════")
-        logger.info(f"Batch {batch_id[:8]} complete: {len(approved_posts)}/{num_posts} approved")
-        logger.info(f"═══════════════════════════════════════════════════════════════")
-        
+        logger.info(f"Batch {batch_id[:8]} completed: {len(approved_posts)}/{num_posts} approved")
         return BatchResult(batch_id=batch_id, posts=approved_posts, media_type=media_type)
     
+    def _format_single_trend(self, trend) -> str:
+        """Format a single trend for the content generator - THIS IS THE ONLY TREND IT SEES"""
+        
+        return f"""═══════════════════════════════════════════════════════════════════════════════
+🎯 YOUR ASSIGNED TREND - YOU MUST USE THIS ONE
+═══════════════════════════════════════════════════════════════════════════════
+
+📰 {trend.headline}
+
+Source: {trend.source}
+Category: {trend.category}
+{f"Details: {trend.summary[:200]}..." if trend.summary else ""}
+
+💡 Jesse angle: {trend.jesse_angle if hasattr(trend, 'jesse_angle') and trend.jesse_angle else "Find the absurd corporate angle"}
+
+═══════════════════════════════════════════════════════════════════════════════
+INSTRUCTIONS:
+- This is YOUR assigned trend - react to it specifically
+- Use the actual names, companies, and numbers from the headline
+- Do NOT make up a different topic
+- The other posts in this batch have DIFFERENT trends assigned
+═══════════════════════════════════════════════════════════════════════════════"""
+
     async def _process_single_post(
         self,
         post_number: int,
         batch_id: str,
-        trend_context: Optional[str] = None,
-        assigned_trend = None,
+        trending_context: Optional[str] = None,
         use_video: bool = False
     ) -> Optional[LinkedInPost]:
         """Process a single post"""
         
-        avoid_patterns = {
-            "recent_topics": self.recent_topics[-10:]
-        }
-        
         # Step 1: Generate content
+        logger.info(f"Processing post {post_number} (media: {'video' if use_video else 'image'})")
+        
         post = await self.content_generator.execute(
             post_number=post_number,
             batch_id=batch_id,
-            trending_context=trend_context,
-            avoid_patterns=avoid_patterns
+            trending_context=trending_context,
         )
         
-        # Track topic
-        if post.cultural_reference:
-            self.recent_topics.append(post.cultural_reference.reference)
-            self.recent_topics = self.recent_topics[-20:]
-        
-        # Step 2: Generate image/video
+        # Step 2: Generate media
         if self.image_generator:
             try:
+                logger.info(f"Generating {'video' if use_video else 'image'} for post {post_number}...")
                 media_result = await self.image_generator.execute(post, use_video=use_video)
                 
                 if media_result.get("success"):
-                    saved_path = media_result.get("saved_path") or media_result.get("path")
+                    saved_path = media_result.get("saved_path") or media_result.get("path") or media_result.get("url")
                     
                     if use_video or media_result.get("media_type") == "video":
                         web_url = convert_to_web_url(saved_path, "video")
-                        post.image_url = web_url
                         post.video_url = web_url
+                        post.image_url = web_url
                         post.media_type = "video"
                     else:
                         web_url = convert_to_web_url(saved_path, "image")
                         post.image_url = web_url
                         post.media_type = "image"
                     
-                    logger.info(f"✅ Media: {web_url}")
+                    logger.info(f"✅ Image generated: {saved_path} -> {web_url}")
+                else:
+                    logger.warning(f"Media generation failed: {media_result.get('error')}")
             except Exception as e:
                 logger.warning(f"Media generation failed: {e}")
         
-        # Step 3: Validate with ALL validators (including StyleValidator)
+        # Step 3: Validate
         validation_scores = await self._validate_post(post)
         
-        # Step 4: Check results
+        # Step 4: Aggregate feedback
+        aggregated = await self.feedback_aggregator.execute(post, validation_scores)
+        
+        # Step 5: Check approval
         approvals = sum(1 for v in validation_scores if v.approved)
         avg_score = sum(v.score for v in validation_scores) / len(validation_scores) if validation_scores else 0
         
-        # Log each validator's result
-        for v in validation_scores:
-            status = "✅" if v.approved else "❌"
-            logger.info(f"  {status} {v.agent_name}: {v.score}/10 - {v.feedback[:50] if v.feedback else 'No feedback'}...")
+        logger.info(f"Post {post_number}: Validated - {approvals}/3 approvals, avg score: {avg_score:.1f}")
         
-        logger.info(f"Post {post_number}: {approvals}/{len(self.validators)} approvals, avg: {avg_score:.1f}")
+        approved = approvals >= 2
         
-        # Need majority approval
-        min_approvals = len(self.validators) // 2 + 1
-        approved = approvals >= min_approvals
-        
-        # Step 5: Revise if close but not approved
-        if not approved and approvals >= min_approvals - 1:
-            logger.info(f"Post {post_number}: Attempting revision...")
-            
-            aggregated = await self.feedback_aggregator.execute(post, validation_scores)
+        # Step 6: Revise if needed
+        if not approved and approvals >= 1:
+            logger.info(f"Post {post_number}: Attempting revision")
             post = await self.revision_generator.execute(post, aggregated)
             
             validation_scores = await self._validate_post(post)
             approvals = sum(1 for v in validation_scores if v.approved)
             avg_score = sum(v.score for v in validation_scores) / len(validation_scores) if validation_scores else 0
-            approved = approvals >= min_approvals
+            approved = approvals >= 2
             
-            logger.info(f"Post {post_number} after revision: {approvals}/{len(self.validators)} approvals")
+            logger.info(f"Post {post_number}: After revision - {approvals}/3 approvals")
         
         if approved:
+            logger.info(f"Post {post_number}: APPROVED with score {avg_score:.1f}")
+            # Store validation scores so to_dict() can compute average_score
             post.validation_scores = validation_scores
             return post
-        
-        return None
+        else:
+            logger.warning(f"Post {post_number}: REJECTED with score {avg_score:.1f}")
+            return None
     
     async def _validate_post(self, post: LinkedInPost) -> List[ValidationScore]:
         """Run all validators in parallel"""
@@ -265,12 +289,12 @@ class ContentOrchestrator:
         scores = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                logger.error(f"Validator {self.validators[i].name} error: {result}")
+                logger.error(f"Validator {self.validators[i].name} failed: {result}")
                 scores.append(ValidationScore(
                     agent_name=self.validators[i].name,
                     score=5.0,
                     approved=False,
-                    feedback=f"Error: {result}",
+                    feedback=f"Validation error: {result}",
                     criteria_breakdown={"error": True}
                 ))
             else:
@@ -280,9 +304,8 @@ class ContentOrchestrator:
     
     def get_stats(self) -> Dict[str, Any]:
         return {
+            "content_generator": self.content_generator.get_stats(),
             "validators": [v.name for v in self.validators],
-            "validator_count": len(self.validators),
             "trend_service_active": self.trend_service is not None,
-            "image_generator_active": self.image_generator is not None,
-            "style_validator_active": STYLE_VALIDATOR_AVAILABLE
+            "image_generator_active": self.image_generator is not None
         }

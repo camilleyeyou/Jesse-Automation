@@ -1,6 +1,8 @@
 """
-Trend Service V2 - GUARANTEED UNIQUE TRENDS
-Each call to get_trend_for_post() returns a DIFFERENT trend
+Trend Service - FINAL FIX
+Fetches diverse trends from multiple categories to ensure variety.
+
+The key: Use DIFFERENT search queries to get DIFFERENT results.
 """
 
 import os
@@ -8,8 +10,8 @@ import logging
 import asyncio
 import random
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Set
-from dataclasses import dataclass
+from typing import List, Optional
+from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
@@ -18,161 +20,136 @@ try:
     HTTPX_AVAILABLE = True
 except ImportError:
     HTTPX_AVAILABLE = False
+    logger.warning("httpx not available")
 
 
 @dataclass
 class TrendingNews:
     """A trending news item"""
     headline: str
-    summary: str
-    source: str
-    url: str
-    category: str
-    age: str
+    summary: str = ""
+    source: str = ""
+    url: str = ""
+    category: str = ""
+    age: str = "today"
     jesse_angle: str = ""
 
 
 class TrendService:
     """
-    Fetches trending news - GUARANTEES unique trends per batch
+    Fetches trending news from Brave Search API.
     
-    Key change: Instead of returning all trends and hoping AI picks different ones,
-    we now track which trends have been used and return only unused ones.
+    KEY: Each search query returns DIFFERENT results.
+    So we use DIFFERENT queries to get DIVERSE trends.
     """
     
     def __init__(self):
         self.brave_api_key = os.getenv("BRAVE_API_KEY")
         self.logger = logging.getLogger("TrendService")
         
-        # Cache for fetched trends
+        # Cache
         self.cached_trends: List[TrendingNews] = []
         self.cache_time: Optional[datetime] = None
-        self.cache_duration = timedelta(minutes=30)  # Shorter cache for fresher content
-        
-        # Track used trends within current batch
-        self.batch_used_indices: Set[int] = set()
-        self.current_batch_id: Optional[str] = None
+        self.cache_duration = timedelta(minutes=30)
         
         if self.brave_api_key:
-            self.logger.info("✅ Brave Search API configured")
+            self.logger.info("✅ Brave Search API configured for trend fetching")
         else:
-            self.logger.warning("⚠️ No BRAVE_API_KEY - using fallback trends")
+            self.logger.warning("⚠️ No BRAVE_API_KEY - will use fallback trends")
     
-    def start_new_batch(self, batch_id: str):
-        """Call this at the start of each batch to reset used trends"""
-        self.current_batch_id = batch_id
-        self.batch_used_indices = set()
-        self.logger.info(f"Started new batch {batch_id} - trend tracking reset")
-    
-    async def get_next_unused_trend(self) -> Optional[TrendingNews]:
-        """Get the next trend that hasn't been used in this batch"""
+    async def get_trending_news(self, force_refresh: bool = False) -> List[TrendingNews]:
+        """
+        Fetch diverse trending news.
         
-        # Refresh cache if needed
-        if not self.cached_trends or self._cache_expired():
-            await self._refresh_trends()
+        Returns a list of trends from DIFFERENT categories to ensure
+        that when we assign trend[0], trend[1], trend[2] to posts,
+        they're actually different topics.
+        """
         
-        # Find first unused trend
-        for idx, trend in enumerate(self.cached_trends):
-            if idx not in self.batch_used_indices:
-                self.batch_used_indices.add(idx)
-                self.logger.info(f"Assigned trend {idx}: {trend.headline[:50]}...")
-                return trend
+        # Check cache (unless force refresh)
+        if not force_refresh and self.cached_trends and self.cache_time:
+            if datetime.now() < self.cache_time + self.cache_duration:
+                self.logger.info(f"Using cached trends ({len(self.cached_trends)} items)")
+                # Shuffle cached trends to get variety on repeated calls
+                shuffled = self.cached_trends.copy()
+                random.shuffle(shuffled)
+                return shuffled
         
-        # All trends used - fetch fresh ones
-        self.logger.warning("All cached trends used - fetching fresh batch")
-        await self._refresh_trends(force=True)
+        self.logger.info("Fetching fresh trends from multiple categories...")
         
-        # Try again with fresh trends
-        for idx, trend in enumerate(self.cached_trends):
-            if idx not in self.batch_used_indices:
-                self.batch_used_indices.add(idx)
-                return trend
-        
-        # Still nothing - return None (will generate original content)
-        self.logger.warning("No unused trends available")
-        return None
-    
-    def _cache_expired(self) -> bool:
-        """Check if cache needs refresh"""
-        if not self.cache_time:
-            return True
-        return datetime.now() > self.cache_time + self.cache_duration
-    
-    async def _refresh_trends(self, force: bool = False):
-        """Fetch fresh trends from multiple diverse sources"""
-        
-        self.logger.info("Refreshing trends cache...")
         all_trends = []
         
         if self.brave_api_key and HTTPX_AVAILABLE:
-            # DIVERSE search queries - different topics to ensure variety
-            search_queries = [
-                # Tech & Business
-                ("tech layoffs 2026", "tech_industry"),
-                ("startup funding round", "startup_news"),
-                ("CEO resignation fired", "corporate_drama"),
+            # DIFFERENT search queries = DIFFERENT results
+            # This is the key to getting diverse trends
+            search_configs = [
+                # Tech & Business (but different angles)
+                {"query": "tech company layoffs 2026", "category": "tech_layoffs"},
+                {"query": "startup funding Series A B", "category": "startup_funding"},
+                {"query": "CEO fired resigned steps down", "category": "ceo_news"},
                 
-                # AI specifically  
-                ("artificial intelligence OpenAI Google", "ai_news"),
-                ("ChatGPT AI announcement", "ai_news"),
+                # AI (the hot topic)
+                {"query": "OpenAI ChatGPT Google AI announcement", "category": "ai_news"},
                 
-                # Entertainment & Pop Culture
-                ("celebrity news hollywood", "entertainment"),
-                ("Netflix streaming show", "entertainment"),
-                ("viral TikTok trend", "viral_social"),
-                ("new movie release box office", "entertainment"),
-                ("new music album release", "entertainment"),
-                ("pop culture news", "entertainment"),
+                # Workplace & Corporate
+                {"query": "return to office remote work mandate", "category": "workplace"},
+                {"query": "LinkedIn viral post cringe hustle", "category": "linkedin_cringe"},
                 
-                # Sports
-                ("NFL coach fired hired", "sports"),
-                ("NBA trade deadline", "sports"),
+                # Entertainment & Pop Culture (broader appeal)
+                {"query": "Netflix show movie streaming", "category": "entertainment"},
+                {"query": "celebrity news viral moment", "category": "celebrity"},
                 
-                # Business & Finance
-                ("stock market earnings", "finance"),
-                ("company bankruptcy", "finance"),
+                # Sports (mass appeal in US)
+                {"query": "NFL coach fired hired trade", "category": "nfl"},
+                {"query": "NBA trade deadline news", "category": "nba"},
                 
-                # Workplace
-                ("return to office remote work", "workplace"),
-                ("LinkedIn viral post cringe", "workplace_viral"),
+                # Finance & Economy
+                {"query": "stock market earnings report", "category": "finance"},
+                {"query": "inflation economy recession", "category": "economy"},
             ]
             
-            # Shuffle to get different results each time
-            random.shuffle(search_queries)
+            # Shuffle and pick 6 different categories
+            random.shuffle(search_configs)
+            selected_configs = search_configs[:6]
             
-            # Only query 6 random categories to stay under rate limits
-            selected_queries = search_queries[:6]
-            
-            for query, category in selected_queries:
-                trends = await self._search_brave(query, category)
-                all_trends.extend(trends)
-                # Small delay to avoid rate limits
-                await asyncio.sleep(0.2)
+            for config in selected_configs:
+                try:
+                    trends = await self._search_brave(config["query"], config["category"])
+                    if trends:
+                        # Only take the TOP result from each category
+                        # This ensures diversity - one result per category
+                        all_trends.append(trends[0])
+                        self.logger.info(f"  ✓ {config['category']}: {trends[0].headline[:50]}...")
+                except Exception as e:
+                    self.logger.warning(f"  ✗ {config['category']}: {e}")
+                
+                # Small delay to avoid rate limiting
+                await asyncio.sleep(0.15)
         
-        # Add fallback trends if needed
-        if len(all_trends) < 10:
+        # Add fallback trends if we don't have enough
+        if len(all_trends) < 5:
+            self.logger.info("Adding fallback trends for variety")
             fallbacks = self._get_fallback_trends()
-            all_trends.extend(fallbacks)
-        
-        # Deduplicate by headline similarity
-        unique_trends = self._deduplicate_trends(all_trends)
+            # Only add fallbacks we don't already have (by category)
+            existing_categories = {t.category for t in all_trends}
+            for fb in fallbacks:
+                if fb.category not in existing_categories:
+                    all_trends.append(fb)
+                    existing_categories.add(fb.category)
+                if len(all_trends) >= 10:
+                    break
         
         # Add Jesse angles
-        for trend in unique_trends:
+        for trend in all_trends:
             if not trend.jesse_angle:
-                trend.jesse_angle = self._generate_jesse_angle(trend)
+                trend.jesse_angle = self._get_jesse_angle(trend.category)
         
-        # Shuffle to randomize order
-        random.shuffle(unique_trends)
-        
-        self.cached_trends = unique_trends
+        # Update cache
+        self.cached_trends = all_trends
         self.cache_time = datetime.now()
         
-        # Reset used indices when cache refreshes
-        if force:
-            self.batch_used_indices = set()
-        
-        self.logger.info(f"Cached {len(self.cached_trends)} unique trends")
+        self.logger.info(f"📰 Prepared {len(all_trends)} diverse trends")
+        return all_trends
     
     async def _search_brave(self, query: str, category: str) -> List[TrendingNews]:
         """Search Brave News API"""
@@ -182,8 +159,8 @@ class TrendService:
                     "https://api.search.brave.com/res/v1/news/search",
                     params={
                         "q": query,
-                        "count": 3,  # Fewer per query, more queries
-                        "freshness": "pd",
+                        "count": 3,
+                        "freshness": "pd",  # Past day
                         "country": "us",
                         "search_lang": "en"
                     },
@@ -199,200 +176,100 @@ class TrendService:
                     results = data.get("results", [])
                     
                     trends = []
-                    for result in results:
+                    for r in results:
                         trends.append(TrendingNews(
-                            headline=result.get("title", ""),
-                            summary=result.get("description", ""),
-                            source=result.get("meta_url", {}).get("hostname", "unknown"),
-                            url=result.get("url", ""),
+                            headline=r.get("title", ""),
+                            summary=r.get("description", ""),
+                            source=r.get("meta_url", {}).get("hostname", "news"),
+                            url=r.get("url", ""),
                             category=category,
-                            age=result.get("age", "today")
+                            age=r.get("age", "today")
                         ))
                     return trends
                     
                 elif response.status_code == 429:
-                    self.logger.warning(f"Rate limited for '{query}'")
+                    self.logger.warning(f"Brave API rate limited (429) for '{query}'")
                     return []
                 else:
-                    self.logger.warning(f"Brave API returned {response.status_code}")
+                    self.logger.warning(f"Brave API {response.status_code} for '{query}'")
                     return []
                     
         except Exception as e:
-            self.logger.error(f"Brave search failed: {e}")
+            self.logger.error(f"Brave search failed for '{query}': {e}")
             return []
-    
-    def _deduplicate_trends(self, trends: List[TrendingNews]) -> List[TrendingNews]:
-        """Remove duplicate/similar trends"""
-        unique = []
-        seen_keywords = set()
-        
-        for trend in trends:
-            # Extract key words from headline
-            words = set(trend.headline.lower().split())
-            # Remove common words
-            words -= {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'to', 'for', 'of', 
-                     'and', 'in', 'on', 'at', 'as', 'by', 'with', 'from', 'new', 'says',
-                     'after', 'how', 'why', 'what', 'when', 'will', 'has', 'have', 'been'}
-            
-            # Check if we've seen similar keywords
-            significant_words = {w for w in words if len(w) > 4}
-            
-            if significant_words:
-                overlap = significant_words & seen_keywords
-                # If more than 50% overlap, skip as duplicate
-                if len(overlap) > len(significant_words) * 0.5:
-                    continue
-                
-                seen_keywords.update(significant_words)
-            
-            unique.append(trend)
-        
-        return unique
     
     def _get_fallback_trends(self) -> List[TrendingNews]:
         """Diverse fallback trends when API fails"""
-        
         fallbacks = [
             TrendingNews(
-                headline="Major tech company announces surprise layoffs affecting thousands",
-                summary="Another round of 'efficiency measures' hits the industry",
-                source="tech_news", url="", category="tech_industry", age="today"
+                headline="Major tech company announces another round of layoffs",
+                summary="Thousands affected in latest efficiency measures",
+                source="tech_news", category="tech_layoffs",
+                jesse_angle="Your severance package doesn't include lip balm."
             ),
             TrendingNews(
                 headline="Startup raises $50M Series B, immediately pivots to AI",
-                summary="Adding 'AI-powered' to everything continues",
-                source="startup_news", url="", category="startup_news", age="today"
+                summary="Adding AI to everything continues to be a winning strategy with VCs",
+                source="startup_news", category="startup_funding",
+                jesse_angle="Runway is temporary. Lip moisture is eternal. Well, until it dries."
             ),
             TrendingNews(
-                headline="LinkedIn influencer's 4am routine post goes viral for wrong reasons",
-                summary="The hustle culture discourse continues",
-                source="social", url="", category="workplace_viral", age="today"
+                headline="LinkedIn influencer's 4am morning routine goes viral for wrong reasons",
+                summary="Hustle culture meets reality check in the comments",
+                source="social", category="linkedin_cringe",
+                jesse_angle="I wake up at 4am because anxiety, not hustle. At least my lips aren't dry."
             ),
             TrendingNews(
-                headline="CEO sends 2000-word memo about company culture before layoffs",
-                summary="'We're a family' hits different when HR is involved",
-                source="business", url="", category="corporate_drama", age="today"
+                headline="Company mandates return to office, employees push back",
+                summary="Remote work debate continues across corporate America",
+                source="workplace", category="workplace",
+                jesse_angle="Office or home, your lips are dry either way."
             ),
             TrendingNews(
-                headline="New AI model claims to be 'more human than humans'",
-                summary="Still can't apply lip balm though",
-                source="ai_news", url="", category="ai_news", age="today"
+                headline="New AI model claims human-level performance on benchmark",
+                summary="The AI arms race continues with another major announcement",
+                source="ai_news", category="ai_news",
+                jesse_angle="AI can write your emails. It can't moisturize your lips."
             ),
             TrendingNews(
-                headline="NFL team fires coach after disappointing season",
-                summary="Sports leadership changes continue",
-                source="sports", url="", category="sports", age="today"
+                headline="NFL team makes surprising coaching change",
+                summary="Fans react to unexpected front office decision",
+                source="sports", category="nfl",
+                jesse_angle="Coaches come and go. Chapped lips are forever. Unless."
             ),
             TrendingNews(
-                headline="Streaming service raises prices again, loses subscribers",
-                summary="The streaming wars claim another victim",
-                source="entertainment", url="", category="entertainment", age="today"
+                headline="Netflix announces price increase, subscribers react",
+                summary="Streaming costs continue to rise",
+                source="entertainment", category="entertainment",
+                jesse_angle="Subscription fatigue is real. Lip balm is $8.99. Once."
             ),
             TrendingNews(
-                headline="Return to office mandate sparks employee backlash",
-                summary="Executives confused why workers prefer working from home",
-                source="workplace", url="", category="workplace", age="today"
-            ),
-            TrendingNews(
-                headline="Crypto exchange faces regulatory scrutiny",
-                summary="Web3 winter continues",
-                source="finance", url="", category="finance", age="today"
-            ),
-            TrendingNews(
-                headline="Celebrity announces surprise project on social media",
-                summary="Breaking the internet, one post at a time",
-                source="entertainment", url="", category="entertainment", age="today"
+                headline="CEO sends company-wide email about 'difficult decisions'",
+                summary="Corporate speak precedes another round of cuts",
+                source="business", category="ceo_news",
+                jesse_angle="The memo was 2000 words. Nobody read it. Everyone got fired anyway."
             ),
         ]
-        
         random.shuffle(fallbacks)
         return fallbacks
     
-    def _generate_jesse_angle(self, trend: TrendingNews) -> str:
-        """Generate a Jesse-style angle for the trend"""
-        
+    def _get_jesse_angle(self, category: str) -> str:
+        """Get a Jesse-style angle for a category"""
         angles = {
-            "tech_industry": [
-                "Layoffs hit. Your severance doesn't include lip balm. Ours does.",
-                "Tech jobs come and go. Dry lips are forever. Unless.",
-                "Another reorg. Your org chart changes. Your lip care shouldn't.",
-            ],
-            "startup_news": [
-                "Runway is short. So is this lip balm. But it works.",
-                "Series B closed. Series B-alm open. $8.99.",
-                "Pivot complete. Now pivot to lip care.",
-            ],
-            "workplace_viral": [
-                "That post is cringe. Your dry lips are also cringe. Fix one of them.",
-                "LinkedIn thinks you should hustle at 4am. We think you should moisturize.",
-                "Viral for the wrong reasons. Unlike moisturized lips.",
-            ],
-            "corporate_drama": [
-                "Corporate says we're family. Families don't do layoffs. $8.99.",
-                "The memo was long. Your patience is short. So is lip balm application.",
-                "Culture fit? How about moisture fit.",
-            ],
-            "ai_news": [
-                "AI can do a lot. It can't feel chapped lips. You can.",
-                "Robots don't need lip balm. You do. Advantage: you.",
-                "AI wrote your email. It can't write you moisturized lips.",
-            ],
-            "sports": [
-                "Coaching changes happen. Lip moisture doesn't have to.",
-                "Big game energy. Small tube salvation.",
-                "Sports are stressful. Your lips don't have to be.",
-            ],
-            "entertainment": [
-                "Content is streaming. Your lips are cracking. Priorities.",
-                "Binge-watching? Binge-moisturizing.",
-                "Entertainment comes and goes. Dry lips are always there. Unfortunately.",
-            ],
-            "finance": [
-                "Markets are volatile. Lip balm is $8.99. Consistent.",
-                "Your portfolio is uncertain. Your lip moisture doesn't have to be.",
-                "Stock down. Lips dry. Control what you can.",
-            ],
-            "workplace": [
-                "RTO mandate? Return to lip care.",
-                "Office or home. Your lips are dry either way.",
-                "Hybrid work. Consistent lip care.",
-            ],
+            "tech_layoffs": "Your severance doesn't include lip balm. Jesse A. Eisenbalm does.",
+            "startup_funding": "Runway burns fast. Lip balm doesn't. $8.99.",
+            "ceo_news": "Leadership changes. Dry lips don't. Well, they do. That's the problem.",
+            "ai_news": "AI can't feel chapped lips. You can. Advantage: unclear.",
+            "workplace": "Office or home, your lips are dry either way.",
+            "linkedin_cringe": "Hustle culture won't moisturize your lips.",
+            "entertainment": "Content is streaming. Your lips are cracking. Priorities.",
+            "celebrity": "Fame is fleeting. Chapped lips feel eternal.",
+            "nfl": "Coaching carousel spins. Your lip care shouldn't.",
+            "nba": "Trade deadline stress. Lip care is $8.99.",
+            "finance": "Markets are volatile. Lip balm is $8.99. Consistent.",
+            "economy": "Inflation is real. Lip balm is still $8.99.",
         }
-        
-        category_angles = angles.get(trend.category, angles.get("tech_industry"))
-        return random.choice(category_angles)
-    
-    def format_single_trend(self, trend: TrendingNews) -> str:
-        """Format a single trend for the content generator"""
-        
-        return f"""═══════════════════════════════════════════════════════════════════════════════
-🎯 YOUR ASSIGNED TREND - REACT TO THIS SPECIFIC NEWS
-═══════════════════════════════════════════════════════════════════════════════
-
-📰 HEADLINE: {trend.headline}
-
-Category: {trend.category}
-Source: {trend.source}
-
-{f"Details: {trend.summary}" if trend.summary else ""}
-
-💡 Jesse angle: {trend.jesse_angle}
-
-═══════════════════════════════════════════════════════════════════════════════
-REQUIREMENTS:
-- React to THIS headline specifically
-- Use the actual names/numbers from the headline
-- Don't be generic - be specific to this news
-- Each post in the batch gets a DIFFERENT trend
-═══════════════════════════════════════════════════════════════════════════════"""
-
-
-# Legacy compatibility
-async def get_trending_news(self, force_refresh: bool = False) -> List[TrendingNews]:
-    """Legacy method - returns all cached trends"""
-    if force_refresh or not self.cached_trends or self._cache_expired():
-        await self._refresh_trends()
-    return self.cached_trends
+        return angles.get(category, "Life is chaos. Lip balm is $8.99.")
 
 
 # Singleton
