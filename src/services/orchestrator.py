@@ -82,8 +82,9 @@ class ContentOrchestrator:
         
         self.trend_service = None
         if TREND_SERVICE_AVAILABLE:
-            self.trend_service = get_trend_service()
-            logger.info("✅ Trend service initialized")
+            # Use same database as queue manager for consistency
+            self.trend_service = get_trend_service("data/automation/queue.db")
+            logger.info("✅ Trend service initialized - content will react to real news")
         
         if self.image_generator:
             logger.info("✅ ContentOrchestrator initialized WITH image generator")
@@ -104,14 +105,15 @@ class ContentOrchestrator:
         
         for i in range(num_posts):
             post_number = i + 1
+            post_id = f"{batch_id[:8]}_{post_number}"  # Create tracking ID
             logger.info(f"\n--- Post {post_number}/{num_posts} ---")
             
-            # Fetch ONE fresh trend for THIS post
+            # Fetch ONE fresh trend for THIS post (with tracking)
             trend = None
             if self.trend_service:
-                trend = await self.trend_service.get_one_fresh_trend()
+                trend = await self.trend_service.get_one_fresh_trend(post_id=post_id)
                 if trend:
-                    logger.info(f"📰 Trend: {trend.headline[:70]}...")
+                    logger.info(f"📰 Trend ({trend.category}): {trend.headline[:70]}...")
             
             try:
                 post = await self._process_single_post(
@@ -149,15 +151,18 @@ class ContentOrchestrator:
         if trend:
             trend_context = f"""
 ═══════════════════════════════════════════════════════════════════════════════
-📰 TODAY'S TRENDING NEWS - React to this:
+📰 TODAY'S TRENDING NEWS ({trend.category.upper()}) - React to this:
 ═══════════════════════════════════════════════════════════════════════════════
 
-{trend.headline}
+HEADLINE: {trend.headline}
 
 {trend.summary if trend.summary else ""}
 
 Source: {trend.source}
+Category: {trend.category}
 
+═══════════════════════════════════════════════════════════════════════════════
+IMPORTANT: Use the SPECIFIC headline above. Don't create generic content.
 ═══════════════════════════════════════════════════════════════════════════════
 """
         

@@ -448,6 +448,29 @@ async def get_activity(limit: int = 100):
 
 # ============== LinkedIn Endpoints ==============
 
+@app.get("/api/automation/topics/recent")
+async def get_recent_topics(limit: int = 20):
+    """Get recently used trending topics (for debugging/display)"""
+    if not orchestrator or not orchestrator.trend_service:
+        return {"topics": [], "message": "Trend service not available"}
+    
+    topics = orchestrator.trend_service.get_recent_topics(limit=limit)
+    return {
+        "topics": topics,
+        "cooldown_days": orchestrator.trend_service.TOPIC_COOLDOWN_DAYS
+    }
+
+
+@app.post("/api/automation/topics/cleanup")
+async def cleanup_old_topics(days: int = 30):
+    """Clean up topics older than specified days"""
+    if not orchestrator or not orchestrator.trend_service:
+        raise HTTPException(500, "Trend service not available")
+    
+    deleted = orchestrator.trend_service.cleanup_old_topics(days=days)
+    return {"success": True, "deleted": deleted}
+
+
 @app.get("/api/automation/linkedin/status")
 async def get_linkedin_status():
     """Get LinkedIn connection status"""
