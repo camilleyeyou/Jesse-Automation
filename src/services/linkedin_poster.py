@@ -1,6 +1,8 @@
 """
-LinkedIn Poster Service
+LinkedIn Poster Service - FIXED
 Handles posting content to LinkedIn (Personal + Company Pages)
+
+FIX: Convert web URLs back to file paths for image upload
 """
 
 import os
@@ -14,6 +16,36 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
+def web_url_to_file_path(url: str) -> Optional[str]:
+    """
+    Convert web URL to local file path.
+    
+    /images/jesse_xxx.png -> data/images/jesse_xxx.png
+    /videos/jesse_xxx.mp4 -> data/images/videos/jesse_xxx.mp4
+    """
+    if not url:
+        return None
+    
+    # Already a file path
+    if url.startswith('data/') or url.startswith('/home/') or url.startswith('./'):
+        return url
+    
+    # Convert web URL to file path
+    if url.startswith('/images/'):
+        filename = url.replace('/images/', '')
+        return f"data/images/{filename}"
+    
+    if url.startswith('/videos/'):
+        filename = url.replace('/videos/', '')
+        return f"data/images/videos/{filename}"
+    
+    # If it's a full URL (http/https), can't convert
+    if url.startswith('http://') or url.startswith('https://'):
+        return None
+    
+    return url
+
+
 class LinkedInPoster:
     """Posts content to LinkedIn using the API - supports personal and company pages"""
     
@@ -22,18 +54,16 @@ class LinkedInPoster:
         self.access_token = self._get_access_token()
         self.api_base = "https://api.linkedin.com/v2"
         self.user_id = None
-        self.company_id = os.getenv("LINKEDIN_COMPANY_ID")  # For company page posting
+        self.company_id = os.getenv("LINKEDIN_COMPANY_ID")
     
     def _get_access_token(self) -> Optional[str]:
         """Get LinkedIn access token from config or environment"""
         
-        # Try environment variable first
         token = os.getenv("LINKEDIN_ACCESS_TOKEN")
         
         if not token and self.config:
             token = getattr(self.config.linkedin, 'access_token', None)
         
-        # Try token file
         if not token:
             token_file = Path("config/linkedin_token.json")
             if token_file.exists():
@@ -114,9 +144,9 @@ class LinkedInPoster:
         
         Args:
             content: Post text
-            image_path: Optional path to image file
+            image_path: Path to image file OR web URL (will be converted)
             hashtags: Optional list of hashtags
-            to_company: If True, post to company page. If None, auto-detect based on LINKEDIN_COMPANY_ID
+            to_company: If True, post to company page
         """
         
         if not self.access_token:
@@ -178,14 +208,28 @@ class LinkedInPoster:
             }
             
             # Handle image upload if provided
-            if image_path and Path(image_path).exists():
-                image_result = self._upload_image(image_path, author, headers)
-                if image_result.get("success"):
-                    post_body["specificContent"]["com.linkedin.ugc.ShareContent"]["shareMediaCategory"] = "IMAGE"
-                    post_body["specificContent"]["com.linkedin.ugc.ShareContent"]["media"] = [{
-                        "status": "READY",
-                        "media": image_result["asset"]
-                    }]
+            if image_path:
+                # Convert web URL to file path if needed
+                actual_file_path = web_url_to_file_path(image_path)
+                
+                logger.info(f"Image path provided: {image_path}")
+                logger.info(f"Converted to file path: {actual_file_path}")
+                
+                if actual_file_path and Path(actual_file_path).exists():
+                    logger.info(f"File exists, uploading: {actual_file_path}")
+                    image_result = self._upload_image(actual_file_path, author, headers)
+                    
+                    if image_result.get("success"):
+                        post_body["specificContent"]["com.linkedin.ugc.ShareContent"]["shareMediaCategory"] = "IMAGE"
+                        post_body["specificContent"]["com.linkedin.ugc.ShareContent"]["media"] = [{
+                            "status": "READY",
+                            "media": image_result["asset"]
+                        }]
+                        logger.info("Image attached to post")
+                    else:
+                        logger.warning(f"Image upload failed: {image_result.get('error')}")
+                else:
+                    logger.warning(f"Image file not found: {actual_file_path}")
             
             response = requests.post(
                 f"{self.api_base}/ugcPosts",
@@ -201,7 +245,8 @@ class LinkedInPoster:
                     "success": True,
                     "post_id": post_id,
                     "url": f"https://www.linkedin.com/feed/update/{post_id}",
-                    "posted_to": "company" if post_to_company else "personal"
+                    "posted_to": "company" if post_to_company else "personal",
+                    "had_image": "shareMediaCategory" in str(post_body)
                 }
             else:
                 logger.error(f"LinkedIn post failed: {response.status_code} - {response.text}")
@@ -242,7 +287,7 @@ class LinkedInPoster:
             )
             
             if response.status_code != 200:
-                return {"success": False, "error": "Failed to register upload"}
+                return {"success": False, "error": f"Failed to register upload: {response.status_code}"}
             
             upload_data = response.json()
             upload_url = upload_data["value"]["uploadMechanism"]["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"]["uploadUrl"]
@@ -251,6 +296,8 @@ class LinkedInPoster:
             # Upload the image
             with open(image_path, "rb") as f:
                 image_data = f.read()
+            
+            logger.info(f"Uploading image ({len(image_data)} bytes) to LinkedIn...")
             
             upload_headers = {
                 "Authorization": f"Bearer {self.access_token}",
@@ -265,6 +312,7 @@ class LinkedInPoster:
             )
             
             if upload_response.status_code in [200, 201]:
+                logger.info("Image uploaded successfully")
                 return {"success": True, "asset": asset}
             else:
                 return {"success": False, "error": f"Upload failed: {upload_response.status_code}"}
@@ -322,12 +370,20 @@ class MockLinkedInPoster:
     def publish_post(self, content: str, image_path: str = None, 
                      hashtags: list = None, to_company: bool = None) -> Dict[str, Any]:
         post_to = "company" if (to_company or self.company_id) else "personal"
+        
+        # Test the URL conversion
+        actual_path = web_url_to_file_path(image_path) if image_path else None
+        has_image = actual_path and Path(actual_path).exists()
+        
         logger.info(f"[MOCK] Would post to {post_to}: {content[:50]}...")
+        logger.info(f"[MOCK] Image: {image_path} -> {actual_path} (exists: {has_image})")
+        
         return {
             "success": True,
             "post_id": f"mock_post_{datetime.utcnow().timestamp()}",
             "url": "https://linkedin.com/mock-post",
             "posted_to": post_to,
+            "had_image": has_image,
             "mock": True
         }
     
