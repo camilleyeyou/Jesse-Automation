@@ -255,8 +255,19 @@ No trends provided. Make up a specific, realistic scenario:
         price_instruction = "Include $8.99 somewhere naturally." if include_price else "Don't mention price this time."
         
         avoid_section = ""
-        if avoid_patterns.get("recent_headlines"):
-            avoid_section = f"\nDon't use these trends (already used): {', '.join(avoid_patterns['recent_headlines'][:3])}"
+        if avoid_patterns.get("banned_topics"):
+            banned = avoid_patterns["banned_topics"]
+            if banned:
+                avoid_section = f"""
+⛔ BANNED - DO NOT USE THESE TOPICS (already used in this batch):
+{chr(10).join(f'- {h[:60]}...' if len(h) > 60 else f'- {h}' for h in banned)}
+
+Pick a DIFFERENT trend from the list above. If you use any banned topic, the post will be rejected.
+"""
+        elif avoid_patterns.get("recent_headlines"):
+            recent = avoid_patterns["recent_headlines"][:3]
+            if recent:
+                avoid_section = f"\nAvoid these topics (recently used): {', '.join(h[:30] for h in recent)}"
         
         return f"""Write a Jesse A. Eisenbalm LinkedIn post.
 
