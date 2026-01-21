@@ -33,7 +33,7 @@ PERFECT EXAMPLES (study these):
 Trump wants to buy Greenland.
 Your lips are still dry.
 One of these problems has a solution.
-$8.99. #MoistureInTheVoid #JesseAEisenbalm
+$8.99.
 
 ---
 
@@ -41,7 +41,6 @@ Google laid off 200 more people.
 The email said "we're a family."
 Families don't have headcount targets.
 Your severance doesn't include lip balm. Jesse A. Eisenbalm. $8.99.
-#TechLayoffs #JesseAEisenbalm
 
 ---
 
@@ -49,7 +48,6 @@ LinkedIn guy just posted about his 4am routine.
 I wake up at 4am too.
 Because anxiety.
 At least my lips aren't cracked.
-#LinkedInLunatics #JesseAEisenbalm #StopBreatheApply
 
 ---
 
@@ -57,7 +55,6 @@ Elon tweeted 47 times before noon.
 His shareholders are stressed.
 You're stressed reading about it.
 Jesse A. Eisenbalm can't fix Twitter. But $8.99 fixes your lips.
-#MoistureInTheVoid #JesseAEisenbalm
 
 ══════════════════════════════════════════════════════════════════════
 THE FORMULA:
@@ -66,9 +63,8 @@ THE FORMULA:
 Line 1: State the news/fact (specific names, numbers)
 Line 2-3: Deadpan observation (dark humor, NOT advice)
 Line 4: Lip balm pivot (matter-of-fact, often just product + price)
-Line 5: 3 hashtags
 
-TOTAL: 40-70 words. MAX 80.
+TOTAL: 40-70 words. MAX 80. NO HASHTAGS.
 
 ══════════════════════════════════════════════════════════════════════
 RULES:
@@ -82,6 +78,7 @@ RULES:
 - End with product name and/or price naturally
 
 ❌ NEVER:
+- Use hashtags (NO HASHTAGS AT ALL)
 - "In a world where..." (instant cringe)
 - "Don't forget to..." / "Remember to..." (preachy)
 - "Your lips wait for..." / "while your lips..." (awkward)
@@ -90,16 +87,6 @@ RULES:
 - Long paragraphs
 - Explaining why lip balm matters
 - Being earnest about self-care
-
-══════════════════════════════════════════════════════════════════════
-HASHTAGS (pick exactly 3):
-══════════════════════════════════════════════════════════════════════
-
-Brand: JesseAEisenbalm, NotJesseEisenberg, StopBreatheApply
-Vibe: MoistureInTheVoid, AICannotMoisturize, BalmBeforeTheChaos
-Topic: TechLayoffs, CorporateSurvival, LinkedInLunatics, DoomscrollPause
-
-NEVER use: #Motivation #Success #SelfCare #Wellness #Mindfulness
 """
     
     async def execute(
@@ -127,17 +114,16 @@ NEVER use: #Motivation #Success #SelfCare #Wellness #Mindfulness
             
             content = content_data.get("content", "")
             
-            # Extract hashtags or generate defaults
-            hashtags = content_data.get("hashtags", [])
-            if not hashtags or len(hashtags) != 3:
-                hashtags = ["MoistureInTheVoid", "JesseAEisenbalm", "DoomscrollPause"]
+            # Strip any hashtags that might have been generated anyway
+            import re
+            content = re.sub(r'\s*#\w+', '', content).strip()
             
             post = LinkedInPost(
                 batch_id=batch_id,
                 post_number=post_number,
                 content=content,
                 hook=content.split('\n')[0][:80] if content else "",
-                hashtags=hashtags,
+                hashtags=[],  # No hashtags
                 target_audience=self.config.brand.target_audience,
                 cultural_reference=CulturalReference(
                     category="trending" if trending_context else "original",
@@ -169,7 +155,7 @@ REQUIREMENTS:
 - 4-5 short lines, each on its own line
 - 40-70 words max
 - {price_instruction}
-- Exactly 3 hashtags at the end
+- NO HASHTAGS
 - Deadpan humor, NOT preachy
 
 FORMAT YOUR RESPONSE AS:
@@ -177,10 +163,9 @@ FORMAT YOUR RESPONSE AS:
 [Line 2 - observation]
 [Line 3 - dark humor or pivot setup]
 [Line 4 - lip balm mention, matter-of-fact]
-#Hashtag1 #Hashtag2 #Hashtag3
 
 Return as JSON:
-{{"content": "the full post with line breaks", "hashtags": ["Three", "Tags", "Here"], "trend_used": "brief description of news used"}}"""
+{{"content": "the full post with line breaks", "trend_used": "brief description of news used"}}"""
         
         else:
             return f"""Write a Jesse A. Eisenbalm LinkedIn post.
@@ -195,11 +180,11 @@ REQUIREMENTS:
 - 4-5 short lines, each on its own line
 - 40-70 words max
 - {price_instruction}
-- Exactly 3 hashtags at the end
+- NO HASHTAGS
 - Deadpan humor, NOT preachy
 
 Return as JSON:
-{{"content": "the full post with line breaks", "hashtags": ["Three", "Tags", "Here"], "trend_used": "topic covered"}}"""
+{{"content": "the full post with line breaks", "trend_used": "topic covered"}}"""
     
     def get_stats(self):
-        return {"name": self.name, "version": "optimized"}
+        return {"name": self.name, "version": "optimized-no-hashtags"}

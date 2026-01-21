@@ -179,9 +179,10 @@ class LinkedInPoster:
                 "X-Restli-Protocol-Version": "2.0.0"
             }
             
-            # Build post text with hashtags
+            # Build post text (no hashtags added - content should be complete)
             post_text = content
-            if hashtags:
+            # Only add hashtags if explicitly provided and non-empty
+            if hashtags and len(hashtags) > 0:
                 post_text += "\n\n" + " ".join(f"#{h.replace('#', '')}" for h in hashtags)
             
             # Set author based on posting target
