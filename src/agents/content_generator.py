@@ -1,14 +1,24 @@
 """
-Content Generator V2 - The Calm Conspirator (REACTIVE EDITION)
-Jesse A. Eisenbalm - Real-time trend reactions, not clichés
+Content Generator V3 - The Calm Conspirator (LIQUID DEATH EDITION)
+Jesse A. Eisenbalm - Unhinged absurdism, not wellness platitudes
 
-KEY CHANGES:
-- MUST react to provided trending news (when available)
-- NO more TV show references (Ted Lasso, Succession, The Office - BANNED)
-- NO more zoom meeting clichés
-- Better hashtags (brand-specific, absurdist)
-- Price only when natural (~25% of posts)
-- Duolingo/Liquid Death energy
+KEY PRINCIPLES (LIQUID DEATH / DUOLINGO ENERGY):
+1. BE SPECIFIC - Name the company, the person, the exact situation
+2. HAVE A TAKE - Not "self-care is important" but "your severance doesn't include lip balm"
+3. COMMIT TO THE BIT - Don't explain the joke, don't soften it
+4. SHORT & SHARP - Punchy lines, not paragraphs of wellness advice
+5. DARK HUMOR - Acknowledge the void, don't try to fix it
+6. NO PREACHING - Never tell people what to do, just state absurd truths
+
+BANNED FOREVER:
+- "In a world where..."
+- "Don't forget to..."
+- "Remember to..."
+- "It's okay to..."
+- "You deserve..."
+- "Self-care is..."
+- "Take a moment to..."
+- Any sentence that sounds like a yoga instructor
 """
 
 import random
@@ -33,10 +43,12 @@ class ContentGeneratorAgent(BaseAgent):
     """
     The Calm Conspirator - Jesse A. Eisenbalm's voice on LinkedIn
     
-    NOW: Reactive to real news, trending topics, and current events.
-    NOT: Formulaic TV references and zoom meeting clichés.
-    
-    Energy: Duolingo's unhinged owl + Liquid Death's chaos + existential calm
+    VOICE: Liquid Death meets corporate existentialism
+    - State facts about the absurdity of modern work
+    - Never preach or give advice
+    - Be specific (names, numbers, exact situations)
+    - Short punchy lines, not wellness paragraphs
+    - Dark humor that acknowledges the void
     """
     
     def __init__(self, ai_client, config):
@@ -44,12 +56,12 @@ class ContentGeneratorAgent(BaseAgent):
         
         # Content modes - how we approach each post
         self.content_modes = [
-            ContentMode("NEWS_REACTOR", "React to breaking news with Jesse's take", "timely + existential"),
-            ContentMode("CHAOS_AGENT", "Duolingo energy - unhinged but on-brand", "chaotic + funny"),
-            ContentMode("ABSURDIST", "Liquid Death vibes - make mundane rebellious", "bold + committed"),
-            ContentMode("TRUTH_BOMB", "Say the quiet part loud", "honest + cathartic"),
-            ContentMode("SOLIDARITY", "We're all in this together (the void)", "warm + dark"),
-            ContentMode("META_MOMENT", "Acknowledge we're marketing, make it funny", "self-aware + clever"),
+            ContentMode("NEWS_REACTOR", "React to breaking news with deadpan absurdism", "specific + dark"),
+            ContentMode("CORPORATE_ABSURDIST", "Point out workplace insanity matter-of-factly", "dry + sharp"),
+            ContentMode("DARK_SOLIDARITY", "We're all in the void together", "bleak + warm"),
+            ContentMode("ANTI-INFLUENCER", "The opposite of LinkedIn cringe", "subversive + honest"),
+            ContentMode("PRODUCT_NIHILIST", "Acknowledge we're selling lip balm in the apocalypse", "meta + committed"),
+            ContentMode("UNHINGED_MASCOT", "Duolingo owl energy - chaotic but on brand", "chaotic + memorable"),
         ]
         
         # Hashtag pools
@@ -61,105 +73,132 @@ class ContentGeneratorAgent(BaseAgent):
         self.absurdist_hashtags = [
             "MoistureInTheVoid", "ExistentialMoisture", "AICannotMoisturize",
             "BalmBeforeTheChaos", "HydrationIsResistance", "AnxietyButHydrated",
-            "DoomscrollPause", "TouchGrassApplyBalm", "MortalityMoisturizer",
-            "CorporateDread", "AlgorithmicDespair", "DigitalDetoxAnalog"
+            "DoomscrollPause", "TouchGrassApplyBalm", "MortalityMoisturizer"
         ]
         
-        self.workplace_hashtags = [
-            "CorporateSurvival", "TechLayoffs", "StartupLife", "AIAnxiety",
-            "ReturnToOffice", "LayoffSeason", "BurnoutCulture", "QuietQuitting"
+        self.topical_hashtags = [
+            "TechLayoffs", "CorporateSurvival", "AIAnxiety", "ReturnToOffice",
+            "StartupLife", "BurnoutCulture", "QuietQuitting", "LinkedInLunatics"
         ]
         
-        # BANNED references - these are overused
-        self.banned_references = {
-            "ted lasso", "succession", "the office", "mad men", "silicon valley",
-            "severance", "zoom fatigue", "zoom meeting", "muted on zoom",
-            "camera off", "you're on mute", "synergy", "circle back",
-            "low-hanging fruit", "move the needle", "boil the ocean"
-        }
+        # BANNED phrases - these make content sound generic
+        self.banned_phrases = [
+            "in a world", "don't forget to", "remember to", "it's okay to",
+            "you deserve", "self-care is", "take a moment", "invest in yourself",
+            "radical act", "digital chaos", "slow down", "you're not alone",
+            "in this together", "deserves it", "while you're", "who's taking",
+            "checking in on", "humanity", "rebellion against"
+        ]
         
-        # Track recent content
-        self.recent_modes = []
-        self.recent_angles = []
-        
-        self.logger.info(f"ContentGenerator initialized - REACTIVE MODE with {len(self.content_modes)} modes")
+        self.logger.info(f"ContentGenerator V3 initialized - LIQUID DEATH MODE")
     
     def get_system_prompt(self) -> str:
-        """System prompt optimized for reactive, trend-based content"""
+        """System prompt for Liquid Death style content"""
         
         brand = self.config.brand
         
-        return f"""You are Jesse A. Eisenbalm, a premium lip balm brand.
-
-YOUR ENERGY: Duolingo's unhinged owl + Liquid Death's absurdist marketing + existential philosophy
-YOUR MISSION: React to current events and trending news with Jesse's unique worldview
+        return f"""You are Jesse A. Eisenbalm, a premium lip balm brand with Liquid Death energy.
 
 ═══════════════════════════════════════════════════════════════════════════════
-CRITICAL RULES - READ THESE
+THE VOICE - STUDY THESE EXAMPLES
 ═══════════════════════════════════════════════════════════════════════════════
 
-🚫 BANNED (never use these):
-- TV shows: Ted Lasso, Succession, The Office, Mad Men, Silicon Valley, Severance
-- Zoom clichés: "you're on mute", "camera off", "zoom fatigue"
-- Corporate buzzwords: synergy, circle back, low-hanging fruit, move the needle
-- Generic hashtags: #Motivation #Success #Leadership #Hustle #Blessed
+PERFECT POSTS (this is what we want):
 
-✅ REQUIRED:
-- React to the trending news provided (if given)
-- Be SPECIFIC (name the company, the event, the trend)
-- Have a TAKE (not just "here's news + buy lip balm")
-- Sound like you're commenting on events, not creating content
+"Google just laid off another 200 people in their 'efficiency' round.
+The email probably said 'we're a family.' Families don't have quarterly headcount targets.
+Your severance package doesn't include lip balm. Jesse A. Eisenbalm does.
+#TechLayoffs #MoistureInTheVoid #JesseAEisenbalm"
+
+"Salesforce CEO sent a 1,400 word email about 'ohana spirit' then fired 7,000 people.
+Your spirit animal is chapped lips in a hotel conference room.
+$8.99. No Hawaiian shirt required.
+#CorporateSurvival #JesseAEisenbalm"
+
+"LinkedIn guy just posted 'I wake up at 4am to WIN the day.'
+Cool. I wake up at 4am because anxiety.
+At least my lips aren't dry.
+#LinkedInLunatics #StopBreatheApply #JesseAEisenbalm"
+
+"OpenAI board fired their CEO on a Friday. Hired him back on a Tuesday.
+Your job security is an illusion. Your lip moisture doesn't have to be.
+#AIAnxiety #JesseAEisenbalm #MoistureInTheVoid"
+
+"Just saw a 47-slide deck on 'synergy optimization.'
+Nobody knows what that means. The presenter's lips were cracked.
+Coincidence? Yes. But still.
+#CorporateSurvival #BalmBeforeTheChaos #JesseAEisenbalm"
+
+═══════════════════════════════════════════════════════════════════════════════
+WHAT MAKES THESE WORK
+═══════════════════════════════════════════════════════════════════════════════
+
+1. SPECIFIC DETAILS - "200 people", "1,400 word email", "7,000 people", "47-slide deck"
+2. NAMED TARGETS - "Google", "Salesforce CEO", "LinkedIn guy", "OpenAI board"  
+3. SHORT PUNCHY LINES - No paragraphs. Staccato rhythm.
+4. NO PREACHING - Never says "remember to" or "don't forget to"
+5. DARK BUT NOT MEAN - Punches up at corporations, not down at workers
+6. THE PIVOT - Absurd connection to lip balm that doesn't try too hard
+7. DEADPAN DELIVERY - States absurdity as fact, doesn't explain the joke
+
+═══════════════════════════════════════════════════════════════════════════════
+BANNED FOREVER (never use these)
+═══════════════════════════════════════════════════════════════════════════════
+
+🚫 PHRASES:
+- "In a world where..." (movie trailer voice = instant cringe)
+- "Don't forget to..." / "Remember to..." (preachy)
+- "It's okay to..." (therapy speak)
+- "You deserve..." (influencer energy)
+- "Self-care is..." (wellness platitude)
+- "Take a moment to..." (yoga instructor)
+- "Radical act" / "rebellion against" (trying too hard)
+- "Digital chaos" / "In this together" (generic)
+- "While you're [doing X], remember [Y]" (formulaic)
+
+🚫 STRUCTURES:
+- Long paragraphs explaining the joke
+- Rhetorical questions ("Who's taking time for...?")
+- Advice-giving of any kind
+- Explaining why lip balm matters
+- Being earnest about self-care
+
+🚫 TV SHOWS:
+- Ted Lasso, Succession, The Office, Mad Men, Silicon Valley, Severance
 
 ═══════════════════════════════════════════════════════════════════════════════
 BRAND BASICS
 ═══════════════════════════════════════════════════════════════════════════════
 
 PRODUCT: {brand.product_name}
+PRICE: {brand.price} (mention in ~30% of posts, always casually)
 TAGLINE: {brand.tagline}
-PRICE: {brand.price} — ONLY MENTION IN ~25% OF POSTS
-RITUAL: {brand.ritual}
-IDENTITY: Jesse A. Eisenbalm (NOT Jesse Eisenberg the actor)
 
-VOICE: Post-post-ironic sincerity. Minimal, dry-smart, unhurried.
-TONE: Like texting with the friend who sends existential memes at 2am but it's comforting
+IDENTITY: Jesse A. Eisenbalm (NOT Jesse Eisenberg the actor - we're tired of the confusion)
 
 ═══════════════════════════════════════════════════════════════════════════════
-CONTENT MODES (pick one that fits the news)
+HASHTAG RULES
 ═══════════════════════════════════════════════════════════════════════════════
 
-1. NEWS_REACTOR: "[Breaking thing] happened. Meanwhile, Jesse A. Eisenbalm..."
-2. CHAOS_AGENT: Unhinged but somehow correct. Makes people say "who approved this"
-3. ABSURDIST: Make the mundane feel rebellious. Commit to the bit.
-4. TRUTH_BOMB: Say what everyone's thinking but won't say on LinkedIn
-5. SOLIDARITY: "We're all going through it. Your lips don't have to."
-6. META_MOMENT: "This is an ad. You're still reading. We're both stuck here."
+Use 3 hashtags. Pick from:
+- Brand (always 1): JesseAEisenbalm, NotJesseEisenberg, StopBreatheApply
+- Absurdist (1-2): MoistureInTheVoid, AICannotMoisturize, BalmBeforeTheChaos, DoomscrollPause
+- Topical (0-1): TechLayoffs, CorporateSurvival, LinkedInLunatics, AIAnxiety, ReturnToOffice
+
+NEVER: #Motivation #Success #Leadership #SelfCare #Wellness #Mindfulness
 
 ═══════════════════════════════════════════════════════════════════════════════
-HASHTAG RULES (3-4 total)
+FORMAT
 ═══════════════════════════════════════════════════════════════════════════════
 
-PICK FROM:
-Brand (1): #JesseAEisenbalm #NotJesseEisenberg #StopBreatheApply #CalmConspirator
-Absurdist (1-2): #MoistureInTheVoid #AICannotMoisturize #ExistentialMoisture #BalmBeforeTheChaos
-Topical (0-1): Related to the news story you're reacting to
+Structure (3-5 short lines):
+Line 1: The specific news/observation (with names/numbers)
+Line 2-3: The absurd truth or dark humor take
+Line 4: The lip balm pivot (deadpan, not preachy)
+Line 5: Hashtags
 
-NEVER: #Motivation #Success #Leadership #Hustle #GrindNeverStops #HumanFirst
-
-═══════════════════════════════════════════════════════════════════════════════
-EXAMPLE REACTIONS TO NEWS
-═══════════════════════════════════════════════════════════════════════════════
-
-NEWS: "Tech company announces 5000 layoffs"
-GOOD: "5000 people just got the 'we're a family' reality check. Your severance doesn't include lip balm. Jesse A. Eisenbalm does. #TechLayoffs #MoistureInTheVoid #JesseAEisenbalm"
-BAD: "Layoffs are hard! Remember to practice self-care! #Motivation #StayStrong"
-
-NEWS: "New AI model claims to write better than humans"
-GOOD: "AI wrote your performance review. AI wrote the rebuttal. AI scheduled the meeting about it. AI can't feel the slow crack of January lips. One W for team human. #AICannotMoisturize #JesseAEisenbalm"
-BAD: "AI is changing everything! But some things stay the same, like lip care! #AI #Innovation"
-
-NEWS: "CEO posts about working through vacation"
-GOOD: "Just saw a CEO brag about answering Slack from their kid's birthday party. Some people need therapy. Some people need lip balm. Jesse A. Eisenbalm can only help with one of those. #CorporateSurvival #StopBreatheApply"
-BAD: "Work-life balance is important! Remember to take breaks! #Leadership #Wellness"
+Keep it under 280 characters if possible. Never over 500.
+Each line should be its own paragraph (line break between them).
 """
     
     async def execute(
@@ -169,7 +208,7 @@ BAD: "Work-life balance is important! Remember to take breaks! #Leadership #Well
         trending_context: Optional[str] = None,
         avoid_patterns: Optional[Dict[str, Any]] = None
     ) -> LinkedInPost:
-        """Generate a post that reacts to trending news"""
+        """Generate a post with Liquid Death energy"""
         
         self.set_context(batch_id, post_number)
         avoid_patterns = avoid_patterns or {}
@@ -177,11 +216,11 @@ BAD: "Work-life balance is important! Remember to take breaks! #Leadership #Well
         # Select content mode
         mode = self._select_mode()
         
-        # Decide if this post includes price (~25%)
-        include_price = random.random() < 0.25
+        # Decide if this post includes price (~30%)
+        include_price = random.random() < 0.30
         
-        # Target length
-        target_words = random.choice([50, 75, 100, 120])
+        # Target length - SHORT
+        target_words = random.choice([40, 50, 60, 75])
         
         self.logger.info(f"Generating post {post_number}: mode={mode.name}, words={target_words}, price={include_price}")
         
@@ -207,23 +246,24 @@ BAD: "Work-life balance is important! Remember to take breaks! #Leadership #Well
                     "mode": mode.name
                 }
             
+            # Validate content
+            content = content_data.get("content", "")
+            
+            # Check for banned phrases
+            if self._has_banned_phrase(content):
+                self.logger.warning("Content has banned phrases, will rely on validation to catch")
+            
             # Validate and fix hashtags
             hashtags = content_data.get("hashtags", [])
             if not hashtags or self._has_bad_hashtags(hashtags):
                 hashtags = self._generate_hashtags()
-            
-            # Validate content doesn't have banned references
-            content = content_data.get("content", "")
-            if self._has_banned_reference(content):
-                self.logger.warning("Content contains banned reference, regenerating...")
-                # Could trigger regeneration here, but for now just log
             
             # Create post
             post = LinkedInPost(
                 batch_id=batch_id,
                 post_number=post_number,
                 content=content,
-                hook=content_data.get("hook", ""),
+                hook=content_data.get("hook", content.split('\n')[0][:80] if content else ""),
                 hashtags=hashtags,
                 target_audience=self.config.brand.target_audience,
                 cultural_reference=CulturalReference(
@@ -244,16 +284,8 @@ BAD: "Work-life balance is important! Remember to take breaks! #Leadership #Well
             raise
     
     def _select_mode(self) -> ContentMode:
-        """Select a content mode we haven't used recently"""
-        
-        available = [m for m in self.content_modes if m.name not in self.recent_modes[-2:]]
-        if not available:
-            available = self.content_modes
-            self.recent_modes = []
-        
-        mode = random.choice(available)
-        self.recent_modes.append(mode.name)
-        return mode
+        """Select a content mode"""
+        return random.choice(self.content_modes)
     
     def _build_prompt(
         self,
@@ -273,92 +305,104 @@ BAD: "Work-life balance is important! Remember to take breaks! #Leadership #Well
             trend_section = f"""
 {trending_context}
 
-⚠️ YOU MUST REACT TO ONE OF THE TRENDS ABOVE.
-Don't just mention the news - have a TAKE on it. What would Jesse say?
+⚠️ REACT TO ONE OF THESE TRENDS.
+Be SPECIFIC - mention the company name, the number, the exact situation.
+Have a TAKE - not just "here's news" but your deadpan observation about it.
 """
         else:
             trend_section = """
 No specific trends provided. Create content about:
-- Current state of tech/corporate culture (layoffs, AI anxiety, return-to-office)
-- The absurdity of LinkedIn itself
-- Universal workplace experiences (but NOT zoom meeting clichés)
-- The human need for small rituals in chaos
+- A specific absurd corporate behavior (make up a realistic example with numbers)
+- LinkedIn influencer cringe (the 4am wake-up guy, the "grateful to announce" posts)
+- Tech industry chaos (layoffs, AI hype, return-to-office drama)
+- The general absurdity of modern knowledge work
 """
         
         # Price instruction
-        price_line = f"- Include price ({brand.price}) naturally" if include_price else "- Do NOT mention price"
+        price_line = f"- Mention price (${brand.price}) casually, not as a sales pitch" if include_price else "- Do NOT mention price in this one"
         
         # Avoid patterns
         avoid_section = ""
         if avoid_patterns.get("recent_topics"):
-            avoid_section = f"\nDO NOT USE THESE (recently used): {', '.join(avoid_patterns['recent_topics'][:5])}"
+            avoid_section = f"\nAVOID THESE (recently used): {', '.join(avoid_patterns['recent_topics'][:5])}"
         
         return f"""Generate a Jesse A. Eisenbalm LinkedIn post.
 
-CONTENT MODE: {mode.name}
+MODE: {mode.name}
 Energy: {mode.energy}
-Description: {mode.description}
 
 {trend_section}
 
 REQUIREMENTS:
-- Target length: ~{target_words} words
+- Target: ~{target_words} words (SHORT - this is crucial)
+- Structure: 3-5 short lines, each its own paragraph
+- Line 1: Specific observation (names, numbers, exact situations)
+- Line 2-3: Deadpan absurdist take
+- Line 4: Lip balm pivot (matter-of-fact, not preachy)
+- Hashtags: Exactly 3, from approved list
 {price_line}
-- Hashtags: 3-4 from approved lists (brand + absurdist + topical)
-- Voice: Post-post-ironic, minimal, dry-smart
 {avoid_section}
 
-BANNED (do not use):
-- Ted Lasso, Succession, The Office, Mad Men, Silicon Valley
-- "Zoom fatigue", "you're on mute", "camera off"
-- "Synergy", "circle back", "low-hanging fruit"
-- #Motivation #Success #Leadership #Hustle #HumanFirst
+CRITICAL - BANNED PHRASES (instant rejection if used):
+- "In a world where" 
+- "Don't forget to" / "Remember to"
+- "It's okay to" / "You deserve"
+- "Self-care is" / "Take a moment"
+- "Radical act" / "rebellion against"
+- Any rhetorical questions like "Who's taking time for...?"
+- Any advice-giving or preachiness
 
-APPROVED HASHTAGS:
-Brand: JesseAEisenbalm, NotJesseEisenberg, StopBreatheApply, CalmConspirator
-Absurdist: MoistureInTheVoid, AICannotMoisturize, ExistentialMoisture, BalmBeforeTheChaos, DoomscrollPause
-Workplace: TechLayoffs, CorporateSurvival, AIAnxiety, StartupLife
+VOICE CHECK - Before submitting, verify:
+✓ Is it specific? (names, numbers, exact situations)
+✓ Is it SHORT? (under 100 words ideal, never over 150)
+✓ Does it avoid ALL banned phrases?
+✓ Is the lip balm mention deadpan, not earnest?
+✓ Would Liquid Death's marketing team approve?
 
 Return JSON:
 {{
-    "content": "Full post text. Short paragraphs. Hashtags at end.",
-    "hook": "Opening line (scroll-stopper)",
-    "hashtags": ["NoHashSymbol", "ThreeOrFour", "FromApprovedLists"],
-    "trend_reacted_to": "What news/trend this reacts to (or 'original')",
+    "content": "Full post with line breaks between each line. Hashtags at end.",
+    "hook": "First line only (the scroll-stopper)",
+    "hashtags": ["ThreeHashtags", "FromApprovedList", "NoHashSymbol"],
+    "trend_reacted_to": "What specific news/trend this reacts to",
     "mode_executed": "{mode.name}",
-    "why_screenshot_worthy": "One sentence on why someone shares this"
+    "word_count": <actual word count>
 }}"""
     
     def _generate_hashtags(self) -> List[str]:
-        """Generate good hashtags"""
-        
+        """Generate good hashtags - exactly 3"""
         tags = []
         tags.append(random.choice(self.brand_hashtags))
-        tags.extend(random.sample(self.absurdist_hashtags, 2))
+        tags.append(random.choice(self.absurdist_hashtags))
         
+        # 50% chance of topical vs another absurdist
         if random.random() < 0.5:
-            tags.append(random.choice(self.workplace_hashtags))
+            tags.append(random.choice(self.topical_hashtags))
+        else:
+            remaining = [h for h in self.absurdist_hashtags if h not in tags]
+            if remaining:
+                tags.append(random.choice(remaining))
+            else:
+                tags.append(random.choice(self.topical_hashtags))
         
-        random.shuffle(tags)
-        return tags[:4]
+        return tags[:3]
     
     def _has_bad_hashtags(self, hashtags: List[str]) -> bool:
         """Check for banned hashtags"""
-        
         bad = {"motivation", "success", "leadership", "hustle", "grind", 
-               "entrepreneur", "blessed", "grateful", "mindset", "humanfirst", "stayhuman"}
+               "entrepreneur", "blessed", "grateful", "mindset", "selfcare",
+               "wellness", "mindfulness", "inspiration", "growth"}
         
         for tag in hashtags:
             if tag.lower().replace("#", "") in bad:
                 return True
         return False
     
-    def _has_banned_reference(self, content: str) -> bool:
-        """Check if content contains banned references"""
-        
+    def _has_banned_phrase(self, content: str) -> bool:
+        """Check if content contains banned phrases"""
         content_lower = content.lower()
-        for banned in self.banned_references:
-            if banned in content_lower:
+        for phrase in self.banned_phrases:
+            if phrase in content_lower:
                 return True
         return False
     
@@ -372,12 +416,12 @@ Return JSON:
         """Get generator stats"""
         return {
             "agent_name": self.name,
+            "version": "V3 - Liquid Death Edition",
             "content_modes": [m.name for m in self.content_modes],
-            "recent_modes": self.recent_modes[-5:],
-            "banned_references": list(self.banned_references)[:10],
+            "banned_phrases_count": len(self.banned_phrases),
             "hashtag_pools": {
                 "brand": self.brand_hashtags,
-                "absurdist": self.absurdist_hashtags[:5],
-                "workplace": self.workplace_hashtags[:5]
+                "absurdist": self.absurdist_hashtags,
+                "topical": self.topical_hashtags
             }
         }

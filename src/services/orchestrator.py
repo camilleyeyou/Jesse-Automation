@@ -21,6 +21,8 @@ from ..models.post import LinkedInPost, ValidationScore
 from ..agents.content_generator import ContentGeneratorAgent
 from ..agents.feedback_aggregator import FeedbackAggregatorAgent
 from ..agents.revision_generator import RevisionGeneratorAgent
+from src.agents.style_validator import StyleValidator
+
 from ..agents.validators import SarahChenValidator, MarcusWilliamsValidator, JordanParkValidator
 
 # Import trend service
@@ -115,6 +117,7 @@ class ContentOrchestrator:
         
         # Initialize validators
         self.validators = [
+            StyleValidator(ai_client, config),
             SarahChenValidator(ai_client, config),
             MarcusWilliamsValidator(ai_client, config),
             JordanParkValidator(ai_client, config)
