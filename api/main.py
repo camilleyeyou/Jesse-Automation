@@ -370,6 +370,7 @@ async def generate_content(request: GenerateRequest):
         added_to_queue = 0
         if request.add_to_queue:
             for post in batch.get_approved_posts():
+                # to_dict() automatically calculates average_score from validation_scores
                 queue_manager.add_to_queue(post.to_dict())
                 added_to_queue += 1
         

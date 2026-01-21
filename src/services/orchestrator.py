@@ -345,8 +345,8 @@ class ContentOrchestrator:
         if approved:
             logger.info(f"Post {post_number}: APPROVED with score {avg_score:.1f}")
             
-            # Store validation score for queue display
-            post.average_score = avg_score
+            # Store validation scores in the post - this enables average_score property to work
+            post.validation_scores = validation_scores
             
             # Add to queue if available
             if self.queue_manager:
@@ -355,6 +355,7 @@ class ContentOrchestrator:
                 except Exception as e:
                     logger.error(f"Failed to add post to queue: {e}")
             
+            # Return the post - average_score will be calculated from validation_scores in to_dict()
             return post, used_trend_index
         else:
             logger.warning(f"Post {post_number}: REJECTED with score {avg_score:.1f}")
