@@ -50,53 +50,84 @@ class TrendService:
     - Fallback topic pool that's also tracked
     """
     
-    # Diverse search queries organized by category
+    # Diverse search queries organized by category - MAINSTREAM CULTURE FOCUS
     SEARCH_CATEGORIES = {
-        "tech": [
-            "tech layoffs 2026",
-            "AI company news today",
-            "startup funding news",
-            "tech CEO controversy",
-            "Silicon Valley news today",
-            "cryptocurrency news today",
-            "cybersecurity breach news",
+        "pop_culture": [
+            "celebrity news today",
+            "trending celebrity drama",
+            "famous people controversy today",
+            "Hollywood news today",
+            "music artist news today",
+            "reality TV drama today",
+            "influencer drama news",
+            "celebrity breakup news",
+            "award show news",
         ],
-        "business": [
-            "corporate layoffs today",
-            "CEO news today",
-            "company scandal news",
-            "business merger acquisition",
-            "stock market news today",
-            "retail store closings",
-            "corporate earnings report",
+        "entertainment": [
+            "viral movie news today",
+            "Netflix trending news",
+            "streaming wars news",
+            "TV show controversy",
+            "box office news today",
+            "music industry news",
+            "concert tour news",
+            "album release news today",
         ],
-        "viral": [
-            "viral social media today",
-            "trending Twitter X today",
-            "viral TikTok news",
-            "celebrity controversy today",
-            "internet outrage today",
-            "LinkedIn viral post",
+        "sports": [
+            "NFL news today",
+            "NBA news today",
+            "sports drama today",
+            "athlete controversy",
+            "Super Bowl news",
+            "Olympics news",
+            "sports trade news",
+            "coach fired news",
         ],
-        "politics": [
-            "political news today USA",
-            "government policy news",
-            "election news today",
-            "political controversy",
+        "viral_social": [
+            "viral TikTok today",
+            "trending meme today",
+            "Twitter X drama today",
+            "social media outrage today",
+            "viral video today",
+            "internet celebrity news",
+            "influencer scandal",
+            "cancel culture news",
         ],
-        "culture": [
-            "workplace culture news",
-            "remote work news today",
-            "Gen Z workplace news",
-            "corporate culture controversy",
-            "office return mandate news",
+        "lifestyle": [
+            "dating app news",
+            "relationship trend news",
+            "wellness trend controversy",
+            "food trend news today",
+            "travel chaos news",
+            "fashion controversy today",
+            "beauty industry news",
         ],
-        "economy": [
-            "inflation news today",
-            "housing market news",
-            "job market news today",
-            "recession fears news",
-            "consumer spending news",
+        "tech_mainstream": [
+            "iPhone news today",
+            "social media update news",
+            "AI controversy mainstream",
+            "Elon Musk news today",
+            "Mark Zuckerberg news",
+            "Apple news today",
+            "Google controversy",
+            "Amazon news today",
+        ],
+        "politics_culture": [
+            "political drama today",
+            "politician controversy",
+            "White House news today",
+            "Congress news today",
+            "political scandal",
+            "government shutdown news",
+        ],
+        "economy_personal": [
+            "grocery prices news",
+            "rent prices news today",
+            "gas prices news",
+            "layoffs news today",
+            "job market news",
+            "cost of living news",
+            "minimum wage news",
         ]
     }
     
@@ -346,74 +377,116 @@ class TrendService:
             return []
     
     async def _get_fallback_trend(self, post_id: str = None) -> TrendingNews:
-        """Return a diverse fallback trend when API fails"""
+        """Return a diverse fallback trend when API fails - MAINSTREAM POP CULTURE FOCUS"""
         
-        # Extended diverse fallback pool
+        # Extended diverse fallback pool - POP CULTURE & MAINSTREAM
         fallbacks = [
-            # Tech
+            # Celebrity/Entertainment
             TrendingNews(
-                headline="Tech giant announces surprise workforce reduction amid AI pivot",
-                summary="Company cites need to 'reallocate resources' toward artificial intelligence",
-                source="tech_news", category="tech",
+                headline="Taylor Swift announces surprise album drop during concert",
+                summary="Swifties crash Ticketmaster for the 47th time this year",
+                source="entertainment", category="pop_culture",
             ),
             TrendingNews(
-                headline="Startup founder's viral LinkedIn post about 'hustle culture' sparks debate",
-                summary="Post claiming '4am wake-ups changed my life' draws mixed reactions",
-                source="social", category="viral",
+                headline="Beyoncé spotted at Lakers game looking unbothered",
+                summary="Internet loses collective mind over courtside footage",
+                source="celebrity", category="pop_culture",
             ),
             TrendingNews(
-                headline="Major company reverses remote work policy, mandates office return",
-                summary="Employees express frustration over sudden policy change",
-                source="business", category="culture",
-            ),
-            # Business
-            TrendingNews(
-                headline="CEO's 'we're a family' email precedes mass layoffs",
-                summary="Workers share screenshots of contradictory corporate messaging",
-                source="business", category="business",
+                headline="Timothée Chalamet photographed looking pensive in New York",
+                summary="Fans debate whether he's sad or just French",
+                source="celebrity", category="pop_culture",
             ),
             TrendingNews(
-                headline="Company stock plummets after controversial executive decision",
-                summary="Shareholders demand accountability from leadership",
-                source="finance", category="business",
-            ),
-            # Culture
-            TrendingNews(
-                headline="Gen Z workers push back against 'productivity theater' in offices",
-                summary="Younger employees question value of mandatory in-person attendance",
-                source="culture", category="culture",
+                headline="Zendaya and Tom Holland seen holding hands again",
+                summary="Couple continues to exist, internet continues to care",
+                source="celebrity", category="pop_culture",
             ),
             TrendingNews(
-                headline="LinkedIn 'thought leader' faces backlash for tone-deaf career advice",
-                summary="Post suggesting workers 'just be grateful' goes viral for wrong reasons",
-                source="social", category="viral",
+                headline="Drake and Kendrick beef enters new chapter",
+                summary="Music industry braces for more diss tracks",
+                source="music", category="entertainment",
             ),
-            # Economy
+            # Sports
             TrendingNews(
-                headline="Housing market shows signs of strain as prices continue rising",
-                summary="First-time buyers increasingly priced out of market",
-                source="economy", category="economy",
-            ),
-            TrendingNews(
-                headline="Inflation concerns persist as everyday costs squeeze consumers",
-                summary="Families adjust budgets amid rising prices",
-                source="economy", category="economy",
-            ),
-            # Viral/Social
-            TrendingNews(
-                headline="Corporate jargon reaches new heights with latest buzzword trend",
-                summary="'Synergize your bandwidth' and other phrases workers love to hate",
-                source="viral", category="viral",
+                headline="LeBron James posts cryptic Instagram story",
+                summary="NBA fans analyze every pixel for hidden meaning",
+                source="sports", category="sports",
             ),
             TrendingNews(
-                headline="Employee's honest Glassdoor review goes viral",
-                summary="Candid assessment of workplace culture resonates with thousands",
-                source="social", category="viral",
+                headline="Travis Kelce celebrates touchdown with suspicious dance move",
+                summary="Taylor Swift seen laughing in private box",
+                source="sports", category="sports",
             ),
             TrendingNews(
-                headline="Company's AI chatbot gives hilariously wrong customer advice",
-                summary="Screenshots of bot confusion spread across social media",
-                source="tech", category="tech",
+                headline="NFL referee makes controversial call in playoff game",
+                summary="Twitter explodes with conspiracy theories",
+                source="sports", category="sports",
+            ),
+            # Viral/Social Media
+            TrendingNews(
+                headline="New TikTok trend has everyone doing the same dance",
+                summary="Your aunt will learn it in approximately 3 weeks",
+                source="social", category="viral_social",
+            ),
+            TrendingNews(
+                headline="Influencer's 'day in my life' video sparks heated debate",
+                summary="People question whether anyone actually lives like this",
+                source="social", category="viral_social",
+            ),
+            TrendingNews(
+                headline="Celebrity's unfiltered selfie breaks Instagram record",
+                summary="Fans praise authenticity of $500 skincare routine",
+                source="social", category="viral_social",
+            ),
+            TrendingNews(
+                headline="Dating app releases data on what profiles get most likes",
+                summary="Results surprise absolutely no one",
+                source="lifestyle", category="lifestyle",
+            ),
+            # TV/Streaming
+            TrendingNews(
+                headline="Netflix show finale leaves fans divided",
+                summary="Ending described as 'perfect' and 'a war crime' simultaneously",
+                source="entertainment", category="entertainment",
+            ),
+            TrendingNews(
+                headline="Reality TV star says something controversial on reunion episode",
+                summary="Producers definitely didn't plan this at all",
+                source="entertainment", category="entertainment",
+            ),
+            # Tech but mainstream
+            TrendingNews(
+                headline="Elon Musk tweets something provocative again",
+                summary="Stock price reacts, humanity sighs collectively",
+                source="tech", category="tech_mainstream",
+            ),
+            TrendingNews(
+                headline="Apple announces new iPhone with feature that already existed",
+                summary="Pre-orders sell out in minutes anyway",
+                source="tech", category="tech_mainstream",
+            ),
+            # Politics but pop culture adjacent
+            TrendingNews(
+                headline="Politician's outfit at event becomes main topic of discussion",
+                summary="Policy takes backseat to fashion critique",
+                source="politics", category="politics_culture",
+            ),
+            TrendingNews(
+                headline="First Lady seen reading specific book, internet investigates",
+                summary="Book sales increase 4000% overnight",
+                source="politics", category="politics_culture",
+            ),
+            # Lifestyle/Trends
+            TrendingNews(
+                headline="New wellness trend promises to change your life completely",
+                summary="Involves waking up early and drinking something green",
+                source="lifestyle", category="lifestyle",
+            ),
+            TrendingNews(
+                headline="Avocado toast prices reach new heights in major cities",
+                summary="Millennials blamed for economy again somehow",
+                source="lifestyle", category="economy_personal",
             ),
         ]
         

@@ -1,122 +1,233 @@
 """
-Content Generator - EDGY SATIRICAL VOICE
-Jesse A. Eisenbalm - Mock declarations, absurdist positions, taking stands
+Content Generator - VARIED SATIRICAL VOICE
+Jesse A. Eisenbalm - Multiple post formats, not just declarations
 
-The client wants posts like:
-"And that's why we are no longer the official lip balm of ICE."
+The posts need MORE VARIETY - not just "news + declaration + lip balm"
 """
 
 import random
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from .base_agent import BaseAgent
 from ..models.post import LinkedInPost, CulturalReference
 
 logger = logging.getLogger(__name__)
 
 
+# Different post format templates for variety
+POST_FORMATS = [
+    {
+        "name": "declaration",
+        "description": "Mock corporate statement/press release",
+        "example": """OFFICIAL STATEMENT: Jesse A. Eisenbalm is withdrawing our sponsorship bid for the Met Gala.
+We've seen the guest list.
+Some of those lips? Criminal.
+We can't be associated with that level of dehydration.
+$8.99 was right there.""",
+        "opener_options": [
+            "OFFICIAL STATEMENT:",
+            "PRESS RELEASE:",
+            "Jesse A. Eisenbalm would like to formally announce:",
+            "After careful consideration, we must announce:",
+            "It is with great reluctance that we declare:",
+        ]
+    },
+    {
+        "name": "curse",
+        "description": "Dramatic lip curse on someone in the news",
+        "example": """And that's why we are no longer the official lip balm of ICE.
+And furthermore, we hope your lips remain cracked for eternity as a small reminder of the pain you're inflicting on this world.""",
+        "opener_options": [
+            "And that's why we are no longer affiliated with",
+            "May the lips of everyone involved in this",
+            "We curse the lips of",
+            "Let the record show:",
+            "To everyone who thought this was okay:",
+        ]
+    },
+    {
+        "name": "intervention",
+        "description": "Fake wellness intervention for someone",
+        "example": """This is a formal intervention from Jesse A. Eisenbalm.
+Sir, working 100-hour weeks isn't a flex. It's a cry for help.
+Your lips are screaming.
+We're here when you're ready.
+$8.99.""",
+        "opener_options": [
+            "This is a formal intervention from Jesse A. Eisenbalm.",
+            "We need to talk.",
+            "Honey, no.",
+            "Sir/Ma'am, this is a wellness check:",
+            "Someone check on them because:",
+        ]
+    },
+    {
+        "name": "hot_take",
+        "description": "Spicy opinion disguised as lip balm advice",
+        "example": """Hot take: If your morning routine takes more than 10 minutes to explain, your lips are probably dry from talking about it.
+Jesse A. Eisenbalm. $8.99.
+Moisturize and move on.""",
+        "opener_options": [
+            "Hot take:",
+            "Controversial opinion:",
+            "I will not be elaborating:",
+            "Said what I said:",
+            "The truth that needs to be spoken:",
+        ]
+    },
+    {
+        "name": "unhinged_promo",
+        "description": "Absurdist product placement in news context",
+        "example": """Taylor Swift announced another tour.
+The economy is in shambles.
+But you know what costs less than a concert ticket?
+Jesse A. Eisenbalm.
+$8.99.
+Your lips can have a good time too.""",
+        "opener_options": [
+            "[News headline]",
+            "Breaking:",
+            "Everyone's talking about",
+            "Meanwhile:",
+            "In today's news:",
+        ]
+    },
+    {
+        "name": "parasocial",
+        "description": "Pretending to have a relationship with celebrities",
+        "example": """Saw Timothée Chalamet's new movie poster.
+Timmy, baby, call us.
+Those lips need professional help.
+This isn't a criticism, it's an offer.
+Jesse A. Eisenbalm. $8.99.
+We're waiting.""",
+        "opener_options": [
+            "To [Celebrity]:",
+            "Open letter to",
+            "We see you,",
+            "[Celebrity], if you're reading this:",
+            "A message for",
+        ]
+    },
+    {
+        "name": "chaos_observation",
+        "description": "Commenting on chaos with eerie calm",
+        "example": """The world is on fire.
+Literally, in some places.
+Figuratively, everywhere else.
+You cannot control the flames.
+You can control your lip moisture.
+Jesse A. Eisenbalm. $8.99.""",
+        "opener_options": [
+            "The world is",
+            "Everything is",
+            "Society has",
+            "Another day of",
+            "We're all watching",
+        ]
+    },
+    {
+        "name": "relationship_to_news",
+        "description": "Making the news about lip balm somehow",
+        "example": """Scientists discovered a new high. It's called having moisturized lips when the humidity drops below 30%.
+Jesse A. Eisenbalm.
+$8.99.
+Legal in all 50 states.""",
+        "opener_options": [
+            "Scientists discovered",
+            "Studies show",
+            "New research confirms",
+            "Experts agree:",
+            "Data reveals",
+        ]
+    },
+    {
+        "name": "fake_sponsorship",
+        "description": "Announcing fake sponsorships or partnerships",
+        "example": """Jesse A. Eisenbalm is proud to announce we are NOT sponsoring the Super Bowl this year.
+They didn't ask.
+But if they had, we would have said no.
+Our lips are too moisturized for that halftime stress.
+$8.99.""",
+        "opener_options": [
+            "We are proud to announce we are NOT",
+            "Jesse A. Eisenbalm has declined to",
+            "Despite not being asked, we officially reject",
+            "We have chosen not to",
+            "Our official position on",
+        ]
+    },
+    {
+        "name": "mic_drop",
+        "description": "Short, punchy, ends with finality",
+        "example": """They said print media is dead.
+Our lips are alive.
+Checkmate.
+Jesse A. Eisenbalm. $8.99.""",
+        "opener_options": [
+            "They said",
+            "Everyone thought",
+            "[Thing] happened.",
+            "Plot twist:",
+            "Update:",
+        ]
+    },
+]
+
+
 class ContentGeneratorAgent(BaseAgent):
-    """Generates Jesse A. Eisenbalm content - edgy satirical voice."""
+    """Generates Jesse A. Eisenbalm content with VARIED post formats."""
     
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="ContentGenerator")
-        self.logger.info("ContentGenerator initialized - Edgy Satirical mode")
+        self.post_formats = POST_FORMATS
+        self.logger.info("ContentGenerator initialized - Varied Satirical mode")
     
     def get_system_prompt(self) -> str:
-        return f"""You are the social media voice for Jesse A. Eisenbalm, a $8.99 premium lip balm.
+        return """You are the social media voice for Jesse A. Eisenbalm, a $8.99 premium lip balm.
 
-YOUR VOICE: Satirical declarations. Mock corporate statements. Taking absurd stands on real news. Deadpan dark humor with actual bite.
+YOUR VOICE: Satirical, absurdist, deadpan dark humor with actual bite. You comment on pop culture, celebrities, sports, viral moments, and mainstream news - not just tech/business.
 
-You're not just observing the news - you're making DECLARATIONS about it. Fake corporate announcements. Withdrawing sponsorships that never existed. Issuing mock press releases. Taking dramatic stands on trivial connections.
+CORE PERSONALITY:
+- You're a lip balm brand that takes itself way too seriously
+- You insert yourself into cultural moments uninvited
+- You make dramatic declarations about trivial things
+- You curse people's lips when they deserve it
+- You're weirdly parasocial with celebrities
+- You find lip balm connections in everything
 
-══════════════════════════════════════════════════════════════════════
-PERFECT EXAMPLES (THIS IS THE VOICE):
-══════════════════════════════════════════════════════════════════════
+TONE:
+- Deadpan delivery
+- Mock corporate formality
+- Unhinged but articulate
+- Never actually mean-spirited
+- Self-aware about the absurdity
 
-And that's why we are no longer the official lip balm of ICE.
-And furthermore, we hope your lips remain cracked for eternity as a small reminder of the pain you're inflicting on this world.
+TOPICS YOU COMMENT ON:
+- Celebrity drama and gossip
+- Viral moments and memes
+- Sports news and drama
+- Pop culture events (award shows, concerts, releases)
+- Political chaos (carefully, satirically)
+- Social media trends
+- Dating and relationship discourse
+- Any mainstream cultural moment
 
----
-
-OFFICIAL STATEMENT: Jesse A. Eisenbalm is withdrawing our bid to sponsor the Meta quarterly earnings call.
-Mark, your lips looked chapped in that Reels video.
-We could have helped.
-You chose violence.
-$8.99 was right there.
-
----
-
-Breaking: CEO who laid off 2,000 people just posted "grateful for my team."
-Jesse A. Eisenbalm would like to formally announce we are NOT grateful for him.
-May his lips crack in the winter.
-May chapstick never be near when he needs it.
-We said what we said.
-
----
-
-Tech bro says he works 100-hour weeks and "loves every minute."
-This is a formal intervention from Jesse A. Eisenbalm.
-Sir, you don't love it. You're dissociating.
-Your lips are a cry for help.
-$8.99. We're here when you're ready.
-
----
-
-LinkedIn influencer posted about his "5am miracle morning routine."
-Jesse A. Eisenbalm hereby declares 5am a war crime.
-The only miracle is that your lips haven't filed for divorce.
-Sleep in. Moisturize. $8.99.
-
----
-
-Company just announced "unlimited PTO" alongside hiring freeze.
-Jesse A. Eisenbalm releases the following statement:
-That's not unlimited PTO. That's a dare.
-We see you.
-Your employees' lips see you.
-$8.99 for the inevitable stress-chapping.
-
-══════════════════════════════════════════════════════════════════════
-THE FORMULA:
-══════════════════════════════════════════════════════════════════════
-
-This is NOT observation humor. This is DECLARATION humor:
-- "We are officially/formally/hereby..."
-- "Jesse A. Eisenbalm would like to announce..."
-- "This is our official statement on..."
-- "We are withdrawing our sponsorship of..."
-- "May your lips [dramatic curse]..."
-- "We said what we said."
-- "And furthermore..."
-
-You're issuing mock press releases, fake corporate statements, satirical declarations.
-
-TOTAL: 40-80 words. NO HASHTAGS.
-
-══════════════════════════════════════════════════════════════════════
 RULES:
-══════════════════════════════════════════════════════════════════════
-
 ✅ DO:
-- Make DECLARATIONS and STATEMENTS, not observations
-- Take absurd dramatic stands on the news
-- Issue fake corporate announcements
-- Curse people's lips dramatically ("may your lips crack eternally")
-- Use formal corporate language for absurd purposes
-- Reference the news SPECIFICALLY (names, numbers, quotes)
-- End with defiant mic-drop energy
-- Include $8.99 naturally when it fits
+- Reference SPECIFIC names, events, details from the news
+- Make it about lips somehow (creatively)
+- End with impact (mic drop, curse, price, declaration)
+- Keep it 40-80 words
+- Be genuinely funny, not just weird
 
 ❌ NEVER:
-- Use hashtags (NO HASHTAGS AT ALL)
-- Just observe without taking a stand
-- Be actually mean-spirited (satirical, not cruel)
-- "In a world where..." 
-- Therapy speak ("it's okay to...", "you deserve...")
-- Preachy or earnest
-- Long explanations
-- Generic statements that don't reference real news/people
-"""
+- Use hashtags
+- Be preachy or earnest
+- Explain the joke
+- Be actually cruel (satirical, not mean)
+- Use "In a world where..."
+- Generic statements without specific references"""
     
     async def execute(
         self,
@@ -129,10 +240,12 @@ RULES:
         
         self.set_context(batch_id, post_number)
         
-        # Build prompt
-        include_price = random.random() < 0.6  # 60% include price
+        # Select a random post format for variety
+        post_format = random.choice(self.post_formats)
         
-        prompt = self._build_prompt(trending_context, include_price)
+        # Build prompt with selected format
+        include_price = random.random() < 0.6  # 60% include price
+        prompt = self._build_prompt(trending_context, include_price, post_format)
         
         try:
             result = await self.generate(prompt)
@@ -164,93 +277,97 @@ RULES:
                 )
             )
             
-            self.logger.info(f"Generated post {post_number}: {len(content)} chars")
+            self.logger.info(f"Generated post {post_number} (format: {post_format['name']}): {len(content)} chars")
             return post
             
         except Exception as e:
             self.logger.error(f"Generation failed: {e}")
             raise
     
-    def _build_prompt(self, trending_context: Optional[str], include_price: bool) -> str:
-        """Build the generation prompt."""
+    def _build_prompt(self, trending_context: Optional[str], include_price: bool, post_format: Dict) -> str:
+        """Build the generation prompt with selected format."""
         
-        price_instruction = "Include '$8.99' naturally." if include_price else "Don't mention price this time."
+        price_instruction = "Include '$8.99' naturally somewhere." if include_price else "Don't mention price this time - just the brand name."
         
-        # Randomly select a declaration style to encourage variety
-        declaration_styles = [
-            "Issue a formal statement withdrawing support/sponsorship",
-            "Announce you're officially taking a stand against something",
-            "Deliver a dramatic lip-related curse on someone",
-            "Release a mock press release about the news",
-            "Declare something a 'war crime' or 'act of aggression'",
-            "Stage a fake intervention",
-        ]
-        suggested_style = random.choice(declaration_styles)
+        # Select a random opener from the format
+        opener = random.choice(post_format["opener_options"])
         
-        # Randomly decide image direction (50% product, 50% absurdist)
+        # Image direction options
         image_options = [
-            "product - elegant lip balm shot",
-            "absurdist - surreal/weird image that captures the satirical mood",
-            "absurdist - dramatic stock photo that matches the declaration energy",
-            "product - lip balm in an unexpected context",
-            "absurdist - AI-generated weird corporate imagery",
+            "product - elegant lip balm hero shot",
+            "absurdist - surreal image matching the post's energy",
+            "celebrity-adjacent - something that feels connected to pop culture",
+            "chaotic - visual that matches the unhinged energy",
+            "minimal - clean shot that contrasts with chaotic text",
         ]
-        image_direction = random.choice(image_options)
+        image_suggestion = random.choice(image_options)
+        
+        format_examples = f"""
+POST FORMAT: {post_format['name'].upper()}
+Description: {post_format['description']}
+
+Example of this format:
+{post_format['example']}
+
+Suggested opener style: {opener}
+"""
         
         if trending_context:
-            return f"""Write a Jesse A. Eisenbalm LinkedIn post reacting to this news:
+            return f"""Write a Jesse A. Eisenbalm LinkedIn post reacting to this trending news/topic:
 
 {trending_context}
 
-STYLE SUGGESTION: {suggested_style}
+{format_examples}
 
 REQUIREMENTS:
-- Make a DECLARATION or STATEMENT about this news
-- Don't just observe - TAKE A STAND (absurdly)
-- Use formal corporate language for satirical effect
-- Reference the SPECIFIC headline (names, numbers)
+- Use the {post_format['name'].upper()} format shown above
+- Reference the SPECIFIC news (names, details, quotes)
+- Make it about lips/lip balm somehow (be creative)
 - 40-80 words
 - {price_instruction}
 - NO HASHTAGS
-- End with mic-drop energy
+- End with impact
 
-DECLARATION FORMATS TO USE:
-- "Jesse A. Eisenbalm officially announces..."
-- "OFFICIAL STATEMENT: We are withdrawing..."
-- "This is a formal intervention from..."
-- "And that's why we are no longer..."
-- "May your lips [dramatic curse]..."
-- "We said what we said."
-
-IMAGE DIRECTION: {image_direction}
-(Describe what image would pair well - can be product shot OR absurdist/surreal)
+The news should be something people actually know about and care about. Make the connection to lip balm creative and unexpected.
 
 Return as JSON:
-{{"content": "the full post with line breaks", "trend_used": "brief description of news", "image_direction": "describe ideal image - product shot or absurdist visual"}}"""
+{{"content": "the full post with line breaks", "trend_used": "what specific news/cultural moment", "image_direction": "{image_suggestion} - describe specific visual"}}"""
         
         else:
+            # Fallback topics when no trending context
+            fallback_topics = [
+                "a recent celebrity moment everyone's talking about",
+                "a viral social media trend",
+                "a popular TV show or movie everyone's watching",
+                "a sports moment that broke the internet",
+                "a famous person doing something noteworthy",
+                "a cultural phenomenon people are debating",
+                "something trending on TikTok",
+                "a recent award show moment",
+            ]
+            suggested_topic = random.choice(fallback_topics)
+            
             return f"""Write a Jesse A. Eisenbalm LinkedIn post.
 
-Since no specific news is provided, make up a realistic scenario and TAKE A STAND on it:
-- A fictional tech CEO doing something tone-deaf
-- LinkedIn hustle culture cringe
-- Corporate announcement that deserves mockery
-- AI hype that needs deflating
+Since no specific news is provided, write about {suggested_topic}. Make up a realistic, believable cultural moment.
 
-STYLE SUGGESTION: {suggested_style}
+{format_examples}
 
 REQUIREMENTS:
-- Make a DECLARATION or STATEMENT
-- Use formal corporate language satirically
+- Use the {post_format['name'].upper()} format shown above
+- Make it feel like it's about something real people would know
+- Make it about lips/lip balm somehow (be creative)
 - 40-80 words
 - {price_instruction}
 - NO HASHTAGS
-- End with mic-drop energy
-
-IMAGE DIRECTION: {image_direction}
+- End with impact
 
 Return as JSON:
-{{"content": "the full post with line breaks", "trend_used": "topic covered", "image_direction": "describe ideal image"}}"""
+{{"content": "the full post with line breaks", "trend_used": "topic covered", "image_direction": "{image_suggestion} - describe specific visual"}}"""
     
     def get_stats(self):
-        return {"name": self.name, "version": "edgy-satirical-v2"}
+        return {
+            "name": self.name, 
+            "version": "varied-formats-v3",
+            "available_formats": [f["name"] for f in self.post_formats]
+        }
