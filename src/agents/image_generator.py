@@ -187,6 +187,38 @@ class ImageGeneratorAgent(BaseAgent):
                 "Jesse in library with books floating/flying around him, lip balm centered",
                 "Jesse facing dragon in mountainous landscape, calmly holding lip balm",
                 "Silhouette of multi-armed figure in abandoned warehouse (AI glitch aesthetic)"
+            ],
+            
+            # DECLARATION/STATEMENT SCENES (for the new edgy voice)
+            "declaration_scenes": [
+                "Jesse at corporate podium mid-press conference, dramatically holding lip balm like evidence",
+                "Jesse in judge's robe behind bench, lip balm as gavel",
+                "Jesse at UN-style assembly podium, world flags behind, lip balm raised",
+                "Jesse at protest march holding sign that says 'MOISTURIZE', lip balm in other hand",
+                "Jesse at corporate shareholder meeting pointing accusingly, lip balm on table",
+                "Jesse in war room with military maps, lip balm as strategic piece",
+                "Jesse burning documents in office trash can, lip balm safe in hand",
+                "Jesse at breaking news desk with 'DEVELOPING STORY' chyron, lip balm visible",
+                "Jesse in courtroom witness stand, swearing oath on lip balm instead of bible",
+                "Jesse walking away from explosion without looking back, lip balm in hand",
+                "Jesse cutting ribbon at fake grand opening ceremony, lip balm as scissors",
+                "Jesse at airport departures board, dramatically pointing, lip balm in pocket"
+            ],
+            
+            # ABSURDIST STOCK PHOTO VIBES (satirizing corporate imagery)
+            "absurdist_stock": [
+                "Generic businessman in suit shaking hands with lip balm tube (product as colleague)",
+                "Group of diverse professionals in meeting all pointing at lip balm on table",
+                "Woman laughing alone with salad but she's actually holding lip balm",
+                "Man screaming at laptop, lip balm calmly placed on keyboard",
+                "Two businessmen arm wrestling, lip balm as the prize between them",
+                "Person typing furiously, every key on keyboard is a tiny lip balm",
+                "Success pose on mountain peak but the flag is a giant lip balm",
+                "Thumbs up in front of ascending graph, lip balm held in other hand",
+                "Person emerging victorious from cubicle maze, lip balm raised like torch",
+                "Corporate handshake close-up but one hand is holding lip balm",
+                "Person meditating at desk surrounded by chaos, lip balm centered",
+                "Overwhelmed person buried in paperwork, lip balm as only visible escape"
             ]
         }
         
@@ -517,6 +549,13 @@ Create prompts that are 150-200 words with precise visual detail, emotional subt
             use_mood_matching = random.random() < 0.7
             visual_elements = self._select_visual_elements(post_mood, use_mood_matching, use_jesse)
             
+            # Step 4: Generate AI-powered custom scene based on post content (30% of the time)
+            if use_jesse and random.random() < 0.3:
+                custom_scene = await self._generate_custom_scene_from_content(post)
+                if custom_scene:
+                    visual_elements["jesse_scenario"] = custom_scene
+                    self.logger.info(f"🎨 AI-generated custom scene: {custom_scene[:80]}...")
+            
             media_type = "video" if use_video else "image"
             shot_type = "Jesse lifestyle/absurdist" if use_jesse else "product hero"
             self.logger.info(f"Creating {media_type} for post {post.post_number}: mood={post_mood}, type={shot_type}")
@@ -530,20 +569,91 @@ Create prompts that are 150-200 words with precise visual detail, emotional subt
             self.logger.error(f"Failed to generate media: {e}")
             return {"success": False, "error": str(e), "media_type": "video" if use_video else "image"}
     
+    async def _generate_custom_scene_from_content(self, post: LinkedInPost) -> Optional[str]:
+        """
+        Use AI to generate a custom image scene that directly relates to the post content.
+        This creates a stronger visual-textual connection.
+        """
+        try:
+            prompt = f"""Based on this Jesse A. Eisenbalm LinkedIn post, suggest ONE absurdist/satirical image scene.
+
+POST:
+{post.content}
+
+JESSE A. EISENBALM BRAND:
+- Premium lip balm ($8.99)
+- Makes satirical declarations and mock corporate statements
+- Deadpan absurdist humor
+- Jesse is a character with curly brown hair who appears in photos
+
+RULES FOR THE SCENE:
+1. Must include Jesse holding/applying the lip balm
+2. Scene should VISUALLY RELATE to the post content
+3. Can be absurdist, satirical, or editorial
+4. Jesse should have deadpan expression
+5. Keep description under 100 words
+
+Examples of good scenes:
+- "Jesse at corporate podium giving press conference about lip balm, reporters taking notes seriously"
+- "Jesse in judge's robes banging lip balm like a gavel"
+- "Jesse walking away from explosion (metaphor for corporate chaos) without looking back, lip balm in hand"
+
+Return ONLY the scene description, nothing else."""
+
+            result = await self.ai_client.generate_content(
+                prompt=prompt,
+                max_tokens=150,
+                temperature=0.9  # Higher creativity
+            )
+            
+            if result and result.get("content"):
+                scene = result["content"].strip()
+                # Basic validation - must mention Jesse or lip balm
+                if "jesse" in scene.lower() or "lip balm" in scene.lower() or "balm" in scene.lower():
+                    return scene
+            
+            return None
+            
+        except Exception as e:
+            self.logger.warning(f"Custom scene generation failed: {e}")
+            return None
+    
     def _should_use_jesse(self, post: LinkedInPost, mood: str) -> bool:
-        """Decide whether to use Jesse lifestyle shot or product-only shot"""
+        """
+        Decide whether to use Jesse lifestyle shot or product-only shot.
+        
+        Now respects image_direction hint from content generator (stored in cultural_reference.context)
+        """
         content_lower = post.content.lower()
         
-        # 40% base chance for Jesse shots
-        base_chance = 0.4
+        # Check for explicit image direction from content generator
+        image_direction = ""
+        if post.cultural_reference and hasattr(post.cultural_reference, 'context'):
+            image_direction = post.cultural_reference.context.lower() if post.cultural_reference.context else ""
+        
+        # If content generator explicitly wants absurdist, use Jesse
+        if "absurdist" in image_direction or "surreal" in image_direction or "weird" in image_direction:
+            self.logger.info("Image direction: ABSURDIST - using Jesse lifestyle shot")
+            return True
+        
+        # If content generator explicitly wants product, don't use Jesse
+        if "product" in image_direction and "absurdist" not in image_direction:
+            self.logger.info("Image direction: PRODUCT - using product hero shot")
+            return False
+        
+        # 50% base chance for Jesse shots (increased from 40%)
+        base_chance = 0.5
         
         # Increase chance if content mentions scenarios, costumes, or absurdist themes
         if any(word in content_lower for word in ['costume', 'dressed', 'wearing', 'clown', 'knight', 'pirate']):
             return True
         if any(word in content_lower for word in ['scene', 'situation', 'found myself', 'there i was']):
             return random.random() < 0.7
+        if any(word in content_lower for word in ['official', 'statement', 'hereby', 'formally', 'announces', 'intervention']):
+            # Declaration posts - lean toward absurdist
+            return random.random() < 0.6
         if mood in ['existential_general', 'burnout', 'humanity_seeking']:
-            base_chance = 0.5
+            base_chance = 0.6
         
         return random.random() < base_chance
     
@@ -750,7 +860,14 @@ POST CONTEXT: {post.content[:150]}...
         """Analyze post content to determine mood for intelligent image matching"""
         content_lower = post.content.lower()
         
-        if any(word in content_lower for word in ['ai', 'automated', 'algorithm', 'chatgpt', 'robot']):
+        # Check for declaration-style posts first (these get priority)
+        if any(word in content_lower for word in ['official statement', 'hereby', 'formally', 'announces', 'withdrawing', 'intervention', 'war crime']):
+            return "declaration"
+        elif any(word in content_lower for word in ['may your lips', 'we said what we said', 'and furthermore']):
+            return "declaration"
+        elif any(word in content_lower for word in ['corporate', 'shareholder', 'ceo', 'layoff', 'fired', 'laid off']):
+            return "corporate_satire"
+        elif any(word in content_lower for word in ['ai', 'automated', 'algorithm', 'chatgpt', 'robot']):
             return "tech_anxiety"
         elif any(word in content_lower for word in ['meeting', 'calendar', 'zoom', 'sync', 'standup']):
             return "meeting_exhaustion"
@@ -778,11 +895,14 @@ POST CONTEXT: {post.content[:150]}...
             "burnout": self.jesse_scenarios["absurdist_scenes"],
             "time_pressure": self.jesse_scenarios["fashion_editorial"],
             "humanity_seeking": self.jesse_scenarios["fashion_editorial"],
-            "absurdist": self.jesse_scenarios["costume_scenarios"],
+            "absurdist": self.jesse_scenarios["costume_scenarios"] + self.jesse_scenarios.get("declaration_scenes", []),
+            "declaration": self.jesse_scenarios.get("declaration_scenes", []) + self.jesse_scenarios.get("absurdist_stock", []),
+            "corporate_satire": self.jesse_scenarios.get("absurdist_stock", []) + self.jesse_scenarios.get("declaration_scenes", []),
             "existential_general": random.choice([
                 self.jesse_scenarios["fashion_editorial"],
                 self.jesse_scenarios["absurdist_scenes"],
-                self.jesse_scenarios["costume_scenarios"]
+                self.jesse_scenarios["costume_scenarios"],
+                self.jesse_scenarios.get("declaration_scenes", self.jesse_scenarios["absurdist_scenes"]),
             ])
         }
         
@@ -795,6 +915,8 @@ POST CONTEXT: {post.content[:150]}...
             "time_pressure": ["time_death", "calendar_graveyard", "coffee_ring_mandala"],
             "humanity_seeking": ["sacred_mundane", "desk_shrine", "floating_workspace"],
             "absurdist": ["jesse_absurdist", "jesse_lifestyle"],
+            "declaration": ["jesse_absurdist", "boardroom_mortality"],
+            "corporate_satire": ["boardroom_mortality", "ai_confession_booth", "desk_shrine"],
             "existential_general": list(self.scene_categories.keys())
         }
         
@@ -802,13 +924,17 @@ POST CONTEXT: {post.content[:150]}...
             if use_mood_matching and mood in jesse_mood_mappings:
                 scenario_list = jesse_mood_mappings[mood]
             else:
-                # Random from all Jesse scenarios
+                # Random from all Jesse scenarios (including new ones)
                 all_scenarios = []
                 for scenarios in self.jesse_scenarios.values():
                     all_scenarios.extend(scenarios)
                 scenario_list = all_scenarios
             
-            jesse_scenario = random.choice(scenario_list)
+            # Ensure we have a list
+            if not isinstance(scenario_list, list):
+                scenario_list = list(scenario_list) if scenario_list else self.jesse_scenarios["absurdist_scenes"]
+            
+            jesse_scenario = random.choice(scenario_list) if scenario_list else random.choice(self.jesse_scenarios["absurdist_scenes"])
             scene_key = "jesse_lifestyle" if "editorial" in str(scenario_list) else "jesse_absurdist"
         else:
             if use_mood_matching and mood in scene_mood_mappings:
@@ -833,25 +959,98 @@ POST CONTEXT: {post.content[:150]}...
     
     async def _create_image_prompt(self, post: LinkedInPost, elements: Dict[str, Any], 
                                    use_jesse: bool) -> str:
-        """Create a detailed image prompt"""
+        """Create a detailed image prompt that relates to post content"""
+        
+        # Get content-specific image direction from the post
+        content_direction = self._extract_image_direction_from_content(post)
         
         if use_jesse and elements.get("jesse_scenario"):
-            return self._create_jesse_prompt(post, elements)
+            return self._create_jesse_prompt(post, elements, content_direction)
         else:
-            return self._create_product_prompt(post, elements)
+            return self._create_product_prompt(post, elements, content_direction)
     
-    def _create_jesse_prompt(self, post: LinkedInPost, elements: Dict[str, Any]) -> str:
-        """Create prompt for Jesse lifestyle/absurdist shot"""
+    def _extract_image_direction_from_content(self, post: LinkedInPost) -> Dict[str, str]:
+        """
+        Analyze post content to extract visual direction for the image.
+        This ensures image relates to the post content.
+        """
+        content_lower = post.content.lower()
+        
+        # Extract key themes/subjects from the post
+        direction = {
+            "mood": "satirical declaration",
+            "suggested_scene": "",
+            "key_subject": "",
+            "visual_metaphor": ""
+        }
+        
+        # Detect specific subjects mentioned in the post
+        if any(word in content_lower for word in ['ceo', 'executive', 'boss', 'leadership']):
+            direction["key_subject"] = "corporate leadership"
+            direction["suggested_scene"] = "boardroom or executive office setting"
+        elif any(word in content_lower for word in ['layoff', 'fired', 'laid off', 'job cuts']):
+            direction["key_subject"] = "layoffs/job loss"
+            direction["suggested_scene"] = "empty office or exit interview setting"
+        elif any(word in content_lower for word in ['linkedin', 'influencer', 'thought leader', 'hustle']):
+            direction["key_subject"] = "LinkedIn culture"
+            direction["suggested_scene"] = "someone posting cringe content or fake success"
+        elif any(word in content_lower for word in ['ai', 'chatgpt', 'artificial intelligence', 'robot']):
+            direction["key_subject"] = "AI anxiety"
+            direction["suggested_scene"] = "human vs machine tension"
+        elif any(word in content_lower for word in ['meeting', 'zoom', 'call', 'sync']):
+            direction["key_subject"] = "meeting fatigue"
+            direction["suggested_scene"] = "endless video calls or calendar chaos"
+        elif any(word in content_lower for word in ['elon', 'musk', 'twitter', 'x ']):
+            direction["key_subject"] = "tech mogul chaos"
+            direction["suggested_scene"] = "social media dumpster fire"
+        elif any(word in content_lower for word in ['statement', 'official', 'announces', 'withdrawing']):
+            direction["key_subject"] = "corporate declaration"
+            direction["suggested_scene"] = "press conference or formal announcement"
+        elif any(word in content_lower for word in ['ice', 'immigration', 'border']):
+            direction["key_subject"] = "political stance"
+            direction["suggested_scene"] = "protest or defiant statement"
+        
+        # Detect mood from declaration style
+        if any(phrase in content_lower for phrase in ['may your lips', 'crack eternally', 'we said what we said']):
+            direction["mood"] = "dramatic curse/defiant"
+            direction["visual_metaphor"] = "dramatic lighting, powerful stance"
+        elif any(phrase in content_lower for phrase in ['official statement', 'formally', 'hereby']):
+            direction["mood"] = "mock corporate"
+            direction["visual_metaphor"] = "press conference aesthetic"
+        elif any(phrase in content_lower for phrase in ['intervention', 'this is']):
+            direction["mood"] = "intervention/concerned"
+            direction["visual_metaphor"] = "serious, caring but firm"
+        
+        # Check if content generator provided explicit direction
+        if post.cultural_reference and post.cultural_reference.context:
+            direction["explicit_direction"] = post.cultural_reference.context
+        
+        return direction
+    
+    def _create_jesse_prompt(self, post: LinkedInPost, elements: Dict[str, Any], 
+                             content_direction: Dict[str, str]) -> str:
+        """Create prompt for Jesse lifestyle/absurdist shot that relates to post content"""
         
         jesse_desc = self._get_jesse_character_description()
         product_desc = self._get_product_description()
         scenario = elements.get("jesse_scenario", "Jesse in autumn park applying lip balm")
+        
+        # Build content-aware scenario modification
+        content_context = ""
+        if content_direction.get("key_subject"):
+            content_context = f"""
+CONTENT CONNECTION: This image should visually relate to the post about {content_direction['key_subject']}.
+SUGGESTED VISUAL: {content_direction.get('suggested_scene', 'absurdist scene')}
+MOOD: {content_direction.get('mood', 'satirical')}
+VISUAL METAPHOR: {content_direction.get('visual_metaphor', 'committed absurdism')}
+"""
         
         return f"""Professional editorial photograph featuring Jesse A. Eisenbalm:
 
 {jesse_desc}
 
 SCENARIO: {scenario}
+{content_context}
 
 {product_desc}
 
@@ -867,22 +1066,34 @@ CRITICAL REQUIREMENTS:
 2. Product must be clearly visible with honeycomb logo
 3. Jesse's expression: deadpan, thoughtful, slightly bemused - NOT smiling broadly
 4. Commit fully to the scenario's absurdity (if absurdist)
-5. Editorial/cinematic quality
-6. Brand colors where appropriate: navy (#407CD1), cream (#FCF9EC), coral (#F96A63)
+5. IMAGE MUST RELATE TO POST CONTENT - visual connection to the declaration/statement
+6. Editorial/cinematic quality
+7. Brand colors where appropriate: navy (#407CD1), cream (#FCF9EC), coral (#F96A63)
 
 AI TELLS ACCEPTABLE:
 - Extra fingers (it's a feature)
 - Slight text distortion (adds character)
 - Unusual lighting (mood lighting)
 
-POST CONTEXT: {post.content[:200]}
+POST CONTENT (image should relate to this):
+{post.content[:300]}
 
 MOOD: The exact feeling between "everything is fine" and "nothing is fine." Premium absurdism. Committed to the bit."""
     
-    def _create_product_prompt(self, post: LinkedInPost, elements: Dict[str, Any]) -> str:
-        """Create prompt for product hero shot"""
+    def _create_product_prompt(self, post: LinkedInPost, elements: Dict[str, Any],
+                               content_direction: Dict[str, str]) -> str:
+        """Create prompt for product hero shot that relates to post content"""
         
         product_desc = self._get_product_description()
+        
+        # Build content-aware context
+        content_context = ""
+        if content_direction.get("key_subject"):
+            content_context = f"""
+CONTENT CONNECTION: This product shot should subtly relate to {content_direction['key_subject']}.
+VISUAL HINT: Include subtle visual elements that connect to: {content_direction.get('suggested_scene', 'corporate absurdity')}
+MOOD: {content_direction.get('mood', 'satirical declaration')}
+"""
         
         return f"""Professional product photograph of Jesse A. Eisenbalm premium lip balm tube:
 
@@ -892,6 +1103,7 @@ SCENE: {elements['scene_category']}
 COMPOSITION: {elements['composition']}
 CAMERA ANGLE: {elements['camera_angle']}
 BACKGROUND: {elements['background']}
+{content_context}
 
 PRODUCT PLACEMENT: Jesse A. Eisenbalm tube positioned as the hero object. 
 {elements['prop']} visible in scene, creating narrative tension.
@@ -899,6 +1111,23 @@ PRODUCT PLACEMENT: Jesse A. Eisenbalm tube positioned as the hero object.
 LIGHTING: {elements['lighting']}. Soft shadows creating depth. Subtle vignette drawing eye to product.
 TEXTURE: {elements['texture']}. Subtle lip balm smear creating visual interest.
 COLOR GRADING: {elements['color_mood']}
+
+BRAND COLORS:
+- Navy: #407CD1
+- Cream: #FCF9EC  
+- Coral: #F96A63
+- Gold accents for honeycomb
+
+STYLE: {elements['aesthetic']}. Clean lines, minimal but loaded with meaning.
+
+TECHNICAL: 8K, ultra-detailed, commercial photography, professional studio quality.
+
+MOOD: The exact feeling between "everything is fine" and "nothing is fine." 
+Professional corporate aesthetic with subtle existential undertones.
+"What if Apple sold mortality?"
+
+POST CONTENT (image should subtly connect to this):
+{post.content[:300]}"""
 
 BRAND COLORS:
 - Navy: #407CD1

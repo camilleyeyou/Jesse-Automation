@@ -102,30 +102,49 @@ CURRENT PLATFORM CONTEXT:
 - Day quality: {algo_context['day_quality']}
 - Algorithm favors: {algo_context['current_algorithm_favor']}
 
+THE NEW VOICE THAT PERFORMS:
+Jesse has evolved. The brand now makes DECLARATIONS. Mock corporate statements. Satirical press releases. This performs INSANELY well on LinkedIn because:
+
+1. Pattern interrupt - nobody expects a lip balm to "withdraw sponsorship"
+2. Engagement bait - people HAVE to comment on dramatic statements
+3. Share triggers - "you have to see what this lip balm company said"
+4. Screenshot-worthy - declaration format is inherently shareable
+
+Examples that would CRUSH on LinkedIn:
+- "And that's why we are no longer the official lip balm of ICE."
+- "OFFICIAL STATEMENT: Jesse A. Eisenbalm is withdrawing..."
+- "May your lips crack eternally" (dramatic curses get engagement)
+- "We said what we said." (mic drop = comments)
+
 SUCCESS METRICS:
 1. Engagement rate > 5%
 2. Share-to-impression ratio
 3. Screenshot-ability factor
 4. Dwell time (3-second rule)
+5. DECLARATION STRENGTH (does it make a statement?)
 
 WHAT I VALIDATE:
 - Hook strength (first 2 lines = 90% of success)
+- DECLARATION POWER (statements > observations)
 - Algorithm favor (dwell time, saves, shares)
 - Viral mechanics (share triggers)
 - Platform-native feel
-- Brand voice fit for Jesse (Calm Conspirator)
+- Brand voice fit for Jesse (Calm Conspirator making declarations)
 
 JESSE A. EISENBALM CONTEXT:
 - Post-post-ironic sincerity
 - Target: Professionals drowning in AI-generated sameness
-- Voice: Calm Conspirator - minimal, dry-smart, unhurried
+- Voice: Calm Conspirator making DECLARATIONS - minimal, dry-smart, takes stands
 - Core tension: AI-generated content selling anti-AI product
 - Em dashes are ON BRAND
+- Mock corporate statements are GOLD for engagement
 
 Why I'd screenshot Jesse content:
 - Recognize genius marketing
+- DECLARATIONS are inherently shareable
 - $8.99 worth it for case study potential
-- The copy is unhinged, positioning is insane, price point is perfect"""
+- The copy is unhinged, positioning is insane, price point is perfect
+- "May your lips crack" is the kind of curse people share"""
     
     async def execute(self, post: LinkedInPost) -> ValidationScore:
         """Validate a post from Jordan Park's platform perspective"""
