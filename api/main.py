@@ -182,58 +182,47 @@ except Exception as e:
 # ============== Background Jobs ==============
 
 async def daily_post_job():
-    """Job function for daily posting"""
-    logger.info("Running daily post job...")
+    """
+    Job function for daily posting - ALWAYS generates fresh content.
+    
+    This ensures:
+    - Fresh trending topic every post
+    - No stale queued content
+    - Fully automatic operation
+    """
+    logger.info("=" * 60)
+    logger.info("🕐 SCHEDULED POST JOB TRIGGERED")
+    logger.info("=" * 60)
     
     try:
-        # Get next post from queue
-        post_data = queue_manager.get_next_post()
-        
-        # If queue is empty and auto-generate is enabled, generate new content
-        if not post_data and scheduler.settings.get("auto_generate", True):
-            logger.info("Queue empty, generating new content...")
-            # Scheduler always uses images (not video) for cost efficiency
-            batch = await orchestrator.generate_batch(num_posts=1, use_video=False)
-            approved = batch.get_approved_posts()
-            if approved:
-                post = approved[0]
-                post_data = post.to_dict()
-                queue_manager.add_to_queue(post_data)
-                post_data = queue_manager.get_next_post()
-        
-        if not post_data:
-            logger.warning("No posts available to publish")
-            return
-        
-        # Mark as publishing
-        queue_manager.update_status(post_data["id"], "publishing")
-        
-        # Publish to LinkedIn
-        result = linkedin_poster.publish_post(
-            content=post_data["content"],
-            image_path=post_data.get("image_url"),
-            hashtags=post_data.get("hashtags")
+        # Use generate_and_post_now for fresh content every time
+        result = await orchestrator.generate_and_post_now(
+            linkedin_poster=linkedin_poster,
+            use_video=False  # Use images for cost efficiency
         )
         
         if result.get("success"):
-            queue_manager.remove_from_queue(post_data["id"])
+            # Record to history for tracking
+            post_data = result.get("post", {})
             queue_manager.record_published(
                 post_data,
-                linkedin_post_id=result.get("post_id"),
+                linkedin_post_id=result.get("linkedin", {}).get("post_id"),
                 status="success"
             )
-            logger.info(f"Successfully posted: {result.get('post_id')}")
+            logger.info(f"✅ Scheduled post successful: {result.get('linkedin', {}).get('post_id')}")
         else:
-            queue_manager.update_status(post_data["id"], "failed")
+            logger.error(f"❌ Scheduled post failed: {result.get('error')}")
+            # Record failure
             queue_manager.record_published(
-                post_data,
+                result.get("post", {}),
                 status="failed",
                 error=result.get("error")
             )
-            logger.error(f"Failed to post: {result.get('error')}")
             
     except Exception as e:
-        logger.error(f"Daily post job failed: {e}")
+        logger.error(f"❌ Daily post job exception: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 # ============== Health Check ==============
@@ -341,9 +330,50 @@ async def set_schedule(config: ScheduleConfig):
 
 @app.post("/api/automation/post-now")
 async def post_now(background_tasks: BackgroundTasks):
-    """Trigger an immediate post"""
+    """Trigger an immediate post (generates fresh content)"""
     background_tasks.add_task(daily_post_job)
-    return {"success": True, "message": "Post triggered"}
+    return {"success": True, "message": "Fresh content generation and post triggered"}
+
+
+@app.post("/api/automation/generate-and-post")
+async def generate_and_post(use_video: bool = False):
+    """
+    Generate fresh content and post immediately (synchronous).
+    
+    This is the RECOMMENDED way to post because:
+    - Always uses fresh trending topics
+    - No stale queue content
+    - Returns full result including LinkedIn post ID
+    
+    Args:
+        use_video: Generate video (~$1.00) instead of image ($0.03)
+    """
+    if not orchestrator:
+        raise HTTPException(500, "Orchestrator not initialized")
+    if not linkedin_poster:
+        raise HTTPException(500, "LinkedIn poster not initialized")
+    
+    try:
+        result = await orchestrator.generate_and_post_now(
+            linkedin_poster=linkedin_poster,
+            use_video=use_video
+        )
+        
+        if result.get("success"):
+            # Record to history
+            queue_manager.record_published(
+                result.get("post", {}),
+                linkedin_post_id=result.get("linkedin", {}).get("post_id"),
+                status="success"
+            )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Generate and post failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(500, f"Failed: {str(e)}")
 
 
 @app.post("/api/automation/generate-content")

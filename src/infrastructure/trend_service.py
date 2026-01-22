@@ -452,6 +452,19 @@ class TrendService:
             self.logger.error(f"Error getting recent topics: {e}")
             return []
     
+    def mark_topic_used_permanent(self, headline: str, category: str = ""):
+        """
+        Mark a topic as permanently used (after successful post).
+        Alias for _record_used_topic that can be called externally.
+        """
+        trend = TrendingNews(
+            headline=headline,
+            category=category,
+            fingerprint=self._generate_fingerprint(headline)
+        )
+        self._record_used_topic(trend, post_id="published")
+        self.logger.info(f"✅ Topic permanently marked as used: {headline[:50]}...")
+    
     def cleanup_old_topics(self, days: int = 30):
         """Remove topics older than specified days"""
         try:

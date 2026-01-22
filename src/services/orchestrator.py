@@ -235,6 +235,111 @@ IMPORTANT: Use the SPECIFIC headline above. Don't create generic content.
         
         return scores
     
+    async def generate_and_post_now(self, linkedin_poster, use_video: bool = False) -> Dict[str, Any]:
+        """
+        Generate fresh content and post immediately to LinkedIn.
+        
+        This is the RECOMMENDED method for automated posting because:
+        - Always uses fresh trending topics (not stale queued content)
+        - Generates and posts in one step
+        - No queue management needed
+        
+        Args:
+            linkedin_poster: LinkedInPoster instance
+            use_video: Whether to generate video instead of image
+            
+        Returns:
+            Dict with success status, post details, and LinkedIn result
+        """
+        import uuid
+        from datetime import datetime
+        
+        logger.info("=" * 60)
+        logger.info("🚀 GENERATE AND POST NOW - Fresh content pipeline")
+        logger.info("=" * 60)
+        
+        try:
+            # Step 1: Reset trend tracking for fresh selection
+            if self.trend_service:
+                self.trend_service.reset_for_new_batch()
+            
+            # Step 2: Get fresh trending topic
+            post_id = f"live_{uuid.uuid4().hex[:8]}"
+            trend = None
+            if self.trend_service:
+                trend = await self.trend_service.get_one_fresh_trend(post_id=post_id)
+                if trend:
+                    logger.info(f"📰 Fresh trend ({trend.category}): {trend.headline[:70]}...")
+                else:
+                    logger.warning("⚠️ No fresh trend available, generating without trend")
+            
+            # Step 3: Generate content
+            logger.info("✍️ Generating content...")
+            post = await self._process_single_post(
+                post_number=1,
+                batch_id=post_id,
+                trend=trend,
+                use_video=use_video
+            )
+            
+            if not post:
+                logger.error("❌ Content generation failed validation")
+                return {
+                    "success": False,
+                    "error": "Content failed validation - no post generated",
+                    "stage": "generation"
+                }
+            
+            logger.info(f"✅ Content generated: {post.content[:50]}...")
+            
+            # Step 4: Post to LinkedIn
+            logger.info("📤 Posting to LinkedIn...")
+            linkedin_result = linkedin_poster.publish_post(
+                content=post.content,
+                image_path=post.image_url,
+                hashtags=[]  # No hashtags per client request
+            )
+            
+            if linkedin_result.get("success"):
+                logger.info(f"✅ Posted successfully: {linkedin_result.get('post_id')}")
+                
+                # Mark trend as used (permanently) after successful post
+                if self.trend_service and trend:
+                    self.trend_service.mark_topic_used_permanent(
+                        headline=trend.headline,
+                        category=trend.category
+                    )
+                
+                return {
+                    "success": True,
+                    "post": post.to_dict(),
+                    "linkedin": linkedin_result,
+                    "trend_used": {
+                        "headline": trend.headline if trend else None,
+                        "category": trend.category if trend else None
+                    },
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            else:
+                logger.error(f"❌ LinkedIn post failed: {linkedin_result.get('error')}")
+                return {
+                    "success": False,
+                    "error": linkedin_result.get("error"),
+                    "details": linkedin_result.get("details"),
+                    "stage": "linkedin_post",
+                    "post": post.to_dict()  # Include post so it can be manually posted
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Generate and post failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "success": False,
+                "error": str(e),
+                "stage": "exception"
+            }
+    
     def get_stats(self):
         return {
             "validators": [v.name for v in self.validators],
