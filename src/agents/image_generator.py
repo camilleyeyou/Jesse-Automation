@@ -1128,22 +1128,6 @@ Professional corporate aesthetic with subtle existential undertones.
 
 POST CONTENT (image should subtly connect to this):
 {post.content[:300]}"""
-
-BRAND COLORS:
-- Navy: #407CD1
-- Cream: #FCF9EC  
-- Coral: #F96A63
-- Gold accents for honeycomb
-
-STYLE: {elements['aesthetic']}. Clean lines, minimal but loaded with meaning.
-
-TECHNICAL: 8K, ultra-detailed, commercial photography, professional studio quality.
-
-MOOD: The exact feeling between "everything is fine" and "nothing is fine." 
-Professional corporate aesthetic with subtle existential undertones.
-"What if Apple sold mortality?"
-
-POST CONTEXT: {post.content[:200]}"""
     
     def _enhance_prompt_with_brand_language(self, prompt: str, use_jesse: bool) -> str:
         """Enhance prompt with Jesse's visual language"""
