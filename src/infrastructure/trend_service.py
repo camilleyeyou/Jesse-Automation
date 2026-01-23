@@ -1,10 +1,9 @@
 """
-Trend Service - ENHANCED with Database Tracking
-- Fetches diverse trending news across multiple categories
+Trend Service - GOOGLE TRENDS POWERED
+- Uses pytrends to get REAL trending topics from Google Trends
+- These are topics people actually know about and are searching for
 - Persists used topics in database to prevent repetition
-- Tracks topics for configurable days (default: 7 days)
-- Uses category rotation to ensure variety
-- Extracts topic "fingerprints" to catch similar stories
+- Falls back to realtime trending searches
 """
 
 import os
@@ -21,6 +20,15 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Try to import pytrends
+try:
+    from pytrends.request import TrendReq
+    PYTRENDS_AVAILABLE = True
+except ImportError:
+    PYTRENDS_AVAILABLE = False
+    logger.warning("pytrends not installed. Run: pip install pytrends")
+
+# Fallback to httpx for backup API
 try:
     import httpx
     HTTPX_AVAILABLE = True
@@ -33,128 +41,56 @@ class TrendingNews:
     """A trending news item"""
     headline: str
     summary: str = ""
-    source: str = ""
+    source: str = "google_trends"
     url: str = ""
-    category: str = ""
+    category: str = "trending"
     fingerprint: str = ""  # For similarity detection
 
 
 class TrendService:
     """
-    Enhanced trend fetcher with persistent topic tracking.
+    Google Trends powered trend fetcher.
     
-    Key improvements:
-    - Database persistence of used topics (no repeats for X days)
-    - Multiple diverse news categories with rotation
-    - Fingerprint-based similarity detection
-    - Fallback topic pool that's also tracked
+    Uses pytrends to get REAL trending topics that people actually care about.
+    No more niche tech news - only mainstream trending topics.
     """
-    
-    # Diverse search queries organized by category - MAINSTREAM CULTURE FOCUS
-    SEARCH_CATEGORIES = {
-        "pop_culture": [
-            "celebrity news today",
-            "trending celebrity drama",
-            "famous people controversy today",
-            "Hollywood news today",
-            "music artist news today",
-            "reality TV drama today",
-            "influencer drama news",
-            "celebrity breakup news",
-            "award show news",
-        ],
-        "entertainment": [
-            "viral movie news today",
-            "Netflix trending news",
-            "streaming wars news",
-            "TV show controversy",
-            "box office news today",
-            "music industry news",
-            "concert tour news",
-            "album release news today",
-        ],
-        "sports": [
-            "NFL news today",
-            "NBA news today",
-            "sports drama today",
-            "athlete controversy",
-            "Super Bowl news",
-            "Olympics news",
-            "sports trade news",
-            "coach fired news",
-        ],
-        "viral_social": [
-            "viral TikTok today",
-            "trending meme today",
-            "Twitter X drama today",
-            "social media outrage today",
-            "viral video today",
-            "internet celebrity news",
-            "influencer scandal",
-            "cancel culture news",
-        ],
-        "lifestyle": [
-            "dating app news",
-            "relationship trend news",
-            "wellness trend controversy",
-            "food trend news today",
-            "travel chaos news",
-            "fashion controversy today",
-            "beauty industry news",
-        ],
-        "tech_mainstream": [
-            "iPhone news today",
-            "social media update news",
-            "AI controversy mainstream",
-            "Elon Musk news today",
-            "Mark Zuckerberg news",
-            "Apple news today",
-            "Google controversy",
-            "Amazon news today",
-        ],
-        "politics_culture": [
-            "political drama today",
-            "politician controversy",
-            "White House news today",
-            "Congress news today",
-            "political scandal",
-            "government shutdown news",
-        ],
-        "economy_personal": [
-            "grocery prices news",
-            "rent prices news today",
-            "gas prices news",
-            "layoffs news today",
-            "job market news",
-            "cost of living news",
-            "minimum wage news",
-        ]
-    }
     
     # Days to prevent topic reuse
     TOPIC_COOLDOWN_DAYS = 7
     
     def __init__(self, db_path: str = "data/automation/queue.db"):
-        self.brave_api_key = os.getenv("BRAVE_API_KEY")
         self.logger = logging.getLogger("TrendService")
         self.db_path = Path(db_path)
         
-        # In-memory cache for current batch (supplements database)
-        self.batch_used_headlines: Set[str] = set()
+        # Ensure directory exists
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Track which categories we've used recently to rotate
-        self.category_usage: Dict[str, int] = {cat: 0 for cat in self.SEARCH_CATEGORIES}
-        
-        # Initialize database table
+        # Initialize database
         self._init_database()
         
-        if self.brave_api_key:
-            self.logger.info("✅ Brave Search API configured for trend fetching")
+        # Track topics used in current batch
+        self.batch_used_headlines: Set[str] = set()
+        
+        # Initialize pytrends connection
+        self.pytrends = None
+        if PYTRENDS_AVAILABLE:
+            try:
+                self.pytrends = TrendReq(
+                    hl='en-US', 
+                    tz=360,  # US timezone
+                    timeout=(10, 25),
+                    retries=2,
+                    backoff_factor=0.5
+                )
+                self.logger.info("✅ Google Trends (pytrends) initialized")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize pytrends: {e}")
+                self.pytrends = None
         else:
-            self.logger.warning("⚠️ No BRAVE_API_KEY - will use fallbacks")
+            self.logger.warning("⚠️ pytrends not available - will use fallback topics")
     
     def _init_database(self):
-        """Initialize the used_topics table in the existing database"""
+        """Initialize SQLite database for topic tracking"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
@@ -162,41 +98,27 @@ class TrendService:
                     CREATE TABLE IF NOT EXISTS used_topics (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         headline TEXT NOT NULL,
-                        fingerprint TEXT NOT NULL,
+                        fingerprint TEXT UNIQUE,
                         category TEXT,
                         source TEXT,
                         url TEXT,
                         used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        post_id TEXT,
-                        UNIQUE(fingerprint)
+                        post_id TEXT
                     )
                 """)
-                
-                # Create index for faster lookups
                 cursor.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_used_topics_fingerprint 
-                    ON used_topics(fingerprint)
+                    CREATE INDEX IF NOT EXISTS idx_fingerprint ON used_topics(fingerprint)
                 """)
                 cursor.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_used_topics_used_at 
-                    ON used_topics(used_at)
+                    CREATE INDEX IF NOT EXISTS idx_used_at ON used_topics(used_at)
                 """)
-                
                 conn.commit()
-                self.logger.info("✅ Used topics database table initialized")
+                self.logger.info(f"📊 Topic tracking database initialized at {self.db_path}")
         except Exception as e:
-            self.logger.error(f"Failed to init database: {e}")
-    
-    def reset_for_new_batch(self):
-        """Reset batch-level tracking (database tracking persists)"""
-        self.batch_used_headlines = set()
-        self.logger.info("Reset batch-level headline tracking")
+            self.logger.error(f"Failed to initialize database: {e}")
     
     def _generate_fingerprint(self, headline: str, summary: str = "") -> str:
-        """
-        Generate a fingerprint for similarity detection.
-        Extracts key entities and concepts to catch similar stories.
-        """
+        """Generate a fingerprint to identify similar topics"""
         text = f"{headline} {summary}".lower()
         
         # Remove common words
@@ -209,28 +131,26 @@ class TrendService:
                      'and', 'but', 'or', 'nor', 'so', 'yet', 'both', 'either',
                      'neither', 'not', 'only', 'own', 'same', 'than', 'too', 'very',
                      'just', 'about', 'also', 'now', 'new', 'says', 'said', 'news',
-                     'today', 'report', 'reports', 'latest', 'breaking'}
+                     'today', 'report', 'reports', 'latest', 'breaking', 'trending'}
         
-        # Extract words (alphanumeric only)
+        # Extract words
         words = re.findall(r'[a-z0-9]+', text)
         
-        # Filter stopwords and very short words
+        # Filter stopwords and short words
         key_words = [w for w in words if w not in stopwords and len(w) > 2]
         
-        # Sort and take top 8 most significant words
+        # Sort and take top words
         key_words = sorted(set(key_words))[:8]
         
-        # Create hash from sorted key words
+        # Create hash
         fingerprint_text = ' '.join(key_words)
         return hashlib.md5(fingerprint_text.encode()).hexdigest()[:16]
     
     def _is_topic_used(self, fingerprint: str) -> bool:
         """Check if a topic fingerprint was used in the cooldown period"""
-        # Check batch cache first
         if fingerprint in self.batch_used_headlines:
             return True
         
-        # Check database
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
@@ -273,224 +193,228 @@ class TrendService:
         except Exception as e:
             self.logger.error(f"Error recording used topic: {e}")
     
-    def _get_least_used_category(self) -> str:
-        """Get the category that's been used least recently"""
-        # Sort by usage count
-        sorted_cats = sorted(self.category_usage.items(), key=lambda x: x[1])
-        return sorted_cats[0][0]
+    def mark_topic_used_permanent(self, trend: TrendingNews, post_id: str = None):
+        """Public method to mark a topic as used (called after successful post)"""
+        self._record_used_topic(trend, post_id)
     
     async def get_one_fresh_trend(self, post_id: str = None) -> Optional[TrendingNews]:
         """
-        Fetch ONE fresh trending topic that hasn't been used recently.
+        Fetch ONE fresh trending topic from Google Trends.
         
         Strategy:
-        1. Rotate through news categories for variety
-        2. Search each category until we find an unused topic
-        3. Check against database for recent usage
-        4. Fall back to diverse fallback pool if needed
+        1. Get trending searches from Google Trends (US)
+        2. Filter out topics we've used recently
+        3. Return the first unused trending topic
+        4. Fall back to curated list if needed
         """
         
-        if not self.brave_api_key or not HTTPX_AVAILABLE:
-            return await self._get_fallback_trend(post_id)
+        # Try Google Trends first
+        if self.pytrends:
+            trend = await self._get_google_trend(post_id)
+            if trend:
+                return trend
         
-        # Get categories in order of least-used first
-        sorted_categories = sorted(
-            self.category_usage.items(), 
-            key=lambda x: (x[1], random.random())  # Sort by usage, random tiebreaker
-        )
-        
-        for category, _ in sorted_categories:
-            queries = self.SEARCH_CATEGORIES[category].copy()
-            random.shuffle(queries)
-            
-            for query in queries[:3]:  # Try up to 3 queries per category
-                try:
-                    trends = await self._search_brave(query, category)
-                    
-                    for trend in trends:
-                        if not self._is_topic_used(trend.fingerprint):
-                            # Found a fresh topic!
-                            self._record_used_topic(trend, post_id)
-                            self.category_usage[category] += 1
-                            self.logger.info(f"✅ Fresh trend from '{category}': {trend.headline[:60]}...")
-                            return trend
-                    
-                except Exception as e:
-                    self.logger.warning(f"Search failed for '{query}': {e}")
-                    continue
-        
-        # All API trends exhausted, use fallback
-        self.logger.warning("All API trends used, trying fallback pool")
+        # Fallback to curated trending topics
         return await self._get_fallback_trend(post_id)
     
-    async def _search_brave(self, query: str, category: str = "general") -> List[TrendingNews]:
-        """Search Brave News API for trending news"""
-        
+    async def _get_google_trend(self, post_id: str = None) -> Optional[TrendingNews]:
+        """Get a trending topic from Google Trends"""
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    "https://api.search.brave.com/res/v1/news/search",
-                    params={
-                        "q": query,
-                        "count": 15,  # Get more results to filter
-                        "freshness": "pd",  # Past day only
-                        "country": "us",
-                        "search_lang": "en"
-                    },
-                    headers={
-                        "X-Subscription-Token": self.brave_api_key,
-                        "Accept": "application/json"
-                    },
-                    timeout=10.0
+            # Get daily trending searches for US
+            self.logger.info("🔍 Fetching Google Trends daily searches...")
+            
+            # trending_searches returns a DataFrame with today's trending searches
+            trending_df = self.pytrends.trending_searches(pn='united_states')
+            
+            if trending_df is None or trending_df.empty:
+                self.logger.warning("No trending searches returned")
+                return None
+            
+            # Convert to list - the DataFrame has trending terms in first column
+            trending_topics = trending_df[0].tolist()
+            
+            self.logger.info(f"📈 Found {len(trending_topics)} trending topics from Google Trends")
+            
+            # Shuffle to add variety (don't always pick #1)
+            random.shuffle(trending_topics)
+            
+            for topic in trending_topics:
+                # Create a TrendingNews object
+                trend = TrendingNews(
+                    headline=topic,
+                    summary=f"Currently trending on Google: {topic}",
+                    source="google_trends",
+                    category="trending",
+                    url=f"https://trends.google.com/trends/explore?q={topic.replace(' ', '%20')}&geo=US"
                 )
+                trend.fingerprint = self._generate_fingerprint(trend.headline, trend.summary)
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    results = data.get("results", [])
-                    
-                    trends = []
-                    for r in results:
-                        headline = r.get("title", "")
-                        summary = r.get("description", "")
-                        
-                        trend = TrendingNews(
-                            headline=headline,
-                            summary=summary,
-                            source=r.get("meta_url", {}).get("hostname", "news"),
-                            url=r.get("url", ""),
-                            category=category,
-                            fingerprint=self._generate_fingerprint(headline, summary)
-                        )
-                        trends.append(trend)
-                    
-                    return trends
-                    
-                elif response.status_code == 429:
-                    self.logger.warning(f"Brave API rate limited (429) for '{query}'")
-                    return []
+                # Check if we've used this topic recently
+                if not self._is_topic_used(trend.fingerprint):
+                    self._record_used_topic(trend, post_id)
+                    self.logger.info(f"✅ Selected Google Trend: {topic}")
+                    return trend
                 else:
-                    self.logger.warning(f"Brave API returned {response.status_code} for '{query}'")
-                    return []
-                    
+                    self.logger.debug(f"⏭️ Skipping used topic: {topic}")
+            
+            self.logger.warning("All Google Trends topics have been used recently")
+            return None
+            
         except Exception as e:
-            self.logger.error(f"Brave search error: {e}")
-            return []
+            self.logger.error(f"Google Trends error: {e}")
+            return None
+    
+    async def _get_realtime_trends(self, post_id: str = None) -> Optional[TrendingNews]:
+        """Get realtime trending searches (backup method)"""
+        try:
+            self.logger.info("🔍 Fetching realtime Google Trends...")
+            
+            # realtime_trending_searches returns DataFrame with more details
+            realtime_df = self.pytrends.realtime_trending_searches(pn='US')
+            
+            if realtime_df is None or realtime_df.empty:
+                return None
+            
+            # Realtime has 'title' and 'entityNames' columns
+            for _, row in realtime_df.iterrows():
+                title = row.get('title', '')
+                if not title:
+                    continue
+                
+                trend = TrendingNews(
+                    headline=title,
+                    summary=str(row.get('entityNames', '')),
+                    source="google_trends_realtime",
+                    category="trending"
+                )
+                trend.fingerprint = self._generate_fingerprint(trend.headline, trend.summary)
+                
+                if not self._is_topic_used(trend.fingerprint):
+                    self._record_used_topic(trend, post_id)
+                    self.logger.info(f"✅ Selected realtime trend: {title}")
+                    return trend
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Realtime trends error: {e}")
+            return None
     
     async def _get_fallback_trend(self, post_id: str = None) -> TrendingNews:
-        """Return a diverse fallback trend when API fails - MAINSTREAM POP CULTURE FOCUS"""
+        """Return a curated fallback trend when Google Trends fails"""
         
-        # Extended diverse fallback pool - POP CULTURE & MAINSTREAM
+        # Curated list of evergreen trending-style topics
+        # These are written to sound like current trends
         fallbacks = [
-            # Celebrity/Entertainment
+            # Celebrity/Entertainment - always relevant
             TrendingNews(
-                headline="Taylor Swift announces surprise album drop during concert",
-                summary="Swifties crash Ticketmaster for the 47th time this year",
-                source="entertainment", category="pop_culture",
+                headline="Taylor Swift",
+                summary="Taylor Swift continues to dominate headlines with tour and music news",
+                source="fallback", category="celebrity",
             ),
             TrendingNews(
-                headline="Beyoncé spotted at Lakers game looking unbothered",
-                summary="Internet loses collective mind over courtside footage",
-                source="celebrity", category="pop_culture",
+                headline="Beyoncé",
+                summary="Beyoncé remains in the spotlight with new projects and appearances",
+                source="fallback", category="celebrity",
             ),
             TrendingNews(
-                headline="Timothée Chalamet photographed looking pensive in New York",
-                summary="Fans debate whether he's sad or just French",
-                source="celebrity", category="pop_culture",
+                headline="Travis Kelce",
+                summary="NFL star Travis Kelce trending for football and personal life",
+                source="fallback", category="sports",
             ),
             TrendingNews(
-                headline="Zendaya and Tom Holland seen holding hands again",
-                summary="Couple continues to exist, internet continues to care",
-                source="celebrity", category="pop_culture",
+                headline="Drake",
+                summary="Drake making headlines in music industry",
+                source="fallback", category="music",
             ),
             TrendingNews(
-                headline="Drake and Kendrick beef enters new chapter",
-                summary="Music industry braces for more diss tracks",
-                source="music", category="entertainment",
+                headline="Kendrick Lamar",
+                summary="Kendrick Lamar trending for music releases and cultural impact",
+                source="fallback", category="music",
             ),
             # Sports
             TrendingNews(
-                headline="LeBron James posts cryptic Instagram story",
-                summary="NBA fans analyze every pixel for hidden meaning",
-                source="sports", category="sports",
+                headline="NFL Playoffs",
+                summary="NFL playoff drama captivates fans nationwide",
+                source="fallback", category="sports",
             ),
             TrendingNews(
-                headline="Travis Kelce celebrates touchdown with suspicious dance move",
-                summary="Taylor Swift seen laughing in private box",
-                source="sports", category="sports",
+                headline="NBA Trade Rumors",
+                summary="NBA teams making moves as trade deadline approaches",
+                source="fallback", category="sports",
             ),
             TrendingNews(
-                headline="NFL referee makes controversial call in playoff game",
-                summary="Twitter explodes with conspiracy theories",
-                source="sports", category="sports",
+                headline="LeBron James",
+                summary="LeBron James continues to make basketball history",
+                source="fallback", category="sports",
             ),
-            # Viral/Social Media
+            # Entertainment
             TrendingNews(
-                headline="New TikTok trend has everyone doing the same dance",
-                summary="Your aunt will learn it in approximately 3 weeks",
-                source="social", category="viral_social",
-            ),
-            TrendingNews(
-                headline="Influencer's 'day in my life' video sparks heated debate",
-                summary="People question whether anyone actually lives like this",
-                source="social", category="viral_social",
+                headline="Netflix",
+                summary="Netflix releases new hit show that everyone is watching",
+                source="fallback", category="entertainment",
             ),
             TrendingNews(
-                headline="Celebrity's unfiltered selfie breaks Instagram record",
-                summary="Fans praise authenticity of $500 skincare routine",
-                source="social", category="viral_social",
+                headline="Oscar Nominations",
+                summary="Hollywood buzzing about award season predictions",
+                source="fallback", category="entertainment",
             ),
             TrendingNews(
-                headline="Dating app releases data on what profiles get most likes",
-                summary="Results surprise absolutely no one",
-                source="lifestyle", category="lifestyle",
-            ),
-            # TV/Streaming
-            TrendingNews(
-                headline="Netflix show finale leaves fans divided",
-                summary="Ending described as 'perfect' and 'a war crime' simultaneously",
-                source="entertainment", category="entertainment",
+                headline="Timothée Chalamet",
+                summary="Timothée Chalamet trending for new film project",
+                source="fallback", category="celebrity",
             ),
             TrendingNews(
-                headline="Reality TV star says something controversial on reunion episode",
-                summary="Producers definitely didn't plan this at all",
-                source="entertainment", category="entertainment",
+                headline="Zendaya",
+                summary="Zendaya making headlines for fashion and film",
+                source="fallback", category="celebrity",
             ),
-            # Tech but mainstream
+            # Tech - mainstream only
             TrendingNews(
-                headline="Elon Musk tweets something provocative again",
-                summary="Stock price reacts, humanity sighs collectively",
-                source="tech", category="tech_mainstream",
-            ),
-            TrendingNews(
-                headline="Apple announces new iPhone with feature that already existed",
-                summary="Pre-orders sell out in minutes anyway",
-                source="tech", category="tech_mainstream",
-            ),
-            # Politics but pop culture adjacent
-            TrendingNews(
-                headline="Politician's outfit at event becomes main topic of discussion",
-                summary="Policy takes backseat to fashion critique",
-                source="politics", category="politics_culture",
+                headline="iPhone",
+                summary="Apple iPhone news continues to trend among consumers",
+                source="fallback", category="tech",
             ),
             TrendingNews(
-                headline="First Lady seen reading specific book, internet investigates",
-                summary="Book sales increase 4000% overnight",
-                source="politics", category="politics_culture",
-            ),
-            # Lifestyle/Trends
-            TrendingNews(
-                headline="New wellness trend promises to change your life completely",
-                summary="Involves waking up early and drinking something green",
-                source="lifestyle", category="lifestyle",
+                headline="Elon Musk",
+                summary="Elon Musk creates controversy with latest statements",
+                source="fallback", category="tech",
             ),
             TrendingNews(
-                headline="Avocado toast prices reach new heights in major cities",
-                summary="Millennials blamed for economy again somehow",
-                source="lifestyle", category="economy_personal",
+                headline="ChatGPT",
+                summary="AI chatbot continues to spark debates about technology",
+                source="fallback", category="tech",
+            ),
+            # Viral/Social
+            TrendingNews(
+                headline="TikTok Trend",
+                summary="New viral TikTok challenge takes over social media",
+                source="fallback", category="viral",
+            ),
+            TrendingNews(
+                headline="Super Bowl",
+                summary="Super Bowl anticipation builds as teams compete",
+                source="fallback", category="sports",
+            ),
+            TrendingNews(
+                headline="Coachella",
+                summary="Music festival announcements generate excitement",
+                source="fallback", category="entertainment",
+            ),
+            # Reality TV
+            TrendingNews(
+                headline="The Bachelor",
+                summary="Reality TV drama unfolds on latest season",
+                source="fallback", category="entertainment",
+            ),
+            TrendingNews(
+                headline="Real Housewives",
+                summary="Reality TV franchise drama trending on social media",
+                source="fallback", category="entertainment",
             ),
         ]
         
-        # Generate fingerprints for fallbacks
+        # Generate fingerprints
         for fb in fallbacks:
             fb.fingerprint = self._generate_fingerprint(fb.headline, fb.summary)
         
@@ -500,12 +424,18 @@ class TrendService:
         for fb in fallbacks:
             if not self._is_topic_used(fb.fingerprint):
                 self._record_used_topic(fb, post_id)
+                self.logger.info(f"📌 Using fallback topic: {fb.headline}")
                 return fb
         
-        # All fallbacks used in cooldown period - return random with warning
-        self.logger.warning("⚠️ All fallback topics used recently - selecting random")
+        # All used - return random with warning
+        self.logger.warning("⚠️ All fallback topics used - selecting random")
         chosen = random.choice(fallbacks)
         return chosen
+    
+    def reset_batch_tracking(self):
+        """Reset batch-level tracking (call at start of new batch)"""
+        self.batch_used_headlines.clear()
+        self.logger.info("🔄 Reset batch tracking")
     
     def get_recent_topics(self, limit: int = 20) -> List[Dict]:
         """Get recently used topics for debugging/display"""
@@ -525,43 +455,59 @@ class TrendService:
             self.logger.error(f"Error getting recent topics: {e}")
             return []
     
-    def mark_topic_used_permanent(self, headline: str, category: str = ""):
-        """
-        Mark a topic as permanently used (after successful post).
-        Alias for _record_used_topic that can be called externally.
-        """
-        trend = TrendingNews(
-            headline=headline,
-            category=category,
-            fingerprint=self._generate_fingerprint(headline)
-        )
-        self._record_used_topic(trend, post_id="published")
-        self.logger.info(f"✅ Topic permanently marked as used: {headline[:50]}...")
-    
     def cleanup_old_topics(self, days: int = 30):
         """Remove topics older than specified days"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cutoff = datetime.now() - timedelta(days=days)
-                cursor.execute(
-                    "DELETE FROM used_topics WHERE used_at < ?", 
-                    (cutoff.isoformat(),)
-                )
+                cutoff_date = datetime.now() - timedelta(days=days)
+                cursor.execute("""
+                    DELETE FROM used_topics WHERE used_at < ?
+                """, (cutoff_date.isoformat(),))
                 deleted = cursor.rowcount
                 conn.commit()
                 self.logger.info(f"🧹 Cleaned up {deleted} old topics")
-                return deleted
         except Exception as e:
             self.logger.error(f"Error cleaning up topics: {e}")
-            return 0
+    
+    def get_stats(self) -> Dict:
+        """Get service statistics"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Total topics used
+                cursor.execute("SELECT COUNT(*) FROM used_topics")
+                total = cursor.fetchone()[0]
+                
+                # Topics in cooldown
+                cutoff = datetime.now() - timedelta(days=self.TOPIC_COOLDOWN_DAYS)
+                cursor.execute("SELECT COUNT(*) FROM used_topics WHERE used_at > ?", 
+                             (cutoff.isoformat(),))
+                in_cooldown = cursor.fetchone()[0]
+                
+                # By category
+                cursor.execute("""
+                    SELECT category, COUNT(*) FROM used_topics 
+                    WHERE used_at > ? GROUP BY category
+                """, (cutoff.isoformat(),))
+                by_category = dict(cursor.fetchall())
+                
+                return {
+                    "total_topics_used": total,
+                    "in_cooldown_period": in_cooldown,
+                    "cooldown_days": self.TOPIC_COOLDOWN_DAYS,
+                    "by_category": by_category,
+                    "pytrends_available": self.pytrends is not None,
+                    "source": "google_trends" if self.pytrends else "fallback"
+                }
+        except Exception as e:
+            self.logger.error(f"Error getting stats: {e}")
+            return {"error": str(e)}
 
 
-# Singleton
-_trend_service: Optional[TrendService] = None
-
-def get_trend_service(db_path: str = "data/automation/queue.db") -> TrendService:
-    global _trend_service
-    if _trend_service is None:
-        _trend_service = TrendService(db_path)
-    return _trend_service
+# Convenience function for quick trend fetch
+async def get_trending_topic() -> Optional[TrendingNews]:
+    """Quick function to get a single trending topic"""
+    service = TrendService()
+    return await service.get_one_fresh_trend()
