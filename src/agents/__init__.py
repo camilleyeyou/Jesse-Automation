@@ -3,7 +3,7 @@ AI Agents Package
 """
 
 from .base_agent import BaseAgent
-from .content_generator import ContentGeneratorAgent
+from .content_strategist import ContentGeneratorAgent
 from .image_generator import ImageGeneratorAgent
 from .feedback_aggregator import FeedbackAggregatorAgent
 from .revision_generator import RevisionGeneratorAgent

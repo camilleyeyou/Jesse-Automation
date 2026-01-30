@@ -11,7 +11,7 @@ import uuid
 from typing import Dict, Any, List, Optional
 
 from ..models.post import LinkedInPost, ValidationScore
-from ..agents.content_generator import ContentGeneratorAgent
+from ..agents.content_strategist import ContentGeneratorAgent
 from ..agents.feedback_aggregator import FeedbackAggregatorAgent
 from ..agents.revision_generator import RevisionGeneratorAgent
 from ..agents.validators import SarahChenValidator, MarcusWilliamsValidator, JordanParkValidator
