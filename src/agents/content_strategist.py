@@ -998,3 +998,8 @@ Return as JSON:
             "linkedin_optimized": True,
             "brand_toolkit_integrated": True
         }
+
+
+# Backward compatibility alias - allows old imports to still work
+# from .content_generator import ContentGeneratorAgent
+ContentGeneratorAgent = ContentStrategistAgent
