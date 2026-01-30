@@ -671,13 +671,8 @@ TONE CALIBRATION:
                 estimated_cost=self._calculate_cost(result.get("usage", {}))
             )
             
-            # Store strategy metadata
-            post.strategy_metadata = {
-                "pillar": strategy.pillar.value,
-                "format": strategy.format.value,
-                "hook_approach": strategy.hook_approach,
-                "engagement_goal": strategy.engagement_goal
-            }
+            # Strategy metadata stored in cultural_reference.context for compatibility
+            # (LinkedInPost is a Pydantic model, can't add arbitrary fields)
             
             self.logger.info(f"✨ Generated post {post_number}: {len(content)} chars, pillar={strategy.pillar.value}")
             
