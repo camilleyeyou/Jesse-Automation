@@ -409,44 +409,30 @@ RULES (NON-NEGOTIABLE)
                 response_format="json"
             )
             
-            # Debug: log what we got back
-            self.logger.info(f"Raw result keys: {list(result.keys()) if isinstance(result, dict) else type(result)}")
-            
-            # Handle different response structures
+            # Extract content from the nested response structure
+            # API returns: {'content': {'post': {'content': "..."}}, 'usage': {...}}
             content_data = result.get("content", {})
             
-            # If content is a string, try to parse it as JSON
+            # If content_data is a string, try to parse as JSON
             if isinstance(content_data, str):
                 try:
                     content_data = json.loads(content_data)
                 except json.JSONDecodeError:
-                    # If it's not valid JSON, treat the string as the content
                     content_data = {"content": content_data}
             
-            # If content_data is still not a dict, wrap it
-            if not isinstance(content_data, dict):
-                content_data = {"content": str(content_data) if content_data else ""}
+            # Handle nested 'post' structure from API
+            if isinstance(content_data, dict) and "post" in content_data:
+                content_data = content_data["post"]
             
-            # Extract the actual post content
-            content = content_data.get("content", "")
-            
-            # If content is empty, check if the whole result IS the content
-            if not content and isinstance(result, dict):
-                # Maybe the structure is flat - content directly in result
-                if "content" in result and isinstance(result["content"], str):
-                    try:
-                        parsed = json.loads(result["content"])
-                        if isinstance(parsed, dict) and "content" in parsed:
-                            content = parsed["content"]
-                            content_data = parsed
-                    except:
-                        content = result["content"]
-            
-            # Final check - log what we extracted
-            self.logger.info(f"Extracted content length: {len(content) if content else 0}")
+            # Now extract the actual content
+            content = ""
+            if isinstance(content_data, dict):
+                content = content_data.get("content", "")
+            elif isinstance(content_data, str):
+                content = content_data
             
             if not content:
-                self.logger.error(f"No content extracted. Result structure: {result}")
+                self.logger.error(f"No content found in response: {result}")
                 raise ValueError("Failed to extract content from API response")
             
             content = self._clean_content(content)
