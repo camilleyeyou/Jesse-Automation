@@ -21,12 +21,16 @@ from dataclasses import dataclass
 
 from .base_agent import BaseAgent
 
-# Import models (handle gracefully if not available)
+# Import models from the correct location
 try:
     from ..models.linkedin_post import LinkedInPost, CulturalReference
 except ImportError:
-    LinkedInPost = None
-    CulturalReference = None
+    try:
+        from ..models.post import LinkedInPost, CulturalReference
+    except ImportError:
+        # If both fail, we'll raise a clear error at runtime
+        LinkedInPost = None
+        CulturalReference = None
 
 
 class ContentPillar(Enum):
@@ -372,6 +376,10 @@ RULES (NON-NEGOTIABLE)
         avoid_patterns: Optional[Dict[str, Any]] = None
     ) -> 'LinkedInPost':
         """Generate a genuinely creative LinkedIn post"""
+        
+        # Verify models are available
+        if LinkedInPost is None or CulturalReference is None:
+            raise ImportError("Could not import LinkedInPost or CulturalReference from models")
         
         self.set_context(batch_id, post_number)
         avoid_patterns = avoid_patterns or {}
