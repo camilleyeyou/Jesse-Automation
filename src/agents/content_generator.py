@@ -71,42 +71,45 @@ class ContentStrategistAgent(BaseAgent):
     that stand out from the sea of generic "thought leadership."
     """
     
-    def __init__(self, **kwargs):
+    def __init__(self, ai_client, config, **kwargs):
         super().__init__(
-            agent_type="ContentStrategist",
-            system_prompt=self._build_creative_system_prompt(),
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "linkedin_post",
-                    "strict": True,
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "content": {
-                                "type": "string",
-                                "description": "The full post content"
-                            },
-                            "hook_type": {
-                                "type": "string",
-                                "description": "What kind of hook was used"
-                            },
-                            "image_direction": {
-                                "type": "string",
-                                "description": "Suggested image concept"
-                            },
-                            "why_this_works": {
-                                "type": "string",
-                                "description": "Brief note on the creative choice"
-                            }
-                        },
-                        "required": ["content", "hook_type", "image_direction", "why_this_works"],
-                        "additionalProperties": False
-                    }
-                }
-            },
-            **kwargs
+            ai_client=ai_client,
+            config=config,
+            name="ContentStrategist"
         )
+        
+        # Store the system prompt and response format
+        self.system_prompt = self._build_creative_system_prompt()
+        self.response_format = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "linkedin_post",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "content": {
+                            "type": "string",
+                            "description": "The full post content"
+                        },
+                        "hook_type": {
+                            "type": "string",
+                            "description": "What kind of hook was used"
+                        },
+                        "image_direction": {
+                            "type": "string",
+                            "description": "Suggested image concept"
+                        },
+                        "why_this_works": {
+                            "type": "string",
+                            "description": "Brief note on the creative choice"
+                        }
+                    },
+                    "required": ["content", "hook_type", "image_direction", "why_this_works"],
+                    "additionalProperties": False
+                }
+            }
+        }
         
         # Initialize creative toolbox
         self._init_creative_hooks()
@@ -118,6 +121,11 @@ class ContentStrategistAgent(BaseAgent):
 
     def _build_creative_system_prompt(self) -> str:
         """Build a system prompt that actually encourages creativity"""
+        
+        # Use class attributes for brand values
+        brand_blue = self.BRAND_COLORS.get("primary_blue", "#407CD1")
+        brand_cream = self.BRAND_COLORS.get("cream", "#FCF9EC")
+        brand_coral = self.BRAND_COLORS.get("coral", "#F96A63")
         
         return f"""You are the content strategist for Jesse A. Eisenbalm, a premium lip balm brand 
 that exists at the intersection of absurdism, sincerity, and self-aware capitalism.
@@ -202,7 +210,7 @@ WHAT MAKES CONTENT GO VIRAL ON LINKEDIN
 BRAND TOOLKIT
 ═══════════════════════════════════════════════════════════════════════════════
 
-Brand Colors: {self.BRAND_BLUE} (blue), {self.BRAND_CREAM} (cream), {self.BRAND_CORAL} (coral)
+Brand Colors: {brand_blue} (blue), {brand_cream} (cream), {brand_coral} (coral)
 Typography: Repro Mono Medium (headlines), Poppins (body)
 Signature Motif: Hexagon (from beeswax)
 Price: $8.99 (use sparingly, not every post)
@@ -386,7 +394,11 @@ RULES (NON-NEGOTIABLE)
         
         try:
             # Step 3: Generate
-            result = await self.generate(prompt)
+            result = await self.generate(
+                prompt=prompt,
+                system_prompt=self.system_prompt,
+                response_format="json"
+            )
             content_data = result.get("content", {})
             
             if isinstance(content_data, str):
