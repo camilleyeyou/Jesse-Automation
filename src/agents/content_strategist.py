@@ -12,6 +12,7 @@ Key differences from v1:
 - Dynamic voice that changes per post
 """
 
+import json
 import logging
 import random
 from datetime import datetime
@@ -407,12 +408,47 @@ RULES (NON-NEGOTIABLE)
                 system_prompt=self.system_prompt,
                 response_format="json"
             )
+            
+            # Debug: log what we got back
+            self.logger.info(f"Raw result keys: {list(result.keys()) if isinstance(result, dict) else type(result)}")
+            
+            # Handle different response structures
             content_data = result.get("content", {})
             
+            # If content is a string, try to parse it as JSON
             if isinstance(content_data, str):
-                content_data = {"content": content_data}
+                try:
+                    content_data = json.loads(content_data)
+                except json.JSONDecodeError:
+                    # If it's not valid JSON, treat the string as the content
+                    content_data = {"content": content_data}
             
+            # If content_data is still not a dict, wrap it
+            if not isinstance(content_data, dict):
+                content_data = {"content": str(content_data) if content_data else ""}
+            
+            # Extract the actual post content
             content = content_data.get("content", "")
+            
+            # If content is empty, check if the whole result IS the content
+            if not content and isinstance(result, dict):
+                # Maybe the structure is flat - content directly in result
+                if "content" in result and isinstance(result["content"], str):
+                    try:
+                        parsed = json.loads(result["content"])
+                        if isinstance(parsed, dict) and "content" in parsed:
+                            content = parsed["content"]
+                            content_data = parsed
+                    except:
+                        content = result["content"]
+            
+            # Final check - log what we extracted
+            self.logger.info(f"Extracted content length: {len(content) if content else 0}")
+            
+            if not content:
+                self.logger.error(f"No content extracted. Result structure: {result}")
+                raise ValueError("Failed to extract content from API response")
+            
             content = self._clean_content(content)
             
             # Step 4: Create post object
