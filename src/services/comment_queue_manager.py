@@ -126,8 +126,8 @@ class CommentQueueManager:
             "source_post_author_headline": comment.source_post.author_headline,
             "source_post_topic": comment.source_post.topic,
             "source_post_tone": comment.source_post.tone.value if comment.source_post.tone else None,
-            "source_post_analysis": json.dumps(comment.source_post.model_dump()),
-            "comment_options": json.dumps([opt.model_dump() for opt in comment.comment_options]),
+            "source_post_analysis": json.dumps(comment.source_post.model_dump(mode='json')),
+            "comment_options": json.dumps([opt.model_dump(mode='json') for opt in comment.comment_options]),
             "selected_option_id": comment.selected_option_id,
             "final_comment": comment.final_comment,
             "status": comment.status.value,
@@ -144,7 +144,7 @@ class CommentQueueManager:
             "engagement_likes": comment.engagement.likes,
             "engagement_replies": comment.engagement.replies,
             "engagement_last_checked": comment.engagement.last_checked_at.isoformat() if comment.engagement.last_checked_at else None,
-            "engagement_data": json.dumps(comment.engagement.model_dump())
+            "engagement_data": json.dumps(comment.engagement.model_dump(mode='json'))
         }
     
     def _row_to_comment(self, row: sqlite3.Row) -> LinkedInComment:
