@@ -14,6 +14,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
+from urllib.parse import quote
 
 import httpx
 
@@ -150,8 +151,10 @@ class LinkedInCommentService:
         
         try:
             async with httpx.AsyncClient() as client:
+                # URL-encode the URN for use in the path
+                encoded_urn = quote(post_urn, safe='')
                 response = await client.post(
-                    f"{self.config.api_base_url}/socialActions/{post_urn}/comments",
+                    f"{self.config.api_base_url}/socialActions/{encoded_urn}/comments",
                     headers=self.headers,
                     json=payload,
                     timeout=30.0
@@ -203,11 +206,13 @@ class LinkedInCommentService:
     
     async def get_comment_engagement(self, comment_urn: str) -> Dict[str, Any]:
         """Fetch engagement metrics for a comment"""
-        
+
         try:
             async with httpx.AsyncClient() as client:
+                # URL-encode the URN for use in the path
+                encoded_urn = quote(comment_urn, safe='')
                 response = await client.get(
-                    f"{self.config.api_base_url}/socialActions/{comment_urn}",
+                    f"{self.config.api_base_url}/socialActions/{encoded_urn}",
                     headers=self.headers,
                     timeout=30.0
                 )
