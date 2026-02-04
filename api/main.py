@@ -735,8 +735,10 @@ async def approve_comment(
     if comment.status != CommentStatus.PENDING:
         raise HTTPException(400, f"Comment is {comment.status.value}, not pending")
     
-    # Make sure an option is selected
-    if not comment.final_comment and not request.edited_text:
+    # Select an option if provided, or auto-select best one
+    if request.option_id:
+        comment.select_option(request.option_id)
+    elif not comment.final_comment and not request.edited_text:
         if not comment.selected_option_id and comment.comment_options:
             # Auto-select best option
             best = max(comment.comment_options, key=lambda x: x.overall_score)

@@ -296,8 +296,8 @@ class CommentGenerationRequest(BaseModel):
 
 class CommentApprovalRequest(BaseModel):
     """Request to approve a comment"""
-    
-    option_id: str = Field(..., description="ID of selected option")
+
+    option_id: Optional[str] = Field(None, description="ID of selected option (auto-selects best if not provided)")
     edited_text: Optional[str] = Field(None, description="Edited comment text (optional)")
     approved_by: str = Field("admin", description="Who is approving")
     post_immediately: bool = Field(False, description="Whether to post immediately after approval")
