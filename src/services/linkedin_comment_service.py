@@ -160,13 +160,17 @@ class LinkedInCommentService:
                     timeout=30.0
                 )
                 
+                # Log full response for debugging
+                logger.info(f"LinkedIn API response: status={response.status_code}, headers={dict(response.headers)}")
+                logger.info(f"LinkedIn API response body: {response.text[:500] if response.text else 'empty'}")
+
                 if response.status_code in [200, 201]:
                     self._comments_posted_today += 1
-                    
+
                     response_data = response.json() if response.text else {}
                     comment_urn = response_data.get("id") or response.headers.get("x-restli-id")
-                    
-                    logger.info(f"Successfully posted comment on {post_urn}")
+
+                    logger.info(f"Successfully posted comment on {post_urn}, comment_urn={comment_urn}")
                     
                     return {
                         "success": True,
