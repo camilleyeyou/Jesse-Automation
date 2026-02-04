@@ -143,8 +143,13 @@ async def lifespan(app: FastAPI):
     
     # Initialize LinkedIn Comment Service
     linkedin_org_urn = os.getenv("LINKEDIN_ORG_URN")
+    linkedin_company_id = os.getenv("LINKEDIN_COMPANY_ID")
     linkedin_access_token = os.getenv("LINKEDIN_ACCESS_TOKEN")
-    
+
+    # Build org URN from company ID if not provided directly
+    if not linkedin_org_urn and linkedin_company_id:
+        linkedin_org_urn = f"urn:li:organization:{linkedin_company_id}"
+
     if os.getenv("MOCK_LINKEDIN_COMMENTS", "false").lower() == "true":
         linkedin_comment_service = MockLinkedInCommentService()
         logger.info("Using MOCK LinkedIn Comment Service")
@@ -157,7 +162,7 @@ async def lifespan(app: FastAPI):
         )
         logger.info("✅ LinkedIn Comment Service initialized")
     else:
-        logger.warning("LinkedIn Comment Service not configured (missing LINKEDIN_ORG_URN or LINKEDIN_ACCESS_TOKEN)")
+        logger.warning("LinkedIn Comment Service not configured (missing LINKEDIN_ORG_URN/LINKEDIN_COMPANY_ID or LINKEDIN_ACCESS_TOKEN)")
     
     # ═══════════════════════════════════════════════════════════════════════════
     
