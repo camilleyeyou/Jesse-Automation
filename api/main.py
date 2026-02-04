@@ -31,6 +31,20 @@ from src.services.scheduler import get_scheduler
 from src.services.linkedin_poster import LinkedInPoster, MockLinkedInPoster
 # NEW: Import ImageGeneratorAgent
 from src.agents.image_generator import ImageGeneratorAgent
+# NEW: Import Comment System
+from src.agents.comment_generator import CommentGeneratorAgent
+from src.services.comment_queue_manager import get_comment_queue_manager
+from src.services.linkedin_comment_service import (
+    LinkedInCommentService, 
+    LinkedInCommentConfig,
+    MockLinkedInCommentService
+)
+from src.models.comment import (
+    CommentGenerationRequest,
+    CommentApprovalRequest,
+    CommentStatus,
+    CommentStyle
+)
 
 # Configure logging
 logging.basicConfig(
@@ -47,6 +61,10 @@ queue_manager = None
 scheduler = None
 linkedin_poster = None
 image_generator = None  # NEW: Add image generator global
+# Comment System globals
+comment_generator: CommentGeneratorAgent = None
+comment_queue_manager = None
+linkedin_comment_service = None
 
 
 # ============== Pydantic Models ==============
@@ -75,6 +93,7 @@ class GenerateRequest(BaseModel):
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     global config, ai_client, orchestrator, queue_manager, scheduler, linkedin_poster, image_generator
+    global comment_generator, comment_queue_manager, linkedin_comment_service
     
     logger.info("Starting Jesse A. Eisenbalm Automation API...")
     
@@ -109,6 +128,38 @@ async def lifespan(app: FastAPI):
         logger.info("Using MOCK LinkedIn poster")
     else:
         linkedin_poster = LinkedInPoster(config)
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # COMMENT SYSTEM INITIALIZATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    
+    # Initialize Comment Generator Agent
+    comment_generator = CommentGeneratorAgent(ai_client, config)
+    logger.info("✅ CommentGeneratorAgent initialized")
+    
+    # Initialize Comment Queue Manager
+    comment_queue_manager = get_comment_queue_manager()
+    logger.info("✅ Comment Queue Manager initialized")
+    
+    # Initialize LinkedIn Comment Service
+    linkedin_org_urn = os.getenv("LINKEDIN_ORG_URN")
+    linkedin_access_token = os.getenv("LINKEDIN_ACCESS_TOKEN")
+    
+    if os.getenv("MOCK_LINKEDIN_COMMENTS", "false").lower() == "true":
+        linkedin_comment_service = MockLinkedInCommentService()
+        logger.info("Using MOCK LinkedIn Comment Service")
+    elif linkedin_org_urn and linkedin_access_token:
+        linkedin_comment_service = LinkedInCommentService(
+            LinkedInCommentConfig(
+                access_token=linkedin_access_token,
+                organization_urn=linkedin_org_urn
+            )
+        )
+        logger.info("✅ LinkedIn Comment Service initialized")
+    else:
+        logger.warning("LinkedIn Comment Service not configured (missing LINKEDIN_ORG_URN or LINKEDIN_ACCESS_TOKEN)")
+    
+    # ═══════════════════════════════════════════════════════════════════════════
     
     # Auto-start scheduler if configured
     if os.getenv("AUTO_START_SCHEDULER", "false").lower() == "true":
@@ -523,7 +574,323 @@ async def test_linkedin():
     return result
 
 
-# ============== Run ==============
+# ═══════════════════════════════════════════════════════════════════════════════
+# COMMENT ENGAGEMENT ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/comments/generate")
+async def generate_comments(request: CommentGenerationRequest):
+    """
+    Generate comment options for a LinkedIn post
+    
+    Submit a post URL and content, get back 3 comment options to choose from.
+    """
+    if not comment_generator:
+        raise HTTPException(503, "Comment generator not initialized")
+    
+    try:
+        # Parse preferred styles if provided
+        preferred_styles = None
+        if request.preferred_styles:
+            preferred_styles = [
+                CommentStyle(s) for s in request.preferred_styles
+                if s in [e.value for e in CommentStyle]
+            ]
+        
+        # Generate comments
+        comment = await comment_generator.execute(
+            post_url=request.post_url,
+            post_content=request.post_content,
+            author_name=request.author_name,
+            author_headline=request.author_headline,
+            num_options=request.num_options,
+            preferred_styles=preferred_styles
+        )
+        
+        # Save to queue
+        comment_queue_manager.save(comment)
+        
+        return {
+            "success": True,
+            "message": f"Generated {len(comment.comment_options)} comment options",
+            "comment": comment.to_dict()
+        }
+        
+    except Exception as e:
+        logger.error(f"Comment generation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(500, f"Generation failed: {str(e)}")
+
+
+@app.get("/api/comments/queue")
+async def get_comments_queue(status: Optional[str] = None, limit: int = 50):
+    """
+    Get comments in the queue
+    
+    Optionally filter by status: pending, approved, posted, rejected, failed
+    """
+    if not comment_queue_manager:
+        raise HTTPException(503, "Comment queue manager not initialized")
+    
+    if status:
+        try:
+            status_enum = CommentStatus(status)
+            comments = comment_queue_manager.get_by_status(status_enum, limit)
+        except ValueError:
+            raise HTTPException(400, f"Invalid status: {status}")
+    else:
+        comments = comment_queue_manager.get_queue(limit)
+    
+    summary = comment_queue_manager.get_summary()
+    
+    return {
+        "success": True,
+        "comments": [c.to_dict() for c in comments],
+        "summary": {
+            "total": summary.total,
+            "pending": summary.pending,
+            "approved": summary.approved,
+            "posted": summary.posted,
+            "rejected": summary.rejected,
+            "total_likes": summary.total_likes,
+            "total_replies": summary.total_replies
+        }
+    }
+
+
+@app.get("/api/comments/history")
+async def get_comments_history(limit: int = 50, include_rejected: bool = False):
+    """Get comment history (posted and optionally rejected)"""
+    if not comment_queue_manager:
+        raise HTTPException(503, "Comment queue manager not initialized")
+    
+    comments = comment_queue_manager.get_history(limit, include_rejected)
+    
+    return {
+        "success": True,
+        "comments": [c.to_dict() for c in comments],
+        "total": len(comments)
+    }
+
+
+@app.get("/api/comments/{comment_id}")
+async def get_comment(comment_id: str):
+    """Get a single comment by ID"""
+    if not comment_queue_manager:
+        raise HTTPException(503, "Comment queue manager not initialized")
+    
+    comment = comment_queue_manager.get(comment_id)
+    
+    if not comment:
+        raise HTTPException(404, "Comment not found")
+    
+    return {
+        "success": True,
+        "comment": comment.to_dict()
+    }
+
+
+@app.patch("/api/comments/{comment_id}/select")
+async def select_comment_option(comment_id: str, option_id: str, edited_text: Optional[str] = None):
+    """Select a comment option (before approval)"""
+    if not comment_queue_manager:
+        raise HTTPException(503, "Comment queue manager not initialized")
+    
+    comment = comment_queue_manager.get(comment_id)
+    
+    if not comment:
+        raise HTTPException(404, "Comment not found")
+    
+    # Verify option exists
+    option_ids = [opt.id for opt in comment.comment_options]
+    if option_id not in option_ids:
+        raise HTTPException(400, "Invalid option ID")
+    
+    comment.select_option(option_id, edited_text)
+    comment_queue_manager.save(comment)
+    
+    return {
+        "success": True,
+        "message": "Option selected",
+        "comment": comment.to_dict()
+    }
+
+
+@app.patch("/api/comments/{comment_id}/approve")
+async def approve_comment(
+    comment_id: str,
+    request: CommentApprovalRequest,
+    background_tasks: BackgroundTasks
+):
+    """Approve a comment for posting"""
+    if not comment_queue_manager:
+        raise HTTPException(503, "Comment queue manager not initialized")
+    
+    comment = comment_queue_manager.get(comment_id)
+    
+    if not comment:
+        raise HTTPException(404, "Comment not found")
+    
+    if comment.status != CommentStatus.PENDING:
+        raise HTTPException(400, f"Comment is {comment.status.value}, not pending")
+    
+    # Make sure an option is selected
+    if not comment.final_comment and not request.edited_text:
+        if not comment.selected_option_id and comment.comment_options:
+            # Auto-select best option
+            best = max(comment.comment_options, key=lambda x: x.overall_score)
+            comment.select_option(best.id)
+    
+    comment.approve(request.approved_by, request.edited_text)
+    comment_queue_manager.save(comment)
+    
+    # Optionally post immediately
+    if request.post_immediately and linkedin_comment_service:
+        background_tasks.add_task(post_comment_background, comment_id)
+    
+    return {
+        "success": True,
+        "message": "Comment approved" + (" and queued for posting" if request.post_immediately else ""),
+        "comment": comment.to_dict()
+    }
+
+
+@app.patch("/api/comments/{comment_id}/reject")
+async def reject_comment(comment_id: str, reason: Optional[str] = None):
+    """Reject a comment"""
+    if not comment_queue_manager:
+        raise HTTPException(503, "Comment queue manager not initialized")
+    
+    comment = comment_queue_manager.reject(comment_id, reason)
+    
+    if not comment:
+        raise HTTPException(404, "Comment not found")
+    
+    return {
+        "success": True,
+        "message": "Comment rejected",
+        "comment": comment.to_dict()
+    }
+
+
+@app.post("/api/comments/{comment_id}/post")
+async def post_comment(comment_id: str):
+    """Post an approved comment to LinkedIn"""
+    if not comment_queue_manager:
+        raise HTTPException(503, "Comment queue manager not initialized")
+    if not linkedin_comment_service:
+        raise HTTPException(503, "LinkedIn comment service not configured")
+    
+    comment = comment_queue_manager.get(comment_id)
+    
+    if not comment:
+        raise HTTPException(404, "Comment not found")
+    
+    if comment.status != CommentStatus.APPROVED:
+        raise HTTPException(400, f"Comment must be approved first (current: {comment.status.value})")
+    
+    if not comment.final_comment:
+        raise HTTPException(400, "No comment text to post")
+    
+    # Post to LinkedIn
+    result = await linkedin_comment_service.post_comment(
+        post_url=comment.source_post.url,
+        comment_text=comment.final_comment,
+        post_urn=comment.source_post.urn
+    )
+    
+    if result["success"]:
+        comment_queue_manager.mark_posted(
+            comment_id,
+            result.get("comment_urn", ""),
+            result
+        )
+        
+        return {
+            "success": True,
+            "message": "Comment posted successfully",
+            "linkedin_response": result
+        }
+    else:
+        comment_queue_manager.mark_failed(comment_id, result.get("error", "Unknown error"))
+        
+        raise HTTPException(500, f"Failed to post: {result.get('error', 'Unknown error')}")
+
+
+@app.delete("/api/comments/{comment_id}")
+async def delete_comment(comment_id: str):
+    """Delete a comment from the queue"""
+    if not comment_queue_manager:
+        raise HTTPException(503, "Comment queue manager not initialized")
+    
+    deleted = comment_queue_manager.delete(comment_id)
+    
+    if not deleted:
+        raise HTTPException(404, "Comment not found")
+    
+    return {"success": True, "message": "Comment deleted"}
+
+
+@app.get("/api/comments/analytics/summary")
+async def get_comments_analytics():
+    """Get comment engagement analytics"""
+    if not comment_queue_manager:
+        raise HTTPException(503, "Comment queue manager not initialized")
+    
+    summary = comment_queue_manager.get_summary()
+    
+    # Get LinkedIn rate limit status if available
+    rate_limit = None
+    if linkedin_comment_service:
+        rate_limit = linkedin_comment_service.get_rate_limit_status()
+    
+    return {
+        "success": True,
+        "summary": {
+            "total": summary.total,
+            "pending": summary.pending,
+            "approved": summary.approved,
+            "posted": summary.posted,
+            "rejected": summary.rejected,
+            "failed": summary.failed,
+            "total_likes": summary.total_likes,
+            "total_replies": summary.total_replies,
+            "avg_engagement": summary.avg_engagement_rate
+        },
+        "rate_limit": rate_limit
+    }
+
+
+# Background task for posting comments
+async def post_comment_background(comment_id: str):
+    """Background task to post a comment"""
+    if not linkedin_comment_service or not comment_queue_manager:
+        logger.error("Services not available for background comment posting")
+        return
+    
+    comment = comment_queue_manager.get(comment_id)
+    if not comment or not comment.final_comment:
+        logger.error(f"Comment {comment_id} not found or has no text")
+        return
+    
+    result = await linkedin_comment_service.post_comment(
+        post_url=comment.source_post.url,
+        comment_text=comment.final_comment,
+        post_urn=comment.source_post.urn
+    )
+    
+    if result["success"]:
+        comment_queue_manager.mark_posted(comment_id, result.get("comment_urn", ""), result)
+        logger.info(f"Successfully posted comment {comment_id}")
+    else:
+        comment_queue_manager.mark_failed(comment_id, result.get("error", "Unknown error"))
+        logger.error(f"Failed to post comment {comment_id}: {result.get('error')}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Run
+# ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     import uvicorn
