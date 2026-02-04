@@ -88,7 +88,12 @@ class LinkedInCommentService:
         posts_match = re.search(r'activity-(\d+)', post_url)
         if posts_match:
             return f"urn:li:activity:{posts_match.group(1)}"
-        
+
+        # Try share ID from posts URL (e.g., share-7424606489861869568-xxxx)
+        share_posts_match = re.search(r'share-(\d+)', post_url)
+        if share_posts_match:
+            return f"urn:li:share:{share_posts_match.group(1)}"
+
         # Try ugcPost format
         ugc_match = re.search(r'urn:li:ugcPost:(\d+)', post_url)
         if ugc_match:
