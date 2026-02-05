@@ -655,28 +655,75 @@ RULES (NON-NEGOTIABLE)
         return random.choice(style_options)
 
     def _match_trend_to_pillar(self, trending_context: str) -> ContentPillar:
-        """Match a trending topic to the best content pillar"""
-        
+        """Match a trending topic to the best content pillar using keywords and category scoring"""
+
         trend_lower = trending_context.lower()
-        
-        # AI/tech topics
-        if any(kw in trend_lower for kw in ['ai', 'chatgpt', 'automation', 'robot', 'algorithm', 'tech']):
-            return ContentPillar.AI_HUMAN_TENSION
-        
-        # Work/career topics
-        if any(kw in trend_lower for kw in ['layoff', 'meeting', 'remote', 'office', 'boss', 'job', 'career']):
-            return ContentPillar.WORKPLACE_ABSURDISM
-        
-        # Wellness/self-care
-        if any(kw in trend_lower for kw in ['wellness', 'self-care', 'burnout', 'mental health', 'routine']):
-            return ContentPillar.SELF_CARE_SATIRE
-        
-        # Cultural moments
-        if any(kw in trend_lower for kw in ['viral', 'trend', 'discourse', 'everyone', 'discourse']):
-            return ContentPillar.CULTURAL_OBSERVATION
-        
-        # Default
-        return random.choice([ContentPillar.CULTURAL_OBSERVATION, ContentPillar.WORKPLACE_ABSURDISM])
+
+        # Category-based matching (most reliable when Brave provides category)
+        category_map = {
+            "ai_news": ContentPillar.AI_HUMAN_TENSION,
+            "tech_layoffs": ContentPillar.WORKPLACE_ABSURDISM,
+            "workplace_viral": ContentPillar.WORKPLACE_ABSURDISM,
+            "tech_culture": ContentPillar.CULTURAL_OBSERVATION,
+            "remote_work": ContentPillar.WORKPLACE_ABSURDISM,
+            "wellness": ContentPillar.SELF_CARE_SATIRE,
+            "startup_news": ContentPillar.WORKPLACE_ABSURDISM,
+            "pop_culture": ContentPillar.CULTURAL_OBSERVATION,
+        }
+
+        for cat_key, pillar in category_map.items():
+            if cat_key in trend_lower:
+                return pillar
+
+        # Score each pillar by keyword matches
+        pillar_keywords = {
+            ContentPillar.AI_HUMAN_TENSION: [
+                'ai', 'chatgpt', 'openai', 'automation', 'robot', 'algorithm', 'tech',
+                'machine learning', 'artificial intelligence', 'gpt', 'copilot', 'gemini',
+                'deepfake', 'generative', 'llm', 'claude', 'neural', 'automat',
+                'replace', 'disrupt', 'microsoft', 'google ai', 'meta ai', 'anthropic',
+            ],
+            ContentPillar.WORKPLACE_ABSURDISM: [
+                'layoff', 'meeting', 'remote', 'office', 'boss', 'job', 'career',
+                'hiring', 'fired', 'resign', 'quiet quit', 'hustle', 'grind',
+                'corporate', 'ceo', 'work from home', 'wfh', 'rto', 'return to office',
+                'productivity', 'performance review', 'slack', 'zoom', 'teams',
+                'linkedin', 'promotion', 'salary', 'bonus', 'culture fit',
+                'startup', 'founder', 'vc', 'funding', 'runway', 'pivot',
+            ],
+            ContentPillar.SELF_CARE_SATIRE: [
+                'wellness', 'self-care', 'burnout', 'mental health', 'routine',
+                'meditation', 'mindful', 'balance', 'therapy', 'anxiety',
+                'stress', 'rest', 'sleep', 'health', 'gym', 'fitness',
+                'detox', 'cleanse', 'breathe', 'ritual', 'habit',
+            ],
+            ContentPillar.CULTURAL_OBSERVATION: [
+                'viral', 'trend', 'discourse', 'meme', 'social media',
+                'tiktok', 'instagram', 'twitter', 'threads',
+                'super bowl', 'oscars', 'grammy', 'emmy', 'netflix', 'spotify',
+                'taylor swift', 'beyonce', 'drake', 'celebrity', 'movie', 'show',
+                'album', 'concert', 'tour', 'festival', 'coachella',
+                'fashion', 'award', 'premiere', 'release',
+                'nfl', 'nba', 'mlb', 'sports', 'game', 'playoff', 'championship',
+                'streaming', 'debate', 'election', 'controversy', 'backlash',
+            ],
+            ContentPillar.PRODUCT_STORYTELLING: [
+                'lip', 'balm', 'skincare', 'beauty', 'cosmetic', 'moistur',
+                'beeswax', 'organic', 'natural', 'handmade', 'artisan',
+            ],
+        }
+
+        scores = {}
+        for pillar, keywords in pillar_keywords.items():
+            score = sum(1 for kw in keywords if kw in trend_lower)
+            if score > 0:
+                scores[pillar] = score
+
+        if scores:
+            return max(scores, key=scores.get)
+
+        # Default to CULTURAL_OBSERVATION for unknown topics (most flexible)
+        return ContentPillar.CULTURAL_OBSERVATION
 
     def _weighted_pillar_selection(self, avoid_patterns: Dict[str, Any]) -> ContentPillar:
         """Select pillar with weights, avoiding recent ones"""
@@ -743,8 +790,12 @@ TRENDING TOPIC TO REACT TO
 
 {trending_context}
 
-Find the Jesse angle. What does this mean for humans trying to stay human?
-What's the observation nobody else is making? Where does lip balm fit (creatively, unexpectedly)?
+HOW TO USE THIS TREND:
+- Reference the SPECIFIC headline or news event — don't make it generic
+- Find the human absurdity in it: what does this say about us?
+- Connect it to Jesse's world: lip balm as tiny rebellion, small ritual, or existential metaphor
+- You can be a deadpan observer, a warm conspirator, or an amused existentialist about it
+- The trend should feel like the REASON for the post, not an afterthought
 """
         
         # Avoid section

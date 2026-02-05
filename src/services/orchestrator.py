@@ -146,24 +146,46 @@ class ContentOrchestrator:
     ) -> Optional[LinkedInPost]:
         """Process a single post with its assigned trend."""
         
-        # Format trend for content generator
+        # Format trend for content generator with rich context
         trend_context = None
         if trend:
+            parts = [
+                f"HEADLINE: {trend.headline}",
+                f"CATEGORY: {trend.category.upper()}",
+            ]
+
+            # Use description (rich) or summary (basic)
+            description = getattr(trend, 'description', '') or ''
+            if description:
+                parts.append(f"DETAILS: {description[:300]}")
+            elif trend.summary:
+                parts.append(f"SUMMARY: {trend.summary}")
+
+            if trend.url and trend.source != "fallback":
+                parts.append(f"SOURCE: {trend.url}")
+
+            # Include related articles for additional context
+            related = getattr(trend, 'related_articles', []) or []
+            if related:
+                parts.append("\nRELATED CONTEXT:")
+                for i, article in enumerate(related[:3], 1):
+                    if article.get("title"):
+                        parts.append(f"  {i}. {article['title']}")
+                        if article.get("snippet"):
+                            parts.append(f"     {article['snippet']}")
+
+            jesse_angle = getattr(trend, 'jesse_angle', '') or ''
+            if jesse_angle:
+                parts.append(f"\nSUGGESTED ANGLE: {jesse_angle}")
+
+            trend_body = "\n".join(parts)
+
             trend_context = f"""
-═══════════════════════════════════════════════════════════════════════════════
-📰 TODAY'S TRENDING NEWS ({trend.category.upper()}) - React to this:
-═══════════════════════════════════════════════════════════════════════════════
+TODAY'S TRENDING NEWS ({trend.category.upper()}) — React to this:
 
-HEADLINE: {trend.headline}
+{trend_body}
 
-{trend.summary if trend.summary else ""}
-
-Source: {trend.source}
-Category: {trend.category}
-
-═══════════════════════════════════════════════════════════════════════════════
-IMPORTANT: Use the SPECIFIC headline above. Don't create generic content.
-═══════════════════════════════════════════════════════════════════════════════
+IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, details, or cultural moment. Don't create generic content.
 """
         
         # Generate content
@@ -305,10 +327,7 @@ IMPORTANT: Use the SPECIFIC headline above. Don't create generic content.
                 
                 # Mark trend as used (permanently) after successful post
                 if self.trend_service and trend:
-                    self.trend_service.mark_topic_used_permanent(
-                        headline=trend.headline,
-                        category=trend.category
-                    )
+                    self.trend_service.mark_topic_used_permanent(trend, post_id=post_id)
                 
                 return {
                     "success": True,
