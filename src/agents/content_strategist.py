@@ -190,6 +190,20 @@ CREATIVE PRINCIPLES (READ THESE CAREFULLY)
    - Warmly conspiratorial ("we're all in on this together")
    - Existentially amused (nothing matters, and that's kind of nice)
    - Sincerely encouraging (but earned, not forced)
+   - Genuinely delighted (something cool happened and we should talk about it)
+   - Quietly impressed (noticing excellence without making it cringe)
+
+7. SENTIMENT VARIETY (CRITICAL)
+   NOT every post should be cynical, sarcastic, or critical. Mix it up:
+   - Celebrate things: "This is actually incredible"
+   - Marvel at things: "Wait, did you know that..."
+   - Be curious: "What if we looked at this differently?"
+   - Be warm: "Here's something small that matters"
+   - Be amused: "Humans are weird and wonderful"
+   - Be critical SOMETIMES: "Can we talk about this?" — but it's ONE flavor, not the default
+
+   The goal is to feel like a real person with a RANGE of emotions, not a brand
+   that only knows how to be snarky.
 
 ═══════════════════════════════════════════════════════════════════════════════
 WHAT MAKES CONTENT GO VIRAL ON LINKEDIN
@@ -331,12 +345,14 @@ RULES (NON-NEGOTIABLE)
         """Different voice modes for variety"""
         
         self.voice_modifiers = {
-            "nature_documentary": "Narrate this like David Attenborough observing human office behavior. Deadpan, anthropological, slightly amazed at what humans do.",
+            "nature_documentary": "Narrate this like David Attenborough observing human behavior. Deadpan, anthropological, slightly amazed at what humans do.",
             "warm_conspirator": "Write like you're leaning in to tell a friend something you both know is true but haven't said out loud. Inclusive, knowing.",
             "existential_calm": "The voice of someone who has realized nothing matters and finds that oddly peaceful. Not nihilistic — amused.",
             "sincere_encouragement": "Genuinely warm, but earned. Not toxic positivity. Real acknowledgment that things are hard AND you can do small things.",
             "absurdist_commitment": "Full commitment to a weird premise. Play it completely straight. The humor is in the deadpan.",
-            "corporate_satire": "Use actual corporate speak, but slightly wrong. The uncanny valley of business language.",
+            "genuinely_delighted": "Something caught your eye and you're genuinely excited about it. Share that excitement without being performative. Like texting a friend 'you HAVE to see this.'",
+            "quietly_impressed": "Notice something excellent. Appreciate it without overselling. The tone of someone who sees craft and quality and respects it.",
+            "curious_explorer": "Approach the topic with genuine curiosity. Ask questions the reader hasn't thought of. The tone of discovery, not judgment.",
         }
 
     def _init_absurdist_elements(self):
@@ -515,54 +531,54 @@ RULES (NON-NEGOTIABLE)
         directions = {
             ContentPillar.WORKPLACE_ABSURDISM: [
                 "Write about meetings as a nature documentary would describe a strange animal ritual",
-                "Explore the existential horror of 'quick sync' as a concept",
-                "The performance of 'I'm fine' in the modern workplace",
-                "Calendar Tetris as a metaphor for losing control of your life",
-                "The specific moment when you realize the meeting could have been an email",
-                "Slack status as performance art",
-                "The conference room named something aspirational while you discuss budget cuts",
+                "The specific moment when you realize the meeting could have been an email — but the meeting had good snacks",
+                "Slack status as performance art — and the beauty of the 'away' status",
+                "Celebrate the small wins: someone actually read the doc before the meeting",
+                "The quiet heroism of the person who always brings good coffee to the office",
+                "That moment when your team actually ships something and you all just sit there grinning",
+                "The unexpected friendship you made in the breakroom over terrible coffee",
             ],
             ContentPillar.AI_HUMAN_TENSION: [
-                "The specific texture of human experience that AI can't replicate",
-                "Use our own AI-powered existence as the punchline (we're in on the joke)",
-                "The small rebellions of being embodied in a digital world",
-                "ChatGPT can write your emails but can't feel your inbox anxiety",
-                "The algorithm knows what you'll click. It doesn't know what you need.",
-                "Automation making everything efficient except the part where you're a person",
+                "The specific texture of human experience that AI can't replicate — and why that's beautiful",
+                "Use our own AI-powered existence as the punchline (we're in on the joke, and it's a good one)",
+                "AI is incredible at X — but the part where you feel something? That's yours.",
+                "The delightful absurdity of humans building machines to be more human",
+                "What if AI's real gift isn't replacing us but reminding us what makes us irreplaceable?",
+                "The algorithm recommends what you'll like. Your friend recommends what you need. Both are valuable.",
             ],
             ContentPillar.SELF_CARE_SATIRE: [
-                "Mock the wellness industrial complex while genuinely advocating for small rituals",
-                "The gap between Instagram self-care and actual self-care (applying lip balm in a parking lot)",
-                "$400 spa day vs $8.99 lip balm: a meditation",
-                "Your morning routine doesn't need a podcast",
-                "Permission to not optimize your relaxation",
-                "Self-care as resistance to productivity culture",
+                "The gap between Instagram self-care and actual self-care (applying lip balm in a parking lot counts)",
+                "$400 spa day vs $8.99 lip balm: both are valid, one fits in your pocket",
+                "Permission to not optimize your relaxation — just relax",
+                "The radical simplicity of doing one small thing for yourself today",
+                "Celebrate the tiny ritual: you remembered to drink water AND apply lip balm. Legend.",
+                "Self-care isn't a product, but sometimes a product helps — and that's okay",
             ],
             ContentPillar.CULTURAL_OBSERVATION: [
-                "LinkedIn culture observed from slight remove (but affectionately)",
-                "The seasonal rhythms of professional desperation (Q1, Q4, etc.)",
-                "Collective experiences that everyone has but nobody talks about",
-                "The specific vibe of [current moment] on LinkedIn",
-                "What the trending discourse says about what we're all avoiding",
+                "LinkedIn culture observed from slight remove (but affectionately — we're all in this together)",
+                "The collective energy of everyone starting fresh this quarter — there's something beautiful about optimism",
+                "Collective experiences that everyone has but nobody talks about — the recognition is the connection",
+                "The specific vibe of [current moment] and why we're all feeling it",
+                "Something genuinely cool is happening in culture right now — let's talk about it",
             ],
             ContentPillar.PRODUCT_STORYTELLING: [
-                "The absurdity of hand-numbering lip balm tubes (and meaning it)",
+                "The quiet satisfaction of hand-numbering lip balm tubes (yes, we actually do it)",
                 "Beeswax: a hexagonal miracle that doesn't know it's a miracle",
-                "The $8.99 price point as philosophical statement",
-                "Lip balm as tiny rebellion against the tyranny of optimization",
-                "The ritual of application: 2 seconds of choosing yourself",
+                "The ritual of application: 2 seconds of choosing yourself — that's it, that's enough",
+                "Someone ordered tube #4,847. There's a story there, and it's probably a good one.",
+                "The best things are small, specific, and made with care. Like lip balm. Like a good morning.",
             ],
             ContentPillar.JESSE_SIGHTINGS: [
-                "Jesse spotted in an absurd location, deadpan as ever",
+                "Jesse spotted in an absurd location, deadpan as ever, living their best life",
                 "Caption a specific Jesse scenario from our visual library",
-                "The adventures of a man (?) who appears places with moisturized lips",
-                "Jesse at [unexpected location] doing [unexpected thing], lip balm in hand",
+                "The adventures of a person who shows up places with moisturized lips and quiet confidence",
+                "Jesse at [unexpected location] doing [unexpected thing] — but somehow it works",
             ],
             ContentPillar.RITUAL_PHILOSOPHY: [
                 "A sincere meditation on small moments (earned, not forced)",
-                "The philosophy of choosing yourself for 2 seconds",
-                "Why ritual matters when everything is content",
-                "The radical act of doing one thing slowly",
+                "The philosophy of choosing yourself for 2 seconds — and how that compounds",
+                "Why ritual matters when everything is content — because ritual is for YOU, not your audience",
+                "The radical act of doing one thing slowly in a world that rewards speed",
             ],
         }
         
@@ -577,34 +593,35 @@ RULES (NON-NEGOTIABLE)
         """Generate a specific, concrete angle"""
         
         if trending_context:
-            return f"React to '{trending_context}' through Jesse's lens — find the human angle, the absurdist observation, the small ritual that matters."
-        
-        # Generate specific scenarios
+            return f"React to '{trending_context}' through Jesse's lens — find a fresh angle. Could be warm, curious, impressed, funny, or thoughtful. Don't default to cynical."
+
+        # Generate specific scenarios — mix of positive, warm, funny, and observational
         scenarios = {
             ContentPillar.WORKPLACE_ABSURDISM: [
-                "The 3pm meeting about the 2pm meeting",
-                "Someone saying 'let's take this offline' about something that was already offline",
-                "The performance review where you describe your job using words that mean nothing",
-                "Opening Slack to find 47 messages that all say 'following up'",
-                "The conference room named 'Innovate' while you discuss layoffs",
+                "The quiet satisfaction of crossing the last item off your list at 4:58pm",
+                "Someone actually said 'great meeting' and meant it — celebrate that",
+                "The coworker who always remembers your coffee order — unsung hero",
+                "That moment when the team ships something and nobody knows what to do with their hands",
+                "The 3pm meeting that was supposed to be 15 minutes but turned into the best brainstorm you've had all quarter",
+                "Opening Slack to find 47 messages — but one of them is actually really kind",
             ],
             ContentPillar.AI_HUMAN_TENSION: [
-                "Your AI assistant scheduling your therapy appointments",
-                "ChatGPT writing your 'authentic' personal update",
-                "The algorithm serving you exactly what you want instead of what you need",
-                "Automating everything except the part where you're lonely",
+                "AI just did something genuinely impressive — and it's okay to be both amazed and thoughtful about it",
+                "The beautiful irony of using AI to write about being human (we're in on it)",
+                "What AI is teaching us about what we actually value — hint: it's the messy stuff",
+                "Your AI can write the email. You still have to mean it. That's the point.",
             ],
             ContentPillar.SELF_CARE_SATIRE: [
-                "Your $200 morning routine that somehow takes 3 hours",
-                "The wellness influencer selling you optimization disguised as rest",
-                "Meditation apps competing for your attention about having less attention",
-                "Self-care becoming another item on the productivity checklist",
+                "The radical act of doing nothing for 5 minutes — not even optimizing the nothing",
+                "Someone asked 'how are you?' and you said the real answer. Brave.",
+                "The difference between self-care and self-optimization: one has a checklist",
+                "You drank water today. Nobody clapped. You didn't need them to.",
             ],
             ContentPillar.CULTURAL_OBSERVATION: [
-                "January LinkedIn: resolution season",
-                "Everyone posting their year in review (same 5 lessons, different photos)",
-                "The collective pretense that we have work-life balance",
-                "Return to office debates: year 4",
+                "Something beautiful is trending and nobody's being sarcastic about it yet",
+                "The collective energy of everyone trying their best this week — messy, hopeful, human",
+                "That moment when the internet agrees on something genuinely good",
+                "Everyone's talking about this — and for once, the discourse is interesting",
             ],
             ContentPillar.PRODUCT_STORYTELLING: [
                 "Tube #4,847 and the person who ordered it",
@@ -661,14 +678,16 @@ RULES (NON-NEGOTIABLE)
 
         # Category-based matching (most reliable when Brave provides category)
         category_map = {
+            "ai_innovation": ContentPillar.AI_HUMAN_TENSION,
             "ai_news": ContentPillar.AI_HUMAN_TENSION,
-            "tech_layoffs": ContentPillar.WORKPLACE_ABSURDISM,
-            "workplace_viral": ContentPillar.WORKPLACE_ABSURDISM,
-            "tech_culture": ContentPillar.CULTURAL_OBSERVATION,
-            "remote_work": ContentPillar.WORKPLACE_ABSURDISM,
-            "wellness": ContentPillar.SELF_CARE_SATIRE,
-            "startup_news": ContentPillar.WORKPLACE_ABSURDISM,
+            "workplace_culture": ContentPillar.WORKPLACE_ABSURDISM,
+            "tech_news": ContentPillar.CULTURAL_OBSERVATION,
             "pop_culture": ContentPillar.CULTURAL_OBSERVATION,
+            "startup_success": ContentPillar.WORKPLACE_ABSURDISM,
+            "creative_tech": ContentPillar.CULTURAL_OBSERVATION,
+            "wellness_trend": ContentPillar.SELF_CARE_SATIRE,
+            "business_milestone": ContentPillar.PRODUCT_STORYTELLING,
+            "viral_moment": ContentPillar.CULTURAL_OBSERVATION,
         }
 
         for cat_key, pillar in category_map.items():
@@ -792,10 +811,11 @@ TRENDING TOPIC TO REACT TO
 
 HOW TO USE THIS TREND:
 - Reference the SPECIFIC headline or news event — don't make it generic
-- Find the human absurdity in it: what does this say about us?
-- Connect it to Jesse's world: lip balm as tiny rebellion, small ritual, or existential metaphor
-- You can be a deadpan observer, a warm conspirator, or an amused existentialist about it
+- Find YOUR angle: celebrate it, marvel at it, question it, or find the funny in it
+- VARY YOUR SENTIMENT — don't default to cynical. Be warm, curious, impressed, amused, or genuinely excited
+- Connect it to Jesse's world naturally: small rituals, being human, choosing yourself
 - The trend should feel like the REASON for the post, not an afterthought
+- Fresh take = say something nobody else is saying about this. Not the obvious reaction.
 """
         
         # Avoid section
@@ -856,14 +876,18 @@ MUST:
 - Use at least one specific, concrete detail
 - End with the style specified above (NOT the usual)
 - Feel like a smart friend's observation, not a brand
+- Have a FRESH TAKE — say something nobody else is saying about this topic
+- Match the voice/sentiment specified above — DON'T default to cynical or sarcastic
 
 MUST NOT:
-- Be generic or predictable
+- Be generic or predictable — if it could be about anything, rewrite it
+- Always be negative, cynical, or sarcastic — vary sentiment
 - Target individuals negatively
 - Use hashtags
 - Ask for engagement
 - Sound like every other LinkedIn post
 - End with "Stop. Breathe. Balm." (unless specified above)
+- Give the obvious take — find the angle nobody else is hitting
 
 ═══════════════════════════════════════════════════════════════════════════════
 

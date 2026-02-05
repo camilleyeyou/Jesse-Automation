@@ -65,16 +65,18 @@ class TrendService:
     # Days to prevent topic reuse
     TOPIC_COOLDOWN_DAYS = 7
 
-    # Brave Search category queries
+    # Brave Search category queries — balanced mix of positive, neutral, and critical
     CATEGORY_QUERIES = {
-        "ai_news": "AI announcement news today",
-        "workplace_viral": "viral LinkedIn post OR workplace culture news this week",
-        "tech_layoffs": "tech layoffs restructuring today",
-        "tech_culture": "Silicon Valley tech news today",
-        "remote_work": "return to office remote work news",
+        "ai_innovation": "AI breakthrough innovation announcement today",
+        "ai_news": "AI news update today",
+        "workplace_culture": "workplace culture trend this week",
+        "tech_news": "tech industry news today",
         "pop_culture": "trending pop culture news today",
-        "startup_news": "startup funding news today",
-        "wellness": "wellness self-care mental health trending",
+        "startup_success": "startup launch success funding news today",
+        "creative_tech": "creative technology art design trending today",
+        "wellness_trend": "wellness trend self-care popular today",
+        "business_milestone": "company milestone achievement announcement today",
+        "viral_moment": "viral moment feel good story trending today",
     }
 
     def __init__(self, db_path: str = "data/automation/queue.db"):
