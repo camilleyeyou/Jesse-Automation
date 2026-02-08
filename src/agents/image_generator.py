@@ -210,6 +210,72 @@ class ImageGeneratorAgent(BaseAgent):
             "jesse_absurdist": "Jesse in impossible/costume scenarios, deadpan",
             "jesse_surreal": "Jesse in AI-enhanced dreamscapes, glitches welcome"
         }
+
+        # ═══════════════════════════════════════════════════════════════════════
+        # ATTENTION-GRABBING IMAGES (no product required - scroll-stopping visuals)
+        # ═══════════════════════════════════════════════════════════════════════
+        self.attention_images = {
+            "striking_moments": [
+                "Close-up of hands cupping warm coffee on a cold morning, steam rising, cozy sweater sleeve visible",
+                "Person standing alone at edge of ocean at golden hour, silhouette against dramatic sky",
+                "Rain droplets on window with blurred city lights behind, moody and contemplative",
+                "Two friends laughing together at coffee shop, candid moment, warm lighting",
+                "Person with eyes closed, peaceful expression, sun on face, moment of stillness",
+                "Hands typing on laptop keyboard with single flower in vase nearby, work-life juxtaposition",
+                "Empty park bench in autumn with fallen leaves, late afternoon light",
+                "Person reading a book in window seat, rain outside, cozy interior",
+            ],
+            "beautiful_mundane": [
+                "Perfect latte art being poured, close-up, satisfying moment",
+                "Freshly made bed with morning light streaming through curtains",
+                "Person's feet in cozy socks propped up, fireplace glow in background",
+                "Hand reaching for alarm clock at sunrise, new day beginning",
+                "Steam rising from a hot bath, candles, evening relaxation",
+                "Fresh flowers on kitchen table, morning coffee, newspaper",
+                "Person walking dog on misty morning path, peaceful",
+                "Hands kneading bread dough, flour everywhere, tactile satisfaction",
+            ],
+            "human_connection": [
+                "Friends clinking coffee cups together, celebration of small moments",
+                "Parent and child holding hands while walking, only their shadows visible",
+                "Two people deep in conversation at cafe table, engaged and present",
+                "Surprise hug from behind, genuine joy on recipient's face",
+                "Colleagues high-fiving after completing a project, real celebration",
+                "Someone receiving an unexpected compliment, their surprised smile",
+                "Video call screen showing loved one's face lighting up",
+                "Hands of different ages stacked together, family or team solidarity",
+            ],
+            "nature_wonder": [
+                "Sunlight filtering through forest canopy, rays visible in morning mist",
+                "Close-up of dewdrop on leaf, crystal clear, early morning",
+                "Dramatic cloud formation at sunset, vibrant colors, vast sky",
+                "Mountain peak emerging from clouds, majestic and humbling",
+                "Ocean wave about to break, power and beauty frozen in time",
+                "Field of wildflowers swaying in breeze, saturated colors",
+                "Full moon rising over calm lake, reflection on water",
+                "First snow of season falling on autumn leaves, transition moment",
+            ],
+            "cozy_vibes": [
+                "Reading nook with fairy lights, blankets, perfect cozy corner",
+                "Hot chocolate with marshmallows, hands wrapped around mug",
+                "Cat curled up sleeping in sunbeam, pure contentment",
+                "Rainy day window with tea and book, ultimate comfort scene",
+                "Candlelit dinner table for two, intimate atmosphere",
+                "Oversized sweater and coffee on Sunday morning",
+                "Fairy lights reflected in window at dusk, magical",
+                "Person wrapped in blanket watching sunset from porch",
+            ],
+            "work_life_real": [
+                "Genuine smile after finally solving a difficult problem",
+                "Coworkers celebrating small win with snacks in break room",
+                "Clean inbox notification, rare moment of peace",
+                "Person closing laptop with satisfied expression, workday done",
+                "Spontaneous desk dance to a good song, caught mid-move",
+                "Actually productive meeting with everyone engaged",
+                "Friday afternoon vibes, clock showing 4:55pm",
+                "Plants thriving on office windowsill despite everything",
+            ]
+        }
         
         # Lighting moods (10 options)
         self.lighting_options = [
@@ -509,43 +575,70 @@ Create prompts that are 150-200 words with precise visual detail, emotional subt
         try:
             # Step 1: Analyze post mood for intelligent media matching
             post_mood = self._analyze_post_mood(post)
-            
-            # Step 2: Decide if this should be a Jesse shot or product shot
-            use_jesse = self._should_use_jesse(post, post_mood)
-            
+
+            # Step 2: Decide image type (product, jesse, or attention-grabbing)
+            image_type = self._decide_image_type(post, post_mood)
+
             # Step 3: Select visual elements (70% mood-matched, 30% surprise)
             use_mood_matching = random.random() < 0.7
-            visual_elements = self._select_visual_elements(post_mood, use_mood_matching, use_jesse)
-            
+
             media_type = "video" if use_video else "image"
-            shot_type = "Jesse lifestyle/absurdist" if use_jesse else "product hero"
-            self.logger.info(f"Creating {media_type} for post {post.post_number}: mood={post_mood}, type={shot_type}")
-            
-            if use_video:
-                return await self._generate_video(post, post_mood, visual_elements, use_mood_matching, use_jesse)
+            self.logger.info(f"Creating {media_type} for post {post.post_number}: mood={post_mood}, type={image_type}")
+
+            if image_type == 'attention':
+                # Generate scroll-stopping image without product
+                visual_elements = self._select_attention_elements(post_mood)
+                if use_video:
+                    return await self._generate_attention_video(post, post_mood, visual_elements)
+                else:
+                    return await self._generate_attention_image(post, post_mood, visual_elements)
             else:
-                return await self._generate_image(post, post_mood, visual_elements, use_mood_matching, use_jesse)
+                use_jesse = (image_type == 'jesse')
+                visual_elements = self._select_visual_elements(post_mood, use_mood_matching, use_jesse)
+
+                if use_video:
+                    return await self._generate_video(post, post_mood, visual_elements, use_mood_matching, use_jesse)
+                else:
+                    return await self._generate_image(post, post_mood, visual_elements, use_mood_matching, use_jesse)
             
         except Exception as e:
             self.logger.error(f"Failed to generate media: {e}")
             return {"success": False, "error": str(e), "media_type": "video" if use_video else "image"}
     
-    def _should_use_jesse(self, post: LinkedInPost, mood: str) -> bool:
-        """Decide whether to use Jesse lifestyle shot or product-only shot"""
+    def _decide_image_type(self, post: LinkedInPost, mood: str) -> str:
+        """
+        Decide which type of image to generate:
+        - 'product': Hero product shot (lip balm focused)
+        - 'jesse': Jesse lifestyle/absurdist shot
+        - 'attention': Scroll-stopping visual without product (let the text do the brand work)
+
+        Distribution: 30% product, 30% Jesse, 40% attention-grabbing
+        """
         content_lower = post.content.lower()
-        
-        # 40% base chance for Jesse shots
-        base_chance = 0.4
-        
-        # Increase chance if content mentions scenarios, costumes, or absurdist themes
-        if any(word in content_lower for word in ['costume', 'dressed', 'wearing', 'clown', 'knight', 'pirate']):
-            return True
-        if any(word in content_lower for word in ['scene', 'situation', 'found myself', 'there i was']):
-            return random.random() < 0.7
-        if mood in ['existential_general', 'burnout', 'humanity_seeking']:
-            base_chance = 0.5
-        
-        return random.random() < base_chance
+
+        # Force Jesse for absurdist/costume posts
+        if any(word in content_lower for word in ['costume', 'dressed', 'wearing', 'clown', 'knight', 'pirate', 'banana']):
+            return 'jesse'
+        if any(word in content_lower for word in ['scene', 'situation', 'found myself', 'there i was', 'jesse']):
+            return 'jesse' if random.random() < 0.7 else 'attention'
+
+        # Force product for explicit product mentions
+        if any(word in content_lower for word in ['lip balm', '$8.99', 'tube #', 'beeswax', 'apply']):
+            return 'product' if random.random() < 0.6 else 'attention'
+
+        # Otherwise use weighted distribution
+        # 30% product, 30% Jesse, 40% attention-grabbing
+        roll = random.random()
+        if roll < 0.30:
+            return 'product'
+        elif roll < 0.60:
+            return 'jesse'
+        else:
+            return 'attention'
+
+    def _should_use_jesse(self, post: LinkedInPost, mood: str) -> bool:
+        """Legacy method for backwards compatibility"""
+        return self._decide_image_type(post, mood) == 'jesse'
     
     async def _generate_image(self, post: LinkedInPost, post_mood: str, 
                               visual_elements: Dict, use_mood_matching: bool,
@@ -764,9 +857,236 @@ POST CONTEXT: {post.content[:150]}...
             return "humanity_seeking"
         elif any(word in content_lower for word in ['costume', 'dressed', 'wearing', 'clown', 'banana']):
             return "absurdist"
+        elif any(word in content_lower for word in ['celebrate', 'win', 'happy', 'joy', 'love', 'amazing', 'beautiful']):
+            return "positive"
+        elif any(word in content_lower for word in ['connection', 'friend', 'team', 'together', 'community']):
+            return "connection"
+        elif any(word in content_lower for word in ['nature', 'outside', 'walk', 'sun', 'morning']):
+            return "nature"
+        elif any(word in content_lower for word in ['cozy', 'comfort', 'rest', 'relax', 'home']):
+            return "cozy"
         else:
             return "existential_general"
-    
+
+    def _select_attention_elements(self, mood: str) -> Dict[str, Any]:
+        """Select attention-grabbing image elements based on mood"""
+
+        # Map moods to attention image categories
+        mood_to_attention = {
+            "tech_anxiety": ["work_life_real", "cozy_vibes", "nature_wonder"],
+            "meeting_exhaustion": ["cozy_vibes", "nature_wonder", "beautiful_mundane"],
+            "digital_overwhelm": ["nature_wonder", "cozy_vibes", "human_connection"],
+            "burnout": ["cozy_vibes", "nature_wonder", "beautiful_mundane"],
+            "time_pressure": ["cozy_vibes", "beautiful_mundane", "nature_wonder"],
+            "humanity_seeking": ["human_connection", "striking_moments", "beautiful_mundane"],
+            "positive": ["striking_moments", "human_connection", "nature_wonder"],
+            "connection": ["human_connection", "striking_moments", "cozy_vibes"],
+            "nature": ["nature_wonder", "striking_moments", "beautiful_mundane"],
+            "cozy": ["cozy_vibes", "beautiful_mundane", "striking_moments"],
+            "absurdist": ["striking_moments", "work_life_real"],
+            "existential_general": list(self.attention_images.keys())
+        }
+
+        # Pick a category based on mood
+        categories = mood_to_attention.get(mood, list(self.attention_images.keys()))
+        category = random.choice(categories)
+
+        # Pick a specific scene from that category
+        scene = random.choice(self.attention_images[category])
+
+        return {
+            "category": category,
+            "scene": scene,
+            "lighting": random.choice(self.lighting_options),
+            "color_mood": random.choice(self.color_moods),
+            "composition": random.choice(self.composition_styles),
+            "camera_angle": random.choice(self.camera_angles),
+        }
+
+    async def _generate_attention_image(self, post: LinkedInPost, mood: str,
+                                         elements: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate a scroll-stopping attention image without product"""
+
+        try:
+            prompt = self._create_attention_prompt(post, elements, mood)
+
+            start_time = time.time()
+            image_result = await self.ai_client.generate_image(prompt)
+            generation_time = time.time() - start_time
+
+            if image_result.get("error") or not image_result.get("image_data"):
+                self.logger.error(f"Attention image generation failed: {image_result.get('error')}")
+                return {
+                    "success": False,
+                    "error": image_result.get("error", "No image data"),
+                    "prompt": prompt,
+                    "media_type": "image"
+                }
+
+            saved_path = self._save_image(image_result["image_data"], post)
+
+            if not saved_path:
+                return {
+                    "success": False,
+                    "error": "Failed to save image",
+                    "prompt": prompt,
+                    "media_type": "image"
+                }
+
+            file_size = os.path.getsize(saved_path)
+            size_mb = file_size / (1024 * 1024)
+
+            self.logger.info(f"🎨 Generated attention image for post {post.post_number}: {saved_path}")
+
+            return {
+                "success": True,
+                "saved_path": saved_path,
+                "prompt": prompt,
+                "scene_category": elements.get("category"),
+                "scene_description": elements.get("scene"),
+                "post_mood": mood,
+                "image_type": "attention",
+                "uses_product": False,
+                "uses_jesse": False,
+                "generation_time": round(generation_time, 2),
+                "size_mb": round(size_mb, 3),
+                "cost": image_result.get("cost", 0.039),
+                "media_type": "image"
+            }
+
+        except Exception as e:
+            self.logger.error(f"Failed to generate attention image: {e}")
+            return {"success": False, "error": str(e), "media_type": "image"}
+
+    async def _generate_attention_video(self, post: LinkedInPost, mood: str,
+                                         elements: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate a scroll-stopping attention video without product"""
+
+        try:
+            prompt = self._create_attention_video_prompt(post, elements, mood)
+
+            start_time = time.time()
+            video_result = await self.ai_client.generate_video(
+                prompt=prompt,
+                duration_seconds=8,
+                aspect_ratio="16:9",
+                include_audio=False
+            )
+            generation_time = time.time() - start_time
+
+            if video_result.get("error") or not video_result.get("video_data"):
+                self.logger.error(f"Attention video generation failed: {video_result.get('error')}")
+                return {
+                    "success": False,
+                    "error": video_result.get("error", "No video data"),
+                    "prompt": prompt,
+                    "media_type": "video"
+                }
+
+            saved_path = self._save_video(video_result["video_data"], post)
+
+            if not saved_path:
+                return {
+                    "success": False,
+                    "error": "Failed to save video",
+                    "prompt": prompt,
+                    "media_type": "video"
+                }
+
+            file_size = os.path.getsize(saved_path)
+            size_mb = file_size / (1024 * 1024)
+
+            self.logger.info(f"🎬 Generated attention video for post {post.post_number}: {saved_path}")
+
+            return {
+                "success": True,
+                "saved_path": saved_path,
+                "prompt": prompt,
+                "scene_category": elements.get("category"),
+                "scene_description": elements.get("scene"),
+                "post_mood": mood,
+                "image_type": "attention",
+                "uses_product": False,
+                "uses_jesse": False,
+                "generation_time": round(generation_time, 2),
+                "size_mb": round(size_mb, 3),
+                "duration_seconds": 8,
+                "cost": video_result.get("cost", 0.80),
+                "media_type": "video"
+            }
+
+        except Exception as e:
+            self.logger.error(f"Failed to generate attention video: {e}")
+            return {"success": False, "error": str(e), "media_type": "video"}
+
+    def _create_attention_prompt(self, post: LinkedInPost, elements: Dict[str, Any], mood: str) -> str:
+        """Create prompt for attention-grabbing image without product"""
+
+        scene = elements.get("scene", "Person with eyes closed, peaceful expression, moment of stillness")
+
+        return f"""Professional lifestyle/editorial photograph:
+
+SCENE: {scene}
+
+COMPOSITION: {elements.get('composition', 'rule of thirds with subject off-center')}
+CAMERA ANGLE: {elements.get('camera_angle', 'eye level, intimate')}
+LIGHTING: {elements.get('lighting', 'soft natural light')}
+COLOR MOOD: {elements.get('color_mood', 'warm, inviting tones')}
+
+STYLE DIRECTION:
+- High-end editorial quality, magazine-worthy
+- Authentic, candid feel - not stock photo generic
+- Emotional resonance - the image should make people pause
+- Beautiful but real - not overly polished or fake
+- Could be from Kinfolk, The New Yorker, or a premium lifestyle brand campaign
+
+TECHNICAL:
+- 8K, ultra-detailed, professional photography
+- Sharp focus with pleasing bokeh where appropriate
+- Natural color grading, not over-processed
+- Professional depth of field
+
+MOOD: {mood}
+The image should stop the scroll and make someone feel something.
+It complements the post text - the words carry the brand message.
+
+POST CONTEXT: {post.content[:150]}...
+
+IMPORTANT: This is a lifestyle/editorial image. No product placement needed.
+The goal is to create visual interest that draws people to read the post."""
+
+    def _create_attention_video_prompt(self, post: LinkedInPost, elements: Dict[str, Any], mood: str) -> str:
+        """Create prompt for attention-grabbing video without product"""
+
+        scene = elements.get("scene", "Person with eyes closed, peaceful expression, moment of stillness")
+
+        return f"""CINEMATIC LIFESTYLE VIDEO:
+
+SCENE: {scene}
+
+ACTION:
+- Gentle, organic movement (subtle camera drift, natural motion)
+- 8-second loop, seamless if possible
+- Cinematic pacing - slow, contemplative, premium feel
+- Could be: steam rising, leaves falling, person looking up, hands moving
+
+COMPOSITION: {elements.get('composition', 'rule of thirds')}
+LIGHTING: {elements.get('lighting', 'soft natural light')}
+COLOR MOOD: {elements.get('color_mood', 'warm, inviting tones')}
+
+STYLE:
+- A24 film quality, editorial/lifestyle
+- Authentic and emotionally resonant
+- Not stock video generic - feels real and beautiful
+- Premium brand campaign quality
+
+MOOD: {mood}
+The video should stop the scroll and create a moment of connection.
+
+POST CONTEXT: {post.content[:150]}...
+
+IMPORTANT: No product placement. Pure lifestyle/editorial visual."""
+
     def _select_visual_elements(self, mood: str, use_mood_matching: bool, use_jesse: bool) -> Dict[str, Any]:
         """Select visual elements based on mood and whether to use Jesse"""
         
@@ -993,10 +1313,17 @@ POST CONTEXT: {post.content[:200]}"""
     
     def get_stats(self) -> Dict[str, Any]:
         """Get agent statistics"""
+        attention_count = sum(len(scenes) for scenes in self.attention_images.values())
+
         return {
             "agent_name": self.name,
             "visual_philosophy": "what if Apple sold mortality?",
             "total_unique_combinations": f"{self.total_combinations:,}",
+            "image_type_distribution": {
+                "product": "30%",
+                "jesse": "30%",
+                "attention_grabbing": "40%"
+            },
             "brand_toolkit": {
                 "colors": self.brand_colors,
                 "typography": ["Repro Mono Medium (headlines)", "Poppins (body)"],
@@ -1008,6 +1335,10 @@ POST CONTEXT: {post.content[:200]}"""
                 "absurdist_scenes": len(self.jesse_scenarios["absurdist_scenes"]),
                 "costume_scenarios": len(self.jesse_scenarios["costume_scenarios"]),
                 "surreal_ai": len(self.jesse_scenarios["surreal_ai"])
+            },
+            "attention_images": {
+                "total_scenes": attention_count,
+                "categories": list(self.attention_images.keys())
             },
             "variety_systems": {
                 "scene_categories": len(self.scene_categories),
