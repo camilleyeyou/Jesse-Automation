@@ -531,8 +531,16 @@ RULES (NON-NEGOTIABLE)
 
                 if isinstance(content_field, dict):
                     # Check if wrapped in "post" key (common model behavior)
-                    if "post" in content_field and isinstance(content_field["post"], dict):
-                        content_data = content_field["post"]
+                    if "post" in content_field:
+                        post_value = content_field["post"]
+                        if isinstance(post_value, dict):
+                            # {"post": {"content": "..."}}
+                            content_data = post_value
+                        elif isinstance(post_value, str):
+                            # {"post": "actual content text"} - content is directly in post
+                            content_data = {"content": post_value}
+                        else:
+                            content_data = content_field
                     else:
                         content_data = content_field
                 elif isinstance(content_field, str):
