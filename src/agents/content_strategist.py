@@ -933,16 +933,15 @@ REMEMBER: Specificity > generality. "The 3pm meeting about metrics" > "meetings"
 REQUIREMENTS
 ═══════════════════════════════════════════════════════════════════════════════
 
-LENGTH: 60-150 words (punchy, not essay)
+LENGTH: 40-80 words MAX. Punchy. Tight. Every word earns its place or it's cut.
 
 MUST:
+- Be SHORT. 40-80 words. If you can say it in fewer words, do. Brevity is the soul of wit.
 - Make someone screenshot this and send it to a friend — that's the bar
-- Commit to the bit 100%. If it's weird, make it weirder. Never half-ass the absurdity
-- Be the thing people WANT to read on LinkedIn (rare but possible)
-- Feel like a lip balm brand that has absolutely lost it (in a good way)
-- Surprise the reader — they should think "wait, did a brand just say that?"
+- Commit to the bit 100%. Never half-ass the absurdity
+- Surprise the reader — "wait, did a brand just say that?"
 - Be specific. Weirdly specific. The specificity IS the comedy.
-- Match the voice specified above — full commitment, no winking
+- Land the ending hard. No trailing off. Punch out.
 
 MUST NOT:
 - EVER break character. EVER wink at the audience. The bit is sacred.
