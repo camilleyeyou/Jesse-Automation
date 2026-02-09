@@ -23,15 +23,15 @@ from dataclasses import dataclass
 from .base_agent import BaseAgent
 
 # Import models from the correct location
+from ..models.post import LinkedInPost, CulturalReference
+
+# Import memory system
 try:
-    from ..models.linkedin_post import LinkedInPost, CulturalReference
+    from ..infrastructure.memory import get_memory
+    MEMORY_AVAILABLE = True
 except ImportError:
-    try:
-        from ..models.post import LinkedInPost, CulturalReference
-    except ImportError:
-        # If both fail, we'll raise a clear error at runtime
-        LinkedInPost = None
-        CulturalReference = None
+    MEMORY_AVAILABLE = False
+    get_memory = None
 
 
 class ContentPillar(Enum):
@@ -121,7 +121,16 @@ class ContentStrategistAgent(BaseAgent):
         self._init_ending_variations()
         self._init_voice_modifiers()
         self._init_absurdist_elements()
-        
+
+        # Initialize memory system
+        self.memory = None
+        if MEMORY_AVAILABLE:
+            try:
+                self.memory = get_memory()
+                self.logger.info("✅ Memory system connected")
+            except Exception as e:
+                self.logger.warning(f"Memory system unavailable: {e}")
+
         self.logger.info("ContentStrategist v2 initialized — Actually Creative Mode")
 
     def _build_creative_system_prompt(self) -> str:
@@ -455,14 +464,40 @@ RULES (NON-NEGOTIABLE)
         avoid_patterns: Optional[Dict[str, Any]] = None
     ) -> 'LinkedInPost':
         """Generate a genuinely creative LinkedIn post"""
-        
+
         # Verify models are available
         if LinkedInPost is None or CulturalReference is None:
             raise ImportError("Could not import LinkedInPost or CulturalReference from models")
-        
+
         self.set_context(batch_id, post_number)
         avoid_patterns = avoid_patterns or {}
-        
+
+        # Query memory for patterns to avoid (merge with passed-in patterns)
+        memory_context = ""
+        if self.memory:
+            try:
+                # Get session-level avoid patterns
+                session_patterns = self.memory.get_session_avoid_patterns()
+                for key, values in session_patterns.items():
+                    if key not in avoid_patterns:
+                        avoid_patterns[key] = values
+                    elif isinstance(avoid_patterns[key], list):
+                        avoid_patterns[key].extend(values)
+
+                # Get recent topics/hooks from persistent memory
+                if "recent_topics" not in avoid_patterns:
+                    avoid_patterns["recent_topics"] = self.memory.get_recent_topics(days=7, limit=10)
+                if "recent_hooks" not in avoid_patterns:
+                    avoid_patterns["recent_hooks"] = self.memory.get_recent_hooks(days=7, limit=5)
+                if "recent_endings" not in avoid_patterns:
+                    avoid_patterns["recent_endings"] = self.memory.get_recent_endings(days=7, limit=5)
+
+                # Get memory context for prompt
+                memory_context = self.memory.get_memory_context_for_generation(days=7)
+
+            except Exception as e:
+                self.logger.warning(f"Memory query failed: {e}")
+
         # Step 1: Select creative strategy
         strategy = self._select_creative_strategy(
             trending_context=trending_context,
@@ -476,8 +511,8 @@ RULES (NON-NEGOTIABLE)
             f"format={strategy.format.value}, voice={strategy.voice_modifier[:20]}..."
         )
         
-        # Step 2: Build the creative prompt
-        prompt = self._build_creative_prompt(strategy, trending_context, avoid_patterns)
+        # Step 2: Build the creative prompt (with memory context)
+        prompt = self._build_creative_prompt(strategy, trending_context, avoid_patterns, memory_context)
         
         try:
             # Step 3: Generate
@@ -903,10 +938,11 @@ RULES (NON-NEGOTIABLE)
         self,
         strategy: ContentStrategy,
         trending_context: Optional[str],
-        avoid_patterns: Dict[str, Any]
+        avoid_patterns: Dict[str, Any],
+        memory_context: str = ""
     ) -> str:
         """Build a prompt that actually encourages creativity"""
-        
+
         # Get some random creative elements to inspire
         hook_type = random.choice(list(self.creative_hooks.keys()))
         hook_examples = self.creative_hooks[hook_type]
@@ -983,6 +1019,7 @@ SPECIFIC DETAILS TO CONSIDER WEAVING IN:
 
 REMEMBER: Specificity > generality. "The 3pm meeting about metrics" > "meetings"
 {avoid_section}
+{memory_context}
 ═══════════════════════════════════════════════════════════════════════════════
 REQUIREMENTS
 ═══════════════════════════════════════════════════════════════════════════════

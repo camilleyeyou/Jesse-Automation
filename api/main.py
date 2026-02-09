@@ -896,6 +896,146 @@ async def post_comment_background(comment_id: str):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# MEMORY ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/memory/stats")
+async def get_memory_stats():
+    """Get memory system statistics"""
+    if not orchestrator or not orchestrator.memory:
+        return {"available": False, "message": "Memory system not initialized"}
+
+    try:
+        stats = orchestrator.memory.get_stats()
+        return {
+            "available": True,
+            "stats": stats
+        }
+    except Exception as e:
+        logger.error(f"Failed to get memory stats: {e}")
+        raise HTTPException(500, f"Failed to get memory stats: {str(e)}")
+
+
+@app.get("/api/memory/recent-posts")
+async def get_memory_recent_posts(days: int = 7, limit: int = 20):
+    """Get recently generated posts from memory"""
+    if not orchestrator or not orchestrator.memory:
+        raise HTTPException(503, "Memory system not initialized")
+
+    try:
+        posts = orchestrator.memory.get_recent_posts(days=days, limit=limit)
+        return {
+            "posts": posts,
+            "count": len(posts)
+        }
+    except Exception as e:
+        logger.error(f"Failed to get recent posts: {e}")
+        raise HTTPException(500, f"Failed: {str(e)}")
+
+
+@app.get("/api/memory/pillar-stats")
+async def get_pillar_stats(days: int = 30):
+    """Get content pillar performance statistics"""
+    if not orchestrator or not orchestrator.memory:
+        raise HTTPException(503, "Memory system not initialized")
+
+    try:
+        stats = orchestrator.memory.get_pillar_stats(days=days)
+        return {
+            "stats": stats,
+            "period_days": days
+        }
+    except Exception as e:
+        logger.error(f"Failed to get pillar stats: {e}")
+        raise HTTPException(500, f"Failed: {str(e)}")
+
+
+@app.get("/api/memory/validator-patterns")
+async def get_validator_patterns(days: int = 30):
+    """Get learned validator preferences and patterns"""
+    if not orchestrator or not orchestrator.memory:
+        raise HTTPException(503, "Memory system not initialized")
+
+    try:
+        patterns = orchestrator.memory.get_all_validator_patterns(days=days)
+
+        # Convert to serializable format
+        result = {}
+        for name, pattern in patterns.items():
+            result[name] = {
+                "likes": pattern.likes,
+                "dislikes": pattern.dislikes,
+                "approval_rate": pattern.approval_rate,
+                "avg_score": pattern.avg_score,
+                "best_pillars": pattern.best_pillars,
+                "worst_pillars": pattern.worst_pillars,
+                "common_critiques": pattern.common_critiques,
+                "common_praise": pattern.common_praise
+            }
+
+        return {
+            "patterns": result,
+            "period_days": days
+        }
+    except Exception as e:
+        logger.error(f"Failed to get validator patterns: {e}")
+        raise HTTPException(500, f"Failed: {str(e)}")
+
+
+@app.get("/api/memory/successful-patterns")
+async def get_successful_patterns(min_score: float = 7.0, limit: int = 20):
+    """Get patterns from highly-rated posts"""
+    if not orchestrator or not orchestrator.memory:
+        raise HTTPException(503, "Memory system not initialized")
+
+    try:
+        patterns = orchestrator.memory.get_successful_patterns(min_score=min_score, limit=limit)
+        return {
+            "patterns": patterns,
+            "min_score": min_score
+        }
+    except Exception as e:
+        logger.error(f"Failed to get successful patterns: {e}")
+        raise HTTPException(500, f"Failed: {str(e)}")
+
+
+@app.get("/api/memory/failed-patterns")
+async def get_failed_patterns(max_score: float = 5.0, limit: int = 20):
+    """Get patterns from low-rated posts (to learn what to avoid)"""
+    if not orchestrator or not orchestrator.memory:
+        raise HTTPException(503, "Memory system not initialized")
+
+    try:
+        patterns = orchestrator.memory.get_failed_patterns(max_score=max_score, limit=limit)
+        return {
+            "patterns": patterns,
+            "max_score": max_score
+        }
+    except Exception as e:
+        logger.error(f"Failed to get failed patterns: {e}")
+        raise HTTPException(500, f"Failed: {str(e)}")
+
+
+@app.get("/api/memory/insights")
+async def get_memory_insights():
+    """Get all stored learning insights"""
+    if not orchestrator or not orchestrator.memory:
+        raise HTTPException(503, "Memory system not initialized")
+
+    try:
+        insights = orchestrator.memory.get_all_insights()
+        summary = orchestrator.memory.get_validator_feedback_summary()
+
+        return {
+            "insights": insights,
+            "validator_summary": summary
+        }
+    except Exception as e:
+        logger.error(f"Failed to get insights: {e}")
+        raise HTTPException(500, f"Failed: {str(e)}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Run
 # ═══════════════════════════════════════════════════════════════════════════════
 

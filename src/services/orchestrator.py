@@ -3,6 +3,7 @@ Content Orchestrator - SIMPLIFIED
 - One fresh trend fetched per post
 - No trend storage/caching
 - Clean separation of concerns
+- Memory integration for learning and avoiding repetition
 """
 
 import asyncio
@@ -21,6 +22,13 @@ try:
     TREND_SERVICE_AVAILABLE = True
 except ImportError:
     TREND_SERVICE_AVAILABLE = False
+
+try:
+    from ..infrastructure.memory import get_memory
+    MEMORY_AVAILABLE = True
+except ImportError:
+    MEMORY_AVAILABLE = False
+    get_memory = None
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +93,16 @@ class ContentOrchestrator:
             # Use same database as queue manager for consistency
             self.trend_service = get_trend_service("data/automation/queue.db")
             logger.info("✅ Trend service initialized - content will react to real news")
-        
+
+        # Initialize memory system
+        self.memory = None
+        if MEMORY_AVAILABLE:
+            try:
+                self.memory = get_memory("data/automation/queue.db")
+                logger.info("✅ Memory system initialized - agents will learn from past content")
+            except Exception as e:
+                logger.warning(f"Memory system unavailable: {e}")
+
         if self.image_generator:
             logger.info("✅ ContentOrchestrator initialized WITH image generator")
         else:
@@ -93,50 +110,129 @@ class ContentOrchestrator:
     
     async def generate_batch(self, num_posts: int = 1, use_video: bool = False) -> BatchResult:
         """Generate a batch of posts, each with a unique fresh trend."""
-        
+
         batch_id = str(uuid.uuid4())
         logger.info(f"Starting batch {batch_id[:8]} with {num_posts} posts")
-        
+
+        # Start memory session for this batch
+        if self.memory:
+            self.memory.start_session(batch_id)
+            logger.info("📝 Memory session started")
+
         # Reset trend tracking for this batch
         if self.trend_service:
             self.trend_service.reset_for_new_batch()
-        
+
         approved_posts = []
-        
+        rejected_count = 0
+
         for i in range(num_posts):
             post_number = i + 1
             post_id = f"{batch_id[:8]}_{post_number}"  # Create tracking ID
             logger.info(f"\n--- Post {post_number}/{num_posts} ---")
-            
+
             # Fetch ONE fresh trend for THIS post (with tracking)
             trend = None
             if self.trend_service:
                 trend = await self.trend_service.get_one_fresh_trend(post_id=post_id)
                 if trend:
                     logger.info(f"📰 Trend ({trend.category}): {trend.headline[:70]}...")
-            
+
             try:
-                post = await self._process_single_post(
+                post, validation_scores, was_approved = await self._process_single_post_with_memory(
                     post_number=post_number,
                     batch_id=batch_id,
                     trend=trend,
                     use_video=use_video
                 )
-                
-                if post:
+
+                if was_approved and post:
                     approved_posts.append(post)
                     logger.info(f"✅ Post {post_number} APPROVED")
                 else:
+                    rejected_count += 1
                     logger.warning(f"❌ Post {post_number} REJECTED")
-                    
+
             except Exception as e:
                 logger.error(f"Post {post_number} failed: {e}")
                 import traceback
                 traceback.print_exc()
-        
+                rejected_count += 1
+
+        # End memory session
+        if self.memory:
+            self.memory.end_session()
+            logger.info(f"📝 Memory session ended: {len(approved_posts)} approved, {rejected_count} rejected")
+
         logger.info(f"\nBatch complete: {len(approved_posts)}/{num_posts} approved")
         return BatchResult(batch_id=batch_id, posts=approved_posts)
     
+    async def _process_single_post_with_memory(
+        self,
+        post_number: int,
+        batch_id: str,
+        trend=None,
+        use_video: bool = False
+    ) -> tuple:
+        """
+        Process a single post and store results in memory.
+
+        Returns:
+            tuple: (post, validation_scores, was_approved)
+        """
+        post = await self._process_single_post(
+            post_number=post_number,
+            batch_id=batch_id,
+            trend=trend,
+            use_video=use_video
+        )
+
+        was_approved = post is not None
+        validation_scores = post.validation_scores if post else []
+
+        # Store in memory
+        if self.memory:
+            try:
+                # Extract metadata for memory
+                post_id = f"{batch_id[:8]}_{post_number}"
+                content = post.content if post else ""
+                pillar = getattr(post, 'cultural_reference', None)
+                pillar_name = pillar.category if pillar else None
+
+                # Calculate average score
+                avg_score = 0
+                if validation_scores:
+                    avg_score = sum(v.score for v in validation_scores) / len(validation_scores)
+
+                # Convert validation scores to dicts for storage
+                scores_as_dicts = []
+                for vs in validation_scores:
+                    scores_as_dicts.append({
+                        'agent_name': vs.agent_name,
+                        'score': vs.score,
+                        'approved': vs.approved,
+                        'feedback': vs.feedback,
+                        'strengths': getattr(vs, 'strengths', []),
+                        'weaknesses': getattr(vs, 'weaknesses', [])
+                    })
+
+                self.memory.remember_post(
+                    post_id=post_id,
+                    batch_id=batch_id,
+                    content=content,
+                    pillar=pillar_name,
+                    trending_topic=trend.headline if trend else None,
+                    was_approved=was_approved,
+                    average_score=avg_score,
+                    validation_scores=scores_as_dicts
+                )
+                logger.debug(f"📝 Stored post {post_id} in memory (approved={was_approved})")
+
+            except Exception as e:
+                logger.warning(f"Failed to store post in memory: {e}")
+
+        return post, validation_scores, was_approved
+
     async def _process_single_post(
         self,
         post_number: int,
@@ -281,10 +377,14 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
         logger.info("=" * 60)
         
         try:
+            # Start memory session for this live post
+            if self.memory:
+                self.memory.start_session(f"live_{uuid.uuid4().hex[:8]}")
+
             # Step 1: Reset trend tracking for fresh selection
             if self.trend_service:
                 self.trend_service.reset_for_new_batch()
-            
+
             # Step 2: Get fresh trending topic
             post_id = f"live_{uuid.uuid4().hex[:8]}"
             trend = None
@@ -294,26 +394,28 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
                     logger.info(f"📰 Fresh trend ({trend.category}): {trend.headline[:70]}...")
                 else:
                     logger.warning("⚠️ No fresh trend available, generating without trend")
-            
-            # Step 3: Generate content
+
+            # Step 3: Generate content (with memory)
             logger.info("✍️ Generating content...")
-            post = await self._process_single_post(
+            post, validation_scores, was_approved = await self._process_single_post_with_memory(
                 post_number=1,
                 batch_id=post_id,
                 trend=trend,
                 use_video=use_video
             )
-            
-            if not post:
+
+            if not was_approved or not post:
                 logger.error("❌ Content generation failed validation")
+                if self.memory:
+                    self.memory.end_session()
                 return {
                     "success": False,
                     "error": "Content failed validation - no post generated",
                     "stage": "generation"
                 }
-            
+
             logger.info(f"✅ Content generated: {post.content[:50]}...")
-            
+
             # Step 4: Post to LinkedIn
             logger.info("📤 Posting to LinkedIn...")
             linkedin_result = linkedin_poster.publish_post(
@@ -321,14 +423,22 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
                 image_path=post.image_url,
                 hashtags=[]  # No hashtags per client request
             )
-            
+
             if linkedin_result.get("success"):
                 logger.info(f"✅ Posted successfully: {linkedin_result.get('post_id')}")
-                
+
                 # Mark trend as used (permanently) after successful post
                 if self.trend_service and trend:
                     self.trend_service.mark_topic_used_permanent(trend, post_id=post_id)
-                
+
+                # Mark post as published in memory
+                if self.memory:
+                    self.memory.mark_posted_to_linkedin(
+                        f"{post_id[:8]}_1",
+                        linkedin_result.get('post_id', '')
+                    )
+                    self.memory.end_session()
+
                 return {
                     "success": True,
                     "post": post.to_dict(),
@@ -341,6 +451,8 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
                 }
             else:
                 logger.error(f"❌ LinkedIn post failed: {linkedin_result.get('error')}")
+                if self.memory:
+                    self.memory.end_session()
                 return {
                     "success": False,
                     "error": linkedin_result.get("error"),
@@ -348,11 +460,13 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
                     "stage": "linkedin_post",
                     "post": post.to_dict()  # Include post so it can be manually posted
                 }
-                
+
         except Exception as e:
             logger.error(f"❌ Generate and post failed: {e}")
             import traceback
             traceback.print_exc()
+            if self.memory:
+                self.memory.end_session()
             return {
                 "success": False,
                 "error": str(e),
@@ -360,8 +474,18 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
             }
     
     def get_stats(self):
-        return {
+        stats = {
             "validators": [v.name for v in self.validators],
             "trend_service": self.trend_service is not None,
-            "image_generator": self.image_generator is not None
+            "image_generator": self.image_generator is not None,
+            "memory": self.memory is not None
         }
+
+        # Add memory stats if available
+        if self.memory:
+            try:
+                stats["memory_stats"] = self.memory.get_stats()
+            except Exception:
+                pass
+
+        return stats
