@@ -1,8 +1,11 @@
 """
 Jordan Park Validator - The Algorithm Whisperer / LinkedIn Mercenary
-"I can make anything go viral except my own stability."
+"Screenshot-worthy or don't bother posting."
 
-Updated with official Brand Toolkit (January 2026)
+Updated with Liquid Death Energy (February 2026)
+- Validates for: SHAREABILITY + PLATFORM PERFORMANCE
+- Quality bar: Would someone screenshot this and send to a friend?
+- Length: 40-80 words MAX. Punchy hooks that stop the scroll.
 """
 
 import json
@@ -18,23 +21,25 @@ logger = logging.getLogger(__name__)
 
 class JordanParkValidator(BaseAgent):
     """
-    The Algorithm Whisperer - Validates for platform performance
-    
-    Her test: "Would I screenshot this for my 'Best Copy Examples' folder?"
-    
-    Brand Toolkit Awareness:
-    - Knows Jesse's colors: #407CD1 (blue), #FCF9EC (cream), #F96A63 (coral)
-    - Understands "AI tells as features" philosophy
-    - Recognizes Jesse A. Eisenbalm (NOT Jesse Eisenberg) running joke
+    The Algorithm Whisperer - Validates for SHAREABILITY + PLATFORM PERFORMANCE
+
+    Her test: "Would someone screenshot this and send to a friend?"
+
+    Liquid Death Energy Criteria:
+    - Full commitment stops the scroll
+    - 40-80 words MAX (punchy hooks)
+    - Screenshot-worthy = share triggers built in
+    - Entertainment first = higher engagement
     """
-    
+
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="JordanParkValidator")
         self._initialize_meme_lifecycle()
-        self.brand_toolkit = {
-            "colors": {"primary_blue": "#407CD1", "cream": "#FCF9EC", "coral": "#F96A63"},
-            "ai_philosophy": "AI tells as features, not bugs — em dashes encouraged",
-            "identity": "Jesse A. Eisenbalm (NOT Jesse Eisenberg)"
+        self.platform_philosophy = {
+            "quality_bar": "Would someone screenshot this and send to a friend?",
+            "length": "40-80 words MAX. Punchy hooks that stop the scroll.",
+            "share_trigger": "The content itself is so good people HAVE to share it",
+            "entertainment": "Entertainment content outperforms marketing content"
         }
     
     def _initialize_meme_lifecycle(self):
@@ -78,10 +83,10 @@ class JordanParkValidator(BaseAgent):
         return "unknown"
     
     def get_system_prompt(self) -> str:
-        """Jordan Park's full persona system prompt with brand toolkit"""
-        
+        """Jordan Park's full persona system prompt with Liquid Death energy"""
+
         algo_context = self._get_algorithm_context()
-        
+
         return f"""You are Jordan Park, 26-year-old Freelance Content Strategist - "The Algorithm Whisperer"
 
 IDENTITY:
@@ -90,42 +95,73 @@ IDENTITY:
 - Can predict engagement within 2% accuracy
 - Agency refugee, managing chaos solo
 
-BRAND TOOLKIT KNOWLEDGE (Jesse A. Eisenbalm):
-- Colors: #407CD1 (blue), #FCF9EC (cream), #F96A63 (coral), black, white
-- Typography voice: Repro Mono Medium (headlines), Poppins (body)
-- Motif: Hexagons (because beeswax)
-- AI Philosophy: "AI tells as features, not bugs" — em dashes encouraged
-- Identity: Jesse A. Eisenbalm (NOT Jesse Eisenberg the actor — running joke)
-
 CURRENT PLATFORM CONTEXT:
 - Posting time: {algo_context['posting_time_quality']}
 - Day quality: {algo_context['day_quality']}
 - Algorithm favors: {algo_context['current_algorithm_favor']}
 
-SUCCESS METRICS:
-1. Engagement rate > 5%
-2. Share-to-impression ratio
-3. Screenshot-ability factor
-4. Dwell time (3-second rule)
+═══════════════════════════════════════════════════════════════════════════════
+LIQUID DEATH ENERGY VALIDATION (Jesse A. Eisenbalm)
+═══════════════════════════════════════════════════════════════════════════════
+
+THE QUALITY BAR:
+"Would someone screenshot this and send to a friend?"
+If not, it won't perform. Period.
+
+WHY LIQUID DEATH ENERGY WORKS ON LINKEDIN:
+- Full commitment STOPS THE SCROLL (people pause for genuine weird)
+- Entertainment content OUTPERFORMS marketing content
+- Screenshot-worthy = built-in share triggers
+- Memorable > forgettable = algorithm boost from saves
+
+THE PLATFORM REALITY:
+- 40-80 words MAX hits the sweet spot (full read, high dwell time)
+- Punchy hooks in first 2 lines = 90% of success
+- Share triggers = screenshot + send to friend + "you have to see this"
+- Genuine weird beats "relatable" every time
+
+═══════════════════════════════════════════════════════════════════════════════
 
 WHAT I VALIDATE:
-- Hook strength (first 2 lines = 90% of success)
-- Algorithm favor (dwell time, saves, shares)
-- Viral mechanics (share triggers)
-- Platform-native feel
-- Brand voice fit for Jesse (Calm Conspirator)
 
-JESSE A. EISENBALM CONTEXT:
-- Post-post-ironic sincerity
-- Target: Professionals drowning in AI-generated sameness
-- Voice: Calm Conspirator - minimal, dry-smart, unhurried
-- Core tension: AI-generated content selling anti-AI product
-- Em dashes are ON BRAND
+1. SCREENSHOT TEST (Most Important)
+   - Would someone screenshot this and send to a friend?
+   - Is this "you have to see this" content?
+   - Or would they just scroll past?
+
+2. HOOK STRENGTH
+   - First 2 lines = do they STOP the scroll?
+   - Is the hook genuinely arresting?
+   - Or is it generic LinkedIn bait?
+
+3. LENGTH OPTIMIZATION
+   - 40-80 words = sweet spot for full read
+   - Too long = scroll past
+   - Every word must pull its weight
+
+4. SHARE MECHANICS
+   - What makes someone HAVE to share this?
+   - Is the commitment level itself the hook?
+   - Or is it forgettable?
+
+WHAT MAKES ME APPROVE:
+✅ Screenshot-worthy — people would actually share this
+✅ Strong hook — stops the scroll in first 2 lines
+✅ Right length — 40-80 words, punchy
+✅ Full commitment — the dedication IS the entertainment
+✅ Share trigger — "you have to see this" energy
+
+WHAT MAKES ME REJECT:
+❌ Not screenshot-worthy — would scroll past
+❌ Weak hook — doesn't stop the scroll
+❌ Too long — over 80 words loses people
+❌ Half-committed — hedging kills shareability
+❌ Forgettable — no reason to share
 
 Why I'd screenshot Jesse content:
-- Recognize genius marketing
-- $8.99 worth it for case study potential
-- The copy is unhinged, positioning is insane, price point is perfect"""
+- Full commitment is inherently shareable
+- "You have to see what this lip balm brand posted"
+- Entertainment value = algorithm gold"""
     
     async def execute(self, post: LinkedInPost) -> ValidationScore:
         """Validate a post from Jordan Park's platform perspective"""
@@ -144,97 +180,128 @@ Why I'd screenshot Jesse content:
             return self._create_error_score(str(e))
     
     def _build_validation_prompt(self, post: LinkedInPost) -> str:
-        """Build Jordan's evaluation prompt"""
-        
-        cultural_ref = post.cultural_reference.reference if post.cultural_reference else ""
-        meme_status = self._get_meme_status(cultural_ref)
-        
-        hook = post.content.split('\n')[0][:100] if '\n' in post.content else post.content[:100]
-        hashtags = ' '.join(['#' + tag for tag in post.hashtags]) if post.hashtags else 'No hashtags'
-        
-        return f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Jordan Park:
+        """Build Jordan's evaluation prompt with Liquid Death criteria"""
+
+        # Count words in post
+        word_count = len(post.content.split())
+
+        # Extract hook (first 2 lines)
+        lines = post.content.split('\n')
+        hook = '\n'.join(lines[:2])[:150] if len(lines) > 1 else post.content[:150]
+
+        return f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Jordan Park, The Algorithm Whisperer.
 
 POST:
 {post.content}
 
-HOOK: {hook}
-HASHTAGS: {hashtags}
-CULTURAL REFERENCE: {cultural_ref or 'None'}
-MEME STATUS: {meme_status}
+WORD COUNT: {word_count} words (requirement: 40-80 words)
+HOOK (first 2 lines): {hook}
 
-BRAND REQUIREMENTS:
-- Voice: Post-post-ironic sincerity (Calm Conspirator)
-- Tone: Minimal, dry-smart, unhurried, meme-literate
-- Em dashes: Encouraged (brand feature)
-- Identity: Jesse A. Eisenbalm (NOT Eisenberg)
+═══════════════════════════════════════════════════════════════════════════════
+THE ONLY QUESTION THAT MATTERS:
+Would someone screenshot this and send to a friend?
+═══════════════════════════════════════════════════════════════════════════════
 
 EVALUATE:
-1. Hook strength (first 2 lines)
-2. Dwell time potential
-3. Share trigger mechanism
-4. Screenshot-ability
-5. Brand voice fit
+
+1. SCREENSHOT TEST (Pass/Fail):
+   - Would someone actually screenshot this?
+   - Is this "you have to see this" content?
+   - What makes it shareable (or not)?
+
+2. HOOK STRENGTH:
+   - Do the first 2 lines STOP the scroll?
+   - Is the hook genuinely arresting?
+   - Or is it generic/forgettable?
+
+3. LENGTH CHECK:
+   - Is it 40-80 words? (Current: {word_count} words)
+   - Sweet spot for full read + high dwell time?
+   - Or will people scroll past before finishing?
+
+4. SHARE MECHANICS:
+   - What's the share trigger?
+   - Is the commitment level itself the hook?
+   - Why would someone HAVE to share this?
+
+5. ENGAGEMENT PREDICTION:
+   - Given the hook + length + commitment level
+   - Will this perform or flop?
 
 Return JSON:
 {{
-    "algorithm_friendly": true/false,
-    "hook_strength": 1-10,
-    "engagement_prediction": "viral/solid/moderate/flop",
-    "meme_timing": "ahead/perfect/late/dead/ironic",
-    "share_mechanic": "description or 'none'",
-    "platform_fit": "native/adapted/wrong_platform",
-    "dwell_time_estimate": "<3sec/3-10sec/10-30sec/30sec+",
-    "brand_voice_fit": "perfect/good/needs_work",
     "screenshot_worthy": true/false,
-    "em_dash_usage": "appropriate/missing/overused",
+    "would_share_to_friend": true/false,
+    "hook_strength": 1-10,
+    "hook_verdict": "scroll_stopper/decent/weak/generic",
+    "word_count": {word_count},
+    "length_verdict": "perfect/too_short/too_long",
+    "share_trigger": "description of what makes it shareable or 'none'",
+    "commitment_level": "full_send/hedging/broke_character/safe_and_boring",
+    "engagement_prediction": "viral/solid/moderate/flop",
+    "dwell_time": "full_read/partial/scroll_past",
+    "specific_reaction": "your actual reaction as an algorithm expert",
     "score": 1-10,
     "approved": true/false,
-    "platform_optimization": "specific improvement if not approved"
+    "fix": "what would make this screenshot-worthy if not approved"
 }}"""
     
     def _parse_validation(self, content: Dict[str, Any]) -> ValidationScore:
-        """Parse Jordan Park's validation response"""
-        
+        """Parse Jordan Park's validation response with Liquid Death criteria"""
+
         score = max(0, min(10, float(content.get("score", 0))))
-        brand_voice_fit = str(content.get("brand_voice_fit", "needs_work"))
+        screenshot_worthy = bool(content.get("screenshot_worthy", False))
+        would_share = bool(content.get("would_share_to_friend", False))
         hook_strength = float(content.get("hook_strength", 0))
+        word_count = int(content.get("word_count", 0))
+        length_verdict = str(content.get("length_verdict", "too_long"))
         engagement_prediction = str(content.get("engagement_prediction", "moderate"))
-        
+
         criteria_breakdown = {
-            "algorithm_friendly": bool(content.get("algorithm_friendly", False)),
+            "screenshot_worthy": screenshot_worthy,
+            "would_share_to_friend": would_share,
             "hook_strength": hook_strength,
+            "hook_verdict": str(content.get("hook_verdict", "generic")),
+            "word_count": word_count,
+            "length_verdict": length_verdict,
+            "share_trigger": str(content.get("share_trigger", "none")),
+            "commitment_level": str(content.get("commitment_level", "safe_and_boring")),
             "engagement_prediction": engagement_prediction,
-            "meme_timing": str(content.get("meme_timing", "unknown")),
-            "share_mechanic": str(content.get("share_mechanic", "none")),
-            "platform_fit": str(content.get("platform_fit", "adapted")),
-            "dwell_time_estimate": str(content.get("dwell_time_estimate", "3-10sec")),
-            "brand_voice_fit": brand_voice_fit,
-            "screenshot_worthy": bool(content.get("screenshot_worthy", False)),
-            "em_dash_usage": str(content.get("em_dash_usage", "appropriate"))
+            "dwell_time": str(content.get("dwell_time", "scroll_past")),
+            "specific_reaction": str(content.get("specific_reaction", ""))
         }
-        
+
+        # Approval requires: screenshot-worthy + strong hook + right length
         approved = (
-            score >= 7.0 and 
-            engagement_prediction in ["viral", "solid"] and
-            hook_strength >= 6 and
-            brand_voice_fit != "needs_work"
+            score >= 7.0 and
+            screenshot_worthy and
+            would_share and
+            hook_strength >= 7 and
+            length_verdict == "perfect" and
+            engagement_prediction in ["viral", "solid"]
         )
-        
+
         feedback = ""
         if not approved:
-            feedback = content.get("platform_optimization", "")
+            feedback = content.get("fix", "")
             if not feedback:
-                if hook_strength < 6:
-                    feedback = "Hook too weak. First line needs to stop scroll instantly."
-                elif brand_voice_fit == "needs_work":
-                    feedback = "Brand voice doesn't match Jesse's Calm Conspirator style."
-                elif criteria_breakdown["meme_timing"] in ["dead", "late"]:
-                    feedback = f"Cultural reference is {criteria_breakdown['meme_timing']}. Need fresher reference."
+                if not screenshot_worthy:
+                    feedback = "Not screenshot-worthy. No one would share this. Make it genuinely memorable."
+                elif not would_share:
+                    feedback = "Wouldn't send to a friend. Missing the 'you have to see this' factor."
+                elif hook_strength < 7:
+                    feedback = f"Hook too weak ({hook_strength}/10). First 2 lines must STOP the scroll."
+                elif length_verdict == "too_long":
+                    feedback = f"Too long ({word_count} words). Cut to 40-80 words. People will scroll past."
+                elif length_verdict == "too_short":
+                    feedback = f"Too short ({word_count} words). Needs 40-80 words to build the hook properly."
+                elif engagement_prediction in ["moderate", "flop"]:
+                    feedback = f"Engagement prediction: {engagement_prediction}. Missing share trigger."
                 else:
-                    feedback = "Missing engagement trigger. What makes this screenshot-worthy?"
-        
-        self.logger.info(f"Jordan Park: {score}/10 {'✅' if approved else '❌'}")
-        
+                    feedback = "Missing the Liquid Death energy. Full commitment = shareability."
+
+        self.logger.info(f"Jordan Park: {score}/10 {'✅' if approved else '❌'} ({word_count} words, hook: {hook_strength}/10)")
+
         return ValidationScore(
             agent_name="JordanPark",
             score=score,

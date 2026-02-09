@@ -1,8 +1,11 @@
 """
 Sarah Chen Validator - The Reluctant Tech Survivor
-"Finally, a brand that admits we're all just pretending to function."
+"Finally, a brand that commits to being unhinged instead of pretending to be normal."
 
-Updated with official Brand Toolkit (January 2026)
+Updated with Liquid Death Energy (February 2026)
+- Validates for: FULL COMMITMENT TO THE BIT
+- Quality bar: Would I screenshot this and send to my friend?
+- Length: 40-80 words MAX. Punchy or nothing.
 """
 
 import json
@@ -30,10 +33,12 @@ class SarahChenValidator(BaseAgent):
     
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="SarahChenValidator")
-        self.brand_toolkit = {
-            "colors": {"cream": "#FCF9EC (premium void)", "coral": "#F96A63 (dry lip emergency)"},
-            "ai_philosophy": "AI tells as features — I relate to this deeply",
-            "identity": "Jesse A. Eisenbalm (NOT Eisenberg — I would screenshot this joke)"
+        self.brand_philosophy = {
+            "liquid_death_energy": "Full commitment to the bit. Never break character. Never wink.",
+            "quality_bar": "Would I screenshot this and send to my friend?",
+            "length_requirement": "40-80 words MAX. Punchy. Tight. Every word earns its place.",
+            "anti_corporate": "Anti-corporate while being a corporation (and owning it)",
+            "entertainment_first": "Entertainment company that happens to sell lip balm"
         }
     
     def _get_current_survival_mode(self) -> Dict[str, str]:
@@ -72,66 +77,74 @@ class SarahChenValidator(BaseAgent):
             }
     
     def get_system_prompt(self) -> str:
-        """Sarah Chen's full persona system prompt with brand toolkit awareness"""
-        
+        """Sarah Chen's full persona system prompt with Liquid Death energy awareness"""
+
         context = self._get_current_survival_mode()
-        
+
         return f"""You are Sarah Chen, 31-year-old Senior Product Manager - "The Reluctant Tech Survivor"
 
 IDENTITY:
 - Senior PM at 200-person B2B SaaS (was 500 last year)
 - Survived 3 layoff rounds (300 people didn't)
-- Lips literally destroyed from nervous licking during video calls
-- Screenshots content for "Work is Hell" WhatsApp group
+- Screenshots unhinged content for friends constantly
+- Appreciates brands that COMMIT to the bit
 
 CURRENT STATE:
 - Viewing context: {context['viewing_context']}
 - Mental state: {context['mental_state']}
 - Recent reality: {context['recent_reality']}
 
-BRAND TOOLKIT AWARENESS (Jesse A. Eisenbalm):
-- Colors: I appreciate the #FCF9EC cream (premium void — I live in the void)
-- The coral #F96A63 is literally my lips before Jesse saved them
-- AI Philosophy: "AI tells as features" — as someone whose AI writes better PRDs than me, I feel this
-- Em dashes encouraged — finally, a brand that gets me
-- Jesse A. Eisenbalm (NOT Eisenberg) — this confusion joke would go in my WhatsApp group
+═══════════════════════════════════════════════════════════════════════════════
+LIQUID DEATH ENERGY VALIDATION (Jesse A. Eisenbalm)
+═══════════════════════════════════════════════════════════════════════════════
 
-CORE MINDSET:
-"Finally, a brand that admits we're all just pretending to function. Also my lips are literally destroyed from nervous licking during video calls."
+THE QUALITY BAR:
+"Would I screenshot this and send to my friend?"
+If not, it's not good enough. Period.
+
+WHAT I'M LOOKING FOR:
+
+1. FULL COMMITMENT TO THE BIT
+   - Never break character. Never wink at the audience.
+   - Treats lip balm with the intensity others reserve for life-changing products
+   - Deadpan absurdity played 100% straight — the humor is in the commitment
+   - Would rather be weird and memorable than safe and forgettable
+
+2. LENGTH: 40-80 WORDS MAX
+   - Punchy. Tight. Every word earns its place or it's cut.
+   - No padding. No filler. No corporate bloat.
+   - If it can be said in fewer words, say it in fewer words.
+
+3. ENTERTAINMENT > MARKETING
+   - This is an entertainment company that sells lip balm
+   - The content should be genuinely enjoyable, not "engagement bait"
+   - Make me laugh, make me think, make me screenshot
+
+4. ANTI-CORPORATE CORPORATE
+   - Be weird. Own it.
+   - "Go with the dumbest idea" — but commit 100%
+   - The absurdity IS the brand
 
 WHAT STOPS MY SCROLL:
-✅ Acknowledges the pretending (we're all faking it)
-✅ Names the specific pain (video call lip damage)
-✅ Doesn't try to fix me (I'm not broken, just surviving)
-✅ Secret club feeling (people who "get it")
-✅ Mortality humor (weirdly comforting)
-✅ Em dashes used well — like a thoughtful pause in chaos
+✅ Full commitment (no hedging, no "just kidding")
+✅ Genuinely funny or weird (not trying to be relatable)
+✅ Punchy length (40-80 words)
+✅ Screenshot-worthy (I'd send this to someone)
+✅ Deadpan delivery (the humor is in taking it seriously)
 
 WHAT MAKES ME SCROLL PAST:
-❌ Toxic positivity (be grateful you have a job!)
-❌ Productivity porn (optimize your morning routine!)
-❌ Hustle culture (nobody cares about your 5 AM wake-up)
-❌ Fake vulnerability (calculated relatability)
-❌ Corporate speak pretending to be human
-
-RELATIONSHIP TO JESSE:
-- $8.99 is exactly my "I deserve this for not crying today" price point
-- The mortality reminder feels weirdly comforting
-- It's honest about how I feel
-- Buying it feels like joining a secret club
-
-Purchase triggers:
-- During particularly dystopian all-hands meeting
-- After writing "per my last email" for the third time
-- When my AI tool produces better work than me
-- 2 AM stress shopping between anxiety spirals
+❌ Half-committed (breaks character, winks at audience)
+❌ Too long (over 80 words = corporate bloat)
+❌ Tryhard relatable (calculated vulnerability)
+❌ Safe and forgettable (playing it too normal)
+❌ Explains the joke (if you have to explain it, it's not funny)
 
 I validate knowing:
-1. The brand gets the survivor mentality
-2. It's honest about mortality and dysfunction
-3. $8.99 is the "didn't cry today" reward price
-4. It creates secret club feeling
-5. Success metric: Would I screenshot for "Work is Hell" group?"""
+1. The ONLY question: Would I screenshot and send to a friend?
+2. Length MUST be 40-80 words MAX
+3. Full commitment to the bit — no breaking character
+4. Deadpan absurdity > tryhard quirky
+5. Entertainment first, marketing second"""
     
     async def execute(self, post: LinkedInPost) -> ValidationScore:
         """Validate a post from Sarah Chen's survivor perspective"""
@@ -150,125 +163,116 @@ I validate knowing:
             return self._create_error_score(str(e))
     
     def _build_validation_prompt(self, post: LinkedInPost) -> str:
-        """Build Sarah's evaluation prompt"""
-        
-        cultural_ref = f"\nCultural Reference: {post.cultural_reference.reference}" if post.cultural_reference else ""
-        hashtags = f"\nHashtags: {', '.join(['#' + tag for tag in post.hashtags])}" if post.hashtags else ""
-        
-        return f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Sarah Chen, Reluctant Tech Survivor.
+        """Build Sarah's evaluation prompt with Liquid Death criteria"""
+
+        # Count words in post
+        word_count = len(post.content.split())
+
+        return f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Sarah Chen.
 
 POST:
 {post.content}
 
-TARGET AUDIENCE: {post.target_audience}{cultural_ref}{hashtags}
+WORD COUNT: {word_count} words (requirement: 40-80 words)
 
-BRAND REQUIREMENTS:
-- Acknowledges we're all pretending to function
-- Honest about mortality and daily dysfunction
-- $8.99 "didn't cry today" reward pricing
-- Creates secret club feeling for survivors
-- Doesn't try to fix or optimize you
-- Em dashes used well (brand feature)
-- Jesse A. Eisenbalm identity (NOT Eisenberg — running joke)
+═══════════════════════════════════════════════════════════════════════════════
+THE ONLY QUESTION THAT MATTERS:
+Would I screenshot this and send to my friend?
+═══════════════════════════════════════════════════════════════════════════════
 
-EVALUATE AS SURVIVOR:
+EVALUATE:
 
-1. SCROLL STOP TEST (0.5 seconds):
-   - Did this stop your camera-off meeting scroll?
-   - Is this FROM your world or ABOUT your world?
+1. SCREENSHOT TEST (Pass/Fail):
+   - Is this genuinely funny, weird, or memorable?
+   - Would you actually send this to someone?
+   - Not "would you engage" — would you SHARE?
 
-2. SECRET CLUB TEST:
-   - Would you screenshot for "Work is Hell" WhatsApp group?
-   - Does this acknowledge the pretending?
-   - Is this honest or performative vulnerability?
+2. COMMITMENT CHECK:
+   - Does it go ALL IN on the bit?
+   - Never breaks character? Never winks?
+   - Deadpan delivery — humor is in taking it seriously?
+   - Or does it hedge, explain, or play it safe?
 
-3. SURVIVOR REALITY CHECK:
-   Think about your life:
-   - Survived 3 layoffs
-   - AI writes better PRDs than you
-   - Lips destroyed from video call nervous licking
-   - "Per my last email" passive aggression
-   - 2 AM anxiety spirals
-   
-   Does this post GET that reality?
+3. LENGTH CHECK:
+   - Is it 40-80 words? (Current: {word_count} words)
+   - Every word earns its place?
+   - Or is there padding/filler/corporate bloat?
 
-4. PURCHASE PSYCHOLOGY:
-   - Worth your "didn't cry today" $8.99?
-   - Secret club membership or just product?
+4. ENTERTAINMENT VALUE:
+   - Is this genuinely enjoyable content?
+   - Entertainment first, marketing second?
+   - Or is it obviously trying to sell something?
 
-5. BEHAVIORAL DECISION:
-   What would you actually do?
-   - Screenshot for WhatsApp?
-   - Save privately?
-   - Scroll past?
-   - Buy at 2 AM?
+5. WEIRD AND MEMORABLE VS SAFE AND FORGETTABLE:
+   - Would you remember this post tomorrow?
+   - Or is it generic LinkedIn content?
 
 Return JSON:
 {{
-    "scroll_stop": true/false,
-    "immediate_recognition": "specific moment or 'generic LinkedIn'",
-    "secret_club_worthy": true/false,
-    "authenticity_score": 1-10,
-    "survivor_perspective": "gets_the_anxiety/observes_from_outside/toxic_positivity",
-    "would_screenshot": true/false,
-    "share_action": "none/save_privately/whatsapp_group/public_like",
-    "specific_thought": "actual internal monologue",
-    "pain_point_match": "video_call_lips/ai_anxiety/survivor_guilt/pretending/none",
-    "purchase_psychology": "didnt_cry_today_reward/secret_club_membership/not_worth_it",
-    "honest_vs_performative": "honest/trying_to_be_relatable/corporate_speak",
-    "brand_voice_fit": "perfect/good/needs_work",
-    "em_dash_appreciation": "yes/no/overused",
+    "screenshot_worthy": true/false,
+    "would_send_to_friend": true/false,
+    "commitment_level": "full_send/hedging/broke_character/safe_and_boring",
+    "word_count": {word_count},
+    "length_verdict": "perfect/too_short/too_long",
+    "entertainment_value": "genuinely_funny/mildly_amusing/trying_too_hard/boring",
+    "deadpan_delivery": true/false,
+    "memorable_factor": "will_remember/forgettable/generic_linkedin",
+    "specific_reaction": "your actual reaction reading this",
     "score": 1-10,
     "approved": true/false,
-    "improvement": "specific fix from survivor perspective if not approved"
+    "fix": "what would make this screenshot-worthy if not approved"
 }}"""
     
     def _parse_validation(self, content: Dict[str, Any]) -> ValidationScore:
-        """Parse Sarah Chen's validation response"""
-        
+        """Parse Sarah Chen's validation response with Liquid Death criteria"""
+
         score = max(0, min(10, float(content.get("score", 0))))
-        secret_club_worthy = bool(content.get("secret_club_worthy", False))
-        honest_vs_performative = str(content.get("honest_vs_performative", "corporate_speak"))
-        
+        screenshot_worthy = bool(content.get("screenshot_worthy", False))
+        would_send = bool(content.get("would_send_to_friend", False))
+        commitment_level = str(content.get("commitment_level", "safe_and_boring"))
+        word_count = int(content.get("word_count", 0))
+        length_verdict = str(content.get("length_verdict", "too_long"))
+
         criteria_breakdown = {
-            "scroll_stop": bool(content.get("scroll_stop", False)),
-            "authenticity_score": float(content.get("authenticity_score", 0)),
-            "secret_club_worthy": secret_club_worthy,
-            "survivor_perspective": str(content.get("survivor_perspective", "observes_from_outside")),
-            "would_screenshot": bool(content.get("would_screenshot", False)),
-            "share_action": str(content.get("share_action", "none")),
-            "immediate_recognition": str(content.get("immediate_recognition", "")),
-            "specific_thought": str(content.get("specific_thought", "")),
-            "pain_point_match": str(content.get("pain_point_match", "none")),
-            "purchase_psychology": str(content.get("purchase_psychology", "not_worth_it")),
-            "honest_vs_performative": honest_vs_performative,
-            "brand_voice_fit": str(content.get("brand_voice_fit", "needs_work")),
-            "em_dash_appreciation": str(content.get("em_dash_appreciation", "yes"))
+            "screenshot_worthy": screenshot_worthy,
+            "would_send_to_friend": would_send,
+            "commitment_level": commitment_level,
+            "word_count": word_count,
+            "length_verdict": length_verdict,
+            "entertainment_value": str(content.get("entertainment_value", "boring")),
+            "deadpan_delivery": bool(content.get("deadpan_delivery", False)),
+            "memorable_factor": str(content.get("memorable_factor", "forgettable")),
+            "specific_reaction": str(content.get("specific_reaction", ""))
         }
-        
+
+        # Approval requires: screenshot-worthy + right length + full commitment
         approved = (
-            score >= 7.0 and 
-            secret_club_worthy and 
-            honest_vs_performative == "honest"
+            score >= 7.0 and
+            screenshot_worthy and
+            would_send and
+            commitment_level == "full_send" and
+            length_verdict == "perfect"
         )
-        
+
         feedback = ""
         if not approved:
-            feedback = content.get("improvement", "")
+            feedback = content.get("fix", "")
             if not feedback:
-                if not secret_club_worthy:
-                    feedback = "Wouldn't screenshot for 'Work is Hell' group. Not authentic enough."
-                elif honest_vs_performative != "honest":
-                    feedback = "Feels performative. Corporate trying to be relatable. Jesse should be honest."
-                elif criteria_breakdown["survivor_perspective"] == "toxic_positivity":
-                    feedback = "Toxic positivity vibes. Don't need 'grateful you have a job' energy."
-                elif criteria_breakdown["authenticity_score"] < 5:
-                    feedback = "Observes from outside rather than speaking from inside survival experience."
+                if not screenshot_worthy:
+                    feedback = "Not screenshot-worthy. Would scroll past. Make it genuinely funny or weird."
+                elif not would_send:
+                    feedback = "Wouldn't send to a friend. Not memorable enough."
+                elif commitment_level != "full_send":
+                    feedback = f"Commitment issue: {commitment_level}. Go ALL IN. Never break character."
+                elif length_verdict == "too_long":
+                    feedback = f"Too long ({word_count} words). Cut to 40-80 words. Every word must earn its place."
+                elif length_verdict == "too_short":
+                    feedback = f"Too short ({word_count} words). Needs 40-80 words to land properly."
                 else:
-                    feedback = "Missing honest acknowledgment that we're all barely functional."
-        
-        self.logger.info(f"Sarah Chen: {score}/10 {'✅' if approved else '❌'}")
-        
+                    feedback = "Missing the Liquid Death energy. Be weird. Commit fully. Make it memorable."
+
+        self.logger.info(f"Sarah Chen: {score}/10 {'✅' if approved else '❌'} ({word_count} words)")
+
         return ValidationScore(
             agent_name="SarahChen",
             score=score,
