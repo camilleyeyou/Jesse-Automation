@@ -530,16 +530,31 @@ RULES (NON-NEGOTIABLE)
             # Now extract the actual content with proper fallbacks
             content = ""
             if isinstance(content_data, dict):
+                # Try direct "content" field first
                 content = content_data.get("content", "")
-                
-                # Check if content is nested in another field
+
+                # Check if content is nested in "post" field
                 if not content and "post" in content_data:
                     post_info = content_data["post"]
                     if isinstance(post_info, dict):
+                        # Try "content" field in post
                         content = post_info.get("content", "")
-            
+                        # If no "content", try "body" (some models return headline + body)
+                        if not content:
+                            body = post_info.get("body", "")
+                            headline = post_info.get("headline", "")
+                            if body:
+                                content = body
+                            elif headline:
+                                content = headline
+
+                # Also check for direct "body" field at top level
+                if not content:
+                    content = content_data.get("body", "")
+
             # Final fallback: if we still don't have content, use the dict's string representation
             if not content:
+                self.logger.warning(f"No content field found, using raw response. Keys: {content_data.keys() if isinstance(content_data, dict) else 'not a dict'}")
                 content = str(content_data)
             
             content = self._clean_content(content)
