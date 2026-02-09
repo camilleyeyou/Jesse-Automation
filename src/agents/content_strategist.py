@@ -523,74 +523,58 @@ RULES (NON-NEGOTIABLE)
             )
             
             # FIXED: Better handling of the response structure
-            # The result should contain a 'content' field with the parsed JSON
-            if isinstance(result, dict):
-                # Try to get content from various possible locations
-                content_data = None
-                
-                # Check if we have a nested structure
-                if "content" in result:
-                    content_field = result["content"]
-                    
-                    # Case 1: content_field is already a dict with the post data
-                    if isinstance(content_field, dict):
+            # The result contains a 'content' field with the parsed JSON from OpenAI
+            content_data = None
+
+            if isinstance(result, dict) and "content" in result:
+                content_field = result["content"]
+
+                if isinstance(content_field, dict):
+                    # Check if wrapped in "post" key (common model behavior)
+                    if "post" in content_field and isinstance(content_field["post"], dict):
+                        content_data = content_field["post"]
+                    else:
                         content_data = content_field
-                    
-                    # Case 2: content_field is a string that might be JSON
-                    elif isinstance(content_field, str):
-                        try:
-                            parsed = json.loads(content_field)
-                            if isinstance(parsed, dict):
-                                # Check for nested 'post' structure
-                                if "post" in parsed:
-                                    content_data = parsed["post"]
-                                else:
-                                    content_data = parsed
-                        except json.JSONDecodeError:
-                            # If it's not JSON, use it as content directly
-                            content_data = {"content": content_field}
-                
-                # Fallback: use the entire result as content_data
-                if content_data is None:
-                    content_data = result
-            
-            # If result is not a dict (shouldn't happen with proper API response)
-            else:
-                content_data = {"content": str(result)}
-            
-            # Ensure content_data is a dictionary
-            if not isinstance(content_data, dict):
-                content_data = {"content": str(content_data)}
-            
-            # Now extract the actual content with proper fallbacks
+                elif isinstance(content_field, str):
+                    try:
+                        parsed = json.loads(content_field)
+                        if isinstance(parsed, dict):
+                            if "post" in parsed:
+                                content_data = parsed["post"]
+                            else:
+                                content_data = parsed
+                    except json.JSONDecodeError:
+                        content_data = {"content": content_field}
+
+            if content_data is None:
+                content_data = result if isinstance(result, dict) else {"content": str(result)}
+
+            # Extract the actual post content text
             content = ""
             if isinstance(content_data, dict):
-                # Try direct "content" field first
-                content = content_data.get("content", "")
+                # Try these fields in order of preference
+                for field in ["content", "body", "text", "post_content"]:
+                    if field in content_data and content_data[field]:
+                        content = str(content_data[field])
+                        break
 
-                # Check if content is nested in "post" field
+                # If still no content, check for nested post structure one more time
                 if not content and "post" in content_data:
                     post_info = content_data["post"]
                     if isinstance(post_info, dict):
-                        # Try "content" field in post
-                        content = post_info.get("content", "")
-                        # If no "content", try "body" (some models return headline + body)
-                        if not content:
-                            body = post_info.get("body", "")
-                            headline = post_info.get("headline", "")
-                            if body:
-                                content = body
-                            elif headline:
-                                content = headline
+                        for field in ["content", "body", "text"]:
+                            if field in post_info and post_info[field]:
+                                content = str(post_info[field])
+                                break
 
-                # Also check for direct "body" field at top level
-                if not content:
-                    content = content_data.get("body", "")
-
-            # Final fallback: if we still don't have content, use the dict's string representation
+            # Final fallback
             if not content:
-                self.logger.warning(f"No content field found, using raw response. Keys: {content_data.keys() if isinstance(content_data, dict) else 'not a dict'}")
-                content = str(content_data)
+                self.logger.warning(f"No content field found, keys: {content_data.keys() if isinstance(content_data, dict) else 'N/A'}")
+                # Try to extract just the content value, not the whole dict
+                if isinstance(content_data, dict) and len(content_data) == 1:
+                    content = str(list(content_data.values())[0])
+                else:
+                    content = str(content_data)
             
             content = self._clean_content(content)
             

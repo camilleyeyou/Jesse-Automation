@@ -5,13 +5,14 @@ openai:
   max_tokens: 600
   timeout: 30
 
-# Google Gemini configuration for image generation
+# Google Imagen configuration for image generation
 google:
   api_key: ${GOOGLE_API_KEY}
-  
-  # Image model (Gemini 2.5 Flash Image)
-  image_model: gemini-2.5-flash-image
-  
+
+  # Image model - Imagen 3 production ($0.03/image, reliable)
+  # Options: imagen-3.0-generate-002 (recommended), gemini-2.5-flash-image (experimental)
+  image_model: imagen-3.0-generate-002
+
   # Enable/disable image generation
   use_images: true  # Set to false to skip image generation
 
