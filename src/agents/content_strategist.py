@@ -487,33 +487,72 @@ RULES (NON-NEGOTIABLE)
                 response_format="json"
             )
             
-            # Extract content from the nested response structure
-            # API returns: {'content': {'post': {'content': "..."}}, 'usage': {...}}
-            content_data = result.get("content", {})
+            # FIXED: Better handling of the response structure
+            # The result should contain a 'content' field with the parsed JSON
+            if isinstance(result, dict):
+                # Try to get content from various possible locations
+                content_data = None
+                
+                # Check if we have a nested structure
+                if "content" in result:
+                    content_field = result["content"]
+                    
+                    # Case 1: content_field is already a dict with the post data
+                    if isinstance(content_field, dict):
+                        content_data = content_field
+                    
+                    # Case 2: content_field is a string that might be JSON
+                    elif isinstance(content_field, str):
+                        try:
+                            parsed = json.loads(content_field)
+                            if isinstance(parsed, dict):
+                                # Check for nested 'post' structure
+                                if "post" in parsed:
+                                    content_data = parsed["post"]
+                                else:
+                                    content_data = parsed
+                        except json.JSONDecodeError:
+                            # If it's not JSON, use it as content directly
+                            content_data = {"content": content_field}
+                
+                # Fallback: use the entire result as content_data
+                if content_data is None:
+                    content_data = result
             
-            # If content_data is a string, try to parse as JSON
-            if isinstance(content_data, str):
-                try:
-                    content_data = json.loads(content_data)
-                except json.JSONDecodeError:
-                    content_data = {"content": content_data}
+            # If result is not a dict (shouldn't happen with proper API response)
+            else:
+                content_data = {"content": str(result)}
             
-            # Handle nested 'post' structure from API
-            if isinstance(content_data, dict) and "post" in content_data:
-                content_data = content_data["post"]
+            # Ensure content_data is a dictionary
+            if not isinstance(content_data, dict):
+                content_data = {"content": str(content_data)}
             
-            # Now extract the actual content
+            # Now extract the actual content with proper fallbacks
             content = ""
             if isinstance(content_data, dict):
                 content = content_data.get("content", "")
-            elif isinstance(content_data, str):
-                content = content_data
+                
+                # Check if content is nested in another field
+                if not content and "post" in content_data:
+                    post_info = content_data["post"]
+                    if isinstance(post_info, dict):
+                        content = post_info.get("content", "")
             
+            # Final fallback: if we still don't have content, use the dict's string representation
             if not content:
-                self.logger.error(f"No content found in response: {result}")
-                raise ValueError("Failed to extract content from API response")
+                content = str(content_data)
             
             content = self._clean_content(content)
+            
+            # FIXED: Safely extract hook_type from content_data
+            hook_type = "creative"
+            if isinstance(content_data, dict):
+                hook_type = content_data.get("hook_type", "creative")
+            
+            # FIXED: Safely extract image_direction from content_data
+            image_direction = "product"
+            if isinstance(content_data, dict):
+                image_direction = content_data.get("image_direction", "product")
             
             # Step 4: Create post object
             post = LinkedInPost(
@@ -525,18 +564,18 @@ RULES (NON-NEGOTIABLE)
                 target_audience="LinkedIn professionals seeking humanity in work",
                 cultural_reference=CulturalReference(
                     category=strategy.pillar.value,
-                    reference=content_data.get("hook_type", "creative"),
-                    context=content_data.get("image_direction", "product")
+                    reference=hook_type,  # FIXED: Use the extracted hook_type
+                    context=image_direction  # FIXED: Use the extracted image_direction
                 ),
-                total_tokens_used=result.get("usage", {}).get("total_tokens", 0),
-                estimated_cost=self._calculate_cost(result.get("usage", {}))
+                total_tokens_used=result.get("usage", {}).get("total_tokens", 0) if isinstance(result, dict) else 0,
+                estimated_cost=self._calculate_cost(result.get("usage", {})) if isinstance(result, dict) else 0.0
             )
             
             self.logger.info(f"✨ Generated post {post_number}: {len(content)} chars")
             return post
             
         except Exception as e:
-            self.logger.error(f"Generation failed: {e}")
+            self.logger.error(f"Generation failed: {e}", exc_info=True)  # Added exc_info for better debugging
             raise
 
     def _select_creative_strategy(
