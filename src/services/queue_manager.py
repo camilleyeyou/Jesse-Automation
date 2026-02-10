@@ -1,6 +1,7 @@
 """
 Post Queue Manager
 SQLite-backed persistent queue for scheduled posting
+With memory integration for learning from past posts
 """
 
 import json
@@ -13,14 +14,31 @@ from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
+# Import memory system
+try:
+    from ..infrastructure.memory import get_memory
+    MEMORY_AVAILABLE = True
+except ImportError:
+    MEMORY_AVAILABLE = False
+    get_memory = None
+
 
 class PostQueueManager:
     """Manages a persistent queue of posts for scheduled publishing"""
-    
+
     def __init__(self, db_path: str = "data/automation/queue.db"):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_database()
+
+        # Initialize memory system for learning
+        self.memory = None
+        if MEMORY_AVAILABLE:
+            try:
+                self.memory = get_memory(str(self.db_path))
+                logger.info("✅ Queue Manager connected to memory system")
+            except Exception as e:
+                logger.warning(f"Memory system unavailable: {e}")
     
     def _init_database(self):
         """Initialize SQLite database with required tables"""
@@ -204,16 +222,16 @@ class PostQueueManager:
         self._log_activity("remove_from_queue", {"post_id": post_id}, "success")
         logger.info(f"Removed post {post_id} from queue")
     
-    def record_published(self, post_data: Dict[str, Any], linkedin_post_id: str = None, 
+    def record_published(self, post_data: Dict[str, Any], linkedin_post_id: str = None,
                          status: str = "success", error: str = None):
-        """Record a published post to history"""
-        
+        """Record a published post to history and memory"""
+
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            
+
             cursor.execute("""
-                INSERT INTO published_posts 
-                (id, post_id, linkedin_post_id, content, hashtags, image_url, 
+                INSERT INTO published_posts
+                (id, post_id, linkedin_post_id, content, hashtags, image_url,
                  status, error_message, metadata)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
@@ -227,9 +245,20 @@ class PostQueueManager:
                 error,
                 json.dumps(post_data.get("metadata", {}))
             ))
-            
+
             conn.commit()
-        
+
+        # Store in memory system for learning
+        if self.memory and status == "success":
+            try:
+                self.memory.mark_posted_to_linkedin(
+                    post_data.get("id", ""),
+                    linkedin_post_id or ""
+                )
+                logger.debug(f"📝 Recorded published post in memory: {post_data.get('id')}")
+            except Exception as e:
+                logger.warning(f"Failed to record in memory: {e}")
+
         self._log_activity("record_published", {
             "post_id": post_data.get("id"),
             "linkedin_post_id": linkedin_post_id,
@@ -347,18 +376,39 @@ class PostQueueManager:
     
     def get_activity_log(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Get recent activity log entries"""
-        
+
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            
+
             cursor.execute("""
-                SELECT * FROM activity_log 
+                SELECT * FROM activity_log
                 ORDER BY timestamp DESC
                 LIMIT ?
             """, (limit,))
-            
+
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_memory_insights(self) -> Dict[str, Any]:
+        """Get insights from memory system about past content performance"""
+        if not self.memory:
+            return {"available": False, "message": "Memory system not available"}
+
+        try:
+            stats = self.memory.get_stats()
+            recent_posts = self.memory.get_recent_posts(days=30, limit=20)
+            recent_topics = self.memory.get_recent_topics(days=7, limit=10)
+
+            return {
+                "available": True,
+                "stats": stats,
+                "recent_posts_count": len(recent_posts),
+                "recent_topics": recent_topics,
+                "learning_enabled": True
+            }
+        except Exception as e:
+            logger.warning(f"Failed to get memory insights: {e}")
+            return {"available": False, "error": str(e)}
 
 
 # Singleton instance

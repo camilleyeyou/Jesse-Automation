@@ -6,8 +6,9 @@ Generates images that blend premium minimalism, existential dread, and corporate
 with intelligent mood detection and massive variety systems.
 
 Updated with official Brand Toolkit (January 2026) and Jesse photo reference styles.
+Now with memory integration to track visual styles used.
 
-Cost: $0.039 per image (Gemini 2.0 Flash)
+Cost: $0.03 per image (Imagen 3) or $0.039 per image (Gemini Flash)
 """
 
 import os
@@ -21,6 +22,14 @@ from .base_agent import BaseAgent
 from ..models.post import LinkedInPost
 
 logger = logging.getLogger(__name__)
+
+# Import memory system
+try:
+    from ..infrastructure.memory import get_memory
+    MEMORY_AVAILABLE = True
+except ImportError:
+    MEMORY_AVAILABLE = False
+    get_memory = None
 
 
 class ImageGeneratorAgent(BaseAgent):
@@ -41,17 +50,26 @@ class ImageGeneratorAgent(BaseAgent):
     
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="ImageGenerator")
-        
+
         # Image output directory
         self.output_dir = Path("data/images")
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Initialize Jesse's comprehensive visual language from Brand Toolkit
         self._initialize_visual_language()
-        
+
         # Calculate variety
         self.total_combinations = self._calculate_total_combinations()
-        
+
+        # Initialize memory system for tracking visual styles
+        self.memory = None
+        if MEMORY_AVAILABLE:
+            try:
+                self.memory = get_memory()
+                self.logger.info("✅ Memory system connected for visual style tracking")
+            except Exception as e:
+                self.logger.warning(f"Memory system unavailable: {e}")
+
         self.logger.info(f"ImageGenerator initialized: {self.total_combinations:,} unique combinations possible")
     
     def _initialize_visual_language(self):
@@ -679,10 +697,10 @@ Create prompts that are 150-200 words with precise visual detail, emotional subt
             
             file_size = os.path.getsize(saved_path)
             size_mb = file_size / (1024 * 1024)
-            
+
             self.logger.info(f"🎨 Generated image for post {post.post_number}: {saved_path}")
-            
-            return {
+
+            result = {
                 "success": True,
                 "saved_path": saved_path,
                 "prompt": enhanced_prompt,
@@ -694,11 +712,26 @@ Create prompts that are 150-200 words with precise visual detail, emotional subt
                 "uses_jesse": use_jesse,
                 "generation_time": round(generation_time, 2),
                 "size_mb": round(size_mb, 3),
-                "cost": image_result.get("cost", 0.039),
+                "cost": image_result.get("cost", 0.03),
                 "brand_aesthetic": "what if Apple sold mortality?",
                 "visual_philosophy": "premium minimalism meets existential dread",
                 "media_type": "image"
             }
+
+            # Record in memory for visual style tracking
+            if self.memory:
+                try:
+                    self.memory.remember_image_style(
+                        post_id=f"{post.batch_id[:8]}_{post.post_number}",
+                        scene_category=visual_elements.get("scene_key", "custom"),
+                        mood=post_mood,
+                        uses_jesse=use_jesse,
+                        jesse_scenario=visual_elements.get("jesse_scenario")
+                    )
+                except Exception as e:
+                    self.logger.debug(f"Could not record image style in memory: {e}")
+
+            return result
             
         except Exception as e:
             self.logger.error(f"Failed to generate image: {e}")

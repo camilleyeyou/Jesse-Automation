@@ -433,6 +433,57 @@ class AgentMemory:
             conn.commit()
 
     # ═══════════════════════════════════════════════════════════════════════════
+    # IMAGE STYLE MEMORY
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def remember_image_style(
+        self,
+        post_id: str,
+        scene_category: str,
+        mood: str,
+        uses_jesse: bool = False,
+        jesse_scenario: str = None,
+        image_type: str = "product"
+    ):
+        """Record image style used for a post (for variety tracking)"""
+
+        # Store as learning insight
+        self.store_insight(
+            insight_type="image_style",
+            key=post_id,
+            value={
+                "scene_category": scene_category,
+                "mood": mood,
+                "uses_jesse": uses_jesse,
+                "jesse_scenario": jesse_scenario,
+                "image_type": image_type
+            },
+            confidence=1.0,
+            sample_count=1
+        )
+
+        logger.debug(f"Remembered image style for {post_id}: {scene_category}/{mood}")
+
+    def get_recent_image_styles(self, days: int = 7, limit: int = 20) -> List[Dict]:
+        """Get recently used image styles (to avoid repetition)"""
+
+        insights = self.get_all_insights("image_style")
+
+        # Filter by date and limit
+        recent = []
+        for i in insights[:limit]:
+            try:
+                value = json.loads(i.get("insight_value", "{}")) if isinstance(i.get("insight_value"), str) else i.get("insight_value", {})
+                recent.append({
+                    "post_id": i.get("insight_key"),
+                    **value
+                })
+            except Exception:
+                pass
+
+        return recent
+
+    # ═══════════════════════════════════════════════════════════════════════════
     # VALIDATOR LEARNING MEMORY
     # ═══════════════════════════════════════════════════════════════════════════
 

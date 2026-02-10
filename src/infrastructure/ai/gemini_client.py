@@ -22,22 +22,29 @@ except ImportError:
 
 
 class GeminiImageClient:
-    """Client for Google Gemini 2.5 Flash Image generation"""
-    
-    def __init__(self, api_key: Optional[str] = None):
-        """Initialize Gemini client"""
+    """Client for Google Gemini/Imagen image generation"""
+
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
+        """
+        Initialize Gemini client
+
+        Args:
+            api_key: Google API key (defaults to GOOGLE_API_KEY env var)
+            model: Image model to use (defaults to imagen-3.0-generate-002)
+        """
         if not GEMINI_AVAILABLE:
             raise ImportError("Google Gemini SDK not installed")
-        
+
         self.api_key = api_key or os.getenv("GOOGLE_API_KEY")
-        
+
         if not self.api_key:
             raise ValueError("GOOGLE_API_KEY not found in environment")
-        
+
         self.client = genai.Client(api_key=self.api_key)
-        self.model = "gemini-2.5-flash-image"
-        
-        logger.info("GeminiImageClient initialized")
+        # Use provided model or default to production Imagen 3
+        self.model = model or os.getenv("GOOGLE_IMAGE_MODEL", "imagen-3.0-generate-002")
+
+        logger.info(f"GeminiImageClient initialized with model: {self.model}")
     
     def generate_image(
         self,
