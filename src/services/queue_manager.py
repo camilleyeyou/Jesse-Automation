@@ -410,6 +410,122 @@ class PostQueueManager:
             logger.warning(f"Failed to get memory insights: {e}")
             return {"available": False, "error": str(e)}
 
+    def post_from_queue(self, linkedin_poster, post_id: str = None) -> Dict[str, Any]:
+        """
+        Post the next item from the queue to LinkedIn.
+
+        Args:
+            linkedin_poster: LinkedInPoster instance
+            post_id: Optional specific post ID to publish (otherwise uses next in queue)
+
+        Returns:
+            Dict with success status and details
+        """
+        # Get the post to publish
+        if post_id:
+            post_data = self.get_post_by_id(post_id)
+            if not post_data:
+                return {"success": False, "error": f"Post {post_id} not found in queue"}
+        else:
+            post_data = self.get_next_post()
+            if not post_data:
+                return {"success": False, "error": "No pending posts in queue"}
+
+        post_id = post_data.get("id")
+        logger.info(f"📤 Publishing post {post_id} from queue...")
+
+        # Mark as publishing
+        self.update_status(post_id, "publishing")
+
+        try:
+            # Publish to LinkedIn
+            result = linkedin_poster.publish_post(
+                content=post_data.get("content", ""),
+                image_path=post_data.get("image_url"),
+                hashtags=post_data.get("hashtags", [])
+            )
+
+            if result.get("success"):
+                linkedin_post_id = result.get("post_id")
+                logger.info(f"✅ Posted successfully: {linkedin_post_id}")
+
+                # Update queue status
+                self.update_status(post_id, "published")
+
+                # Record in history
+                self.record_published(post_data, linkedin_post_id, "success")
+
+                # Remove from active queue
+                self.remove_from_queue(post_id)
+
+                return {
+                    "success": True,
+                    "post_id": post_id,
+                    "linkedin_post_id": linkedin_post_id,
+                    "content": post_data.get("content", "")[:100] + "...",
+                    "message": "Post published successfully from queue"
+                }
+            else:
+                error_msg = result.get("error", "Unknown error")
+                logger.error(f"❌ LinkedIn publish failed: {error_msg}")
+
+                # Mark as failed but keep in queue
+                self.update_status(post_id, "failed")
+
+                # Record failure
+                self.record_published(post_data, None, "failed", error_msg)
+
+                return {
+                    "success": False,
+                    "post_id": post_id,
+                    "error": error_msg,
+                    "details": result.get("details")
+                }
+
+        except Exception as e:
+            logger.error(f"❌ Exception publishing from queue: {e}")
+            self.update_status(post_id, "failed")
+            return {
+                "success": False,
+                "post_id": post_id,
+                "error": str(e)
+            }
+
+    def get_post_by_id(self, post_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific post from the queue by ID"""
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT * FROM post_queue WHERE id = ?
+            """, (post_id,))
+
+            row = cursor.fetchone()
+            if row:
+                return self._row_to_dict(row)
+            return None
+
+    def requeue_failed(self) -> int:
+        """Move all failed posts back to pending status"""
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE post_queue
+                SET status = 'pending', updated_at = datetime('now')
+                WHERE status = 'failed'
+            """)
+            count = cursor.rowcount
+            conn.commit()
+
+        if count > 0:
+            logger.info(f"♻️ Requeued {count} failed posts")
+            self._log_activity("requeue_failed", {"count": count}, "success")
+
+        return count
+
 
 # Singleton instance
 _queue_manager: Optional[PostQueueManager] = None

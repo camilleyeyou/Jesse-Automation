@@ -514,6 +514,49 @@ async def clear_queue(status: Optional[str] = None):
     return {"success": True, "deleted": deleted}
 
 
+@app.post("/api/automation/queue/post")
+async def post_from_queue(post_id: Optional[str] = None):
+    """
+    Post the next item from the queue to LinkedIn.
+
+    Args:
+        post_id: Optional specific post ID to publish (otherwise uses next pending)
+
+    Returns:
+        Result with LinkedIn post ID on success
+    """
+    if not linkedin_poster:
+        raise HTTPException(500, "LinkedIn poster not initialized")
+
+    result = queue_manager.post_from_queue(linkedin_poster, post_id)
+
+    if result.get("success"):
+        return result
+    else:
+        raise HTTPException(400, result.get("error", "Failed to post from queue"))
+
+
+@app.post("/api/automation/queue/post/{post_id}")
+async def post_specific_from_queue(post_id: str):
+    """Post a specific item from the queue to LinkedIn"""
+    if not linkedin_poster:
+        raise HTTPException(500, "LinkedIn poster not initialized")
+
+    result = queue_manager.post_from_queue(linkedin_poster, post_id)
+
+    if result.get("success"):
+        return result
+    else:
+        raise HTTPException(400, result.get("error", "Failed to post from queue"))
+
+
+@app.post("/api/automation/queue/requeue-failed")
+async def requeue_failed_posts():
+    """Move all failed posts back to pending status"""
+    count = queue_manager.requeue_failed()
+    return {"success": True, "requeued": count}
+
+
 # ============== History Endpoints ==============
 
 @app.get("/api/automation/history")
