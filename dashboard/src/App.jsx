@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Play, Square, Clock, Send, Sparkles, Calendar, 
-  History, Settings, RefreshCw, AlertCircle, CheckCircle,
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Play, Square, Clock, Send, Sparkles, Calendar,
+  History, RefreshCw, AlertCircle, CheckCircle,
   Linkedin, Image, FileText, Zap, BarChart3, X, ZoomIn, Video,
-  MessageCircle, ExternalLink, ThumbsUp, MessageSquare, Copy, Check
+  MessageCircle, ExternalLink, ThumbsUp, MessageSquare, Copy, Check,
+  Menu, ChevronRight
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
@@ -77,38 +78,59 @@ const getVideoUrl = (videoPath) => {
 
 function StatusBadge({ active, label }) {
   return (
-    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-      active 
-        ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+    <span className={`px-2.5 py-1 sm:px-3 rounded-full text-xs sm:text-sm font-medium inline-flex items-center gap-1.5 transition-all duration-200 ${
+      active
+        ? 'bg-green-500/20 text-green-400 border border-green-500/30 shadow-green-500/10 shadow-lg'
         : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
     }`}>
-      {active ? '● ' : '○ '}{label}
+      <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
+      {label}
     </span>
   );
 }
 
-function Card({ children, className = '' }) {
+function Card({ children, className = '', hover = false }) {
   return (
-    <div className={`bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 ${className}`}>
+    <div className={`
+      bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl
+      p-4 sm:p-6
+      transition-all duration-300
+      ${hover ? 'hover:bg-white/8 hover:border-white/20 hover:shadow-xl hover:shadow-black/20 hover:-translate-y-0.5' : ''}
+      ${className}
+    `}>
       {children}
     </div>
   );
 }
 
-function Button({ children, onClick, variant = 'primary', disabled = false, loading = false }) {
+function Button({ children, onClick, variant = 'primary', disabled = false, loading = false, size = 'default', fullWidth = false }) {
   const variants = {
-    primary: 'bg-amber-500 hover:bg-amber-400 text-black',
-    secondary: 'bg-white/10 hover:bg-white/20 text-white border border-white/20',
-    danger: 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30',
-    success: 'bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30'
+    primary: 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30',
+    secondary: 'bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30',
+    danger: 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 hover:border-red-500/50',
+    success: 'bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 hover:border-green-500/50',
+    ghost: 'bg-transparent hover:bg-white/10 text-gray-400 hover:text-white'
+  };
+
+  const sizes = {
+    small: 'px-2.5 py-1.5 text-xs sm:text-sm',
+    default: 'px-3 py-2 sm:px-4 sm:py-2.5 text-sm',
+    large: 'px-5 py-3 sm:px-6 sm:py-3.5 text-base'
   };
 
   return (
     <button
       onClick={onClick}
       disabled={disabled || loading}
-      className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 
-        ${variants[variant]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      className={`
+        ${sizes[size]} rounded-lg font-medium
+        transition-all duration-200
+        flex items-center justify-center gap-2
+        active:scale-[0.98]
+        ${variants[variant]}
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+        ${fullWidth ? 'w-full' : ''}
+      `}
     >
       {loading && <RefreshCw className="w-4 h-4 animate-spin" />}
       {children}
@@ -116,17 +138,23 @@ function Button({ children, onClick, variant = 'primary', disabled = false, load
   );
 }
 
-function StatCard({ icon: Icon, label, value, subtext }) {
+function StatCard({ icon: Icon, label, value, subtext, trend }) {
   return (
-    <Card>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-gray-400 text-sm">{label}</p>
-          <p className="text-3xl font-bold text-white mt-1">{value}</p>
-          {subtext && <p className="text-gray-500 text-sm mt-1">{subtext}</p>}
+    <Card hover>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-gray-400 text-xs sm:text-sm truncate">{label}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-white mt-1 truncate">{value}</p>
+          {subtext && <p className="text-gray-500 text-xs sm:text-sm mt-1 truncate">{subtext}</p>}
+          {trend && (
+            <p className={`text-xs mt-2 flex items-center gap-1 ${trend > 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <ChevronRight className={`w-3 h-3 ${trend > 0 ? 'rotate-[-90deg]' : 'rotate-90'}`} />
+              {Math.abs(trend)}% from last week
+            </p>
+          )}
         </div>
-        <div className="p-3 bg-amber-500/20 rounded-lg">
-          <Icon className="w-6 h-6 text-amber-400" />
+        <div className="p-2.5 sm:p-3 bg-gradient-to-br from-amber-500/20 to-amber-600/10 rounded-xl flex-shrink-0">
+          <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400" />
         </div>
       </div>
     </Card>
@@ -138,16 +166,16 @@ function MediaModal({ mediaUrl, mediaType, onClose }) {
   if (!mediaUrl) return null;
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+    <div
+      className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4"
       onClick={onClose}
     >
-      <div className="relative max-w-4xl max-h-[90vh]">
-        <button 
+      <div className="relative w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh]">
+        <button
           onClick={onClose}
-          className="absolute -top-10 right-0 text-white hover:text-amber-400 transition-colors"
+          className="absolute -top-2 -right-2 sm:-top-10 sm:right-0 z-10 bg-black/50 sm:bg-transparent rounded-full p-2 text-white hover:text-amber-400 transition-colors"
         >
-          <X className="w-8 h-8" />
+          <X className="w-6 h-6 sm:w-8 sm:h-8" />
         </button>
         {mediaType === 'video' ? (
           <video 
@@ -179,100 +207,121 @@ function OverviewTab({ status, onRefresh, onStartScheduler, onStopScheduler, onP
   const linkedin = status?.linkedin || {};
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard 
-          icon={FileText} 
-          label="Queue Size" 
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <StatCard
+          icon={FileText}
+          label="Queue Size"
           value={queue.pending || 0}
           subtext="Posts waiting"
         />
-        <StatCard 
-          icon={Send} 
-          label="Published Today" 
+        <StatCard
+          icon={Send}
+          label="Published Today"
           value={queue.published_today || 0}
           subtext="Posts sent"
         />
-        <StatCard 
-          icon={BarChart3} 
-          label="This Week" 
+        <StatCard
+          icon={BarChart3}
+          label="This Week"
           value={queue.published_this_week || 0}
           subtext="Total published"
         />
-        <StatCard 
-          icon={Zap} 
-          label="Scheduler" 
+        <StatCard
+          icon={Zap}
+          label="Scheduler"
           value={scheduler.running ? 'Active' : 'Stopped'}
-          subtext={scheduler.running ? 'Auto-posting enabled' : 'Manual mode'}
+          subtext={scheduler.running ? 'Auto-posting' : 'Manual mode'}
         />
       </div>
 
       {/* Control Panel */}
       <Card>
-        <h3 className="text-lg font-semibold text-white mb-4">Control Panel</h3>
-        <div className="flex flex-wrap gap-3">
+        <h3 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4">Control Panel</h3>
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-3">
           {scheduler.running ? (
-            <Button onClick={onStopScheduler} variant="danger" loading={loading}>
-              <Square className="w-4 h-4" /> Stop Scheduler
+            <Button onClick={onStopScheduler} variant="danger" loading={loading} fullWidth className="sm:w-auto">
+              <Square className="w-4 h-4" /> <span className="hidden xs:inline">Stop</span> Scheduler
             </Button>
           ) : (
-            <Button onClick={onStartScheduler} variant="success" loading={loading}>
-              <Play className="w-4 h-4" /> Start Scheduler
+            <Button onClick={onStartScheduler} variant="success" loading={loading} fullWidth className="sm:w-auto">
+              <Play className="w-4 h-4" /> <span className="hidden xs:inline">Start</span> Scheduler
             </Button>
           )}
-          <Button onClick={onPostNow} variant="primary" loading={loading}>
+          <Button onClick={onPostNow} variant="primary" loading={loading} fullWidth className="sm:w-auto">
             <Send className="w-4 h-4" /> Post Now
           </Button>
-          <Button onClick={onRefresh} variant="secondary" loading={loading}>
+          <Button onClick={onRefresh} variant="secondary" loading={loading} fullWidth className="col-span-2 sm:w-auto sm:col-span-1">
             <RefreshCw className="w-4 h-4" /> Refresh
           </Button>
         </div>
       </Card>
 
       {/* Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
         {/* Schedule Info */}
-        <Card>
-          <div className="flex items-center gap-3 mb-4">
-            <Clock className="w-5 h-5 text-amber-400" />
-            <h3 className="text-lg font-semibold text-white">Schedule</h3>
+        <Card hover>
+          <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="p-2 bg-amber-500/20 rounded-lg">
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+            </div>
+            <h3 className="text-base sm:text-lg font-semibold text-white">Schedule</h3>
           </div>
-          <div className="space-y-2 text-gray-300">
-            <p>Daily at: <span className="text-white font-medium">
-              {String(scheduler.schedule?.hour || 9).padStart(2, '0')}:
-              {String(scheduler.schedule?.minute || 0).padStart(2, '0')}
-            </span></p>
-            <p>Timezone: <span className="text-white font-medium">
-              {scheduler.schedule?.timezone || 'America/New_York'}
-            </span></p>
+          <div className="space-y-2 text-sm sm:text-base text-gray-300">
+            <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+              <span>Daily at</span>
+              <span className="text-white font-medium">
+                {String(scheduler.schedule?.hour || 9).padStart(2, '0')}:
+                {String(scheduler.schedule?.minute || 0).padStart(2, '0')}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+              <span>Timezone</span>
+              <span className="text-white font-medium text-xs sm:text-sm">
+                {scheduler.schedule?.timezone || 'America/New_York'}
+              </span>
+            </div>
             {scheduler.next_run && (
-              <p>Next run: <span className="text-amber-400 font-medium">
-                {new Date(scheduler.next_run).toLocaleString()}
-              </span></p>
+              <div className="flex justify-between items-center py-1.5">
+                <span>Next run</span>
+                <span className="text-amber-400 font-medium text-xs sm:text-sm">
+                  {new Date(scheduler.next_run).toLocaleString()}
+                </span>
+              </div>
             )}
           </div>
         </Card>
 
         {/* LinkedIn Status */}
-        <Card>
-          <div className="flex items-center gap-3 mb-4">
-            <Linkedin className="w-5 h-5 text-blue-400" />
-            <h3 className="text-lg font-semibold text-white">LinkedIn</h3>
+        <Card hover>
+          <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="p-2 bg-blue-500/20 rounded-lg">
+              <Linkedin className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+            </div>
+            <h3 className="text-base sm:text-lg font-semibold text-white">LinkedIn</h3>
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
               {linkedin.configured ? (
-                <CheckCircle className="w-5 h-5 text-green-400" />
+                <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
               ) : (
-                <AlertCircle className="w-5 h-5 text-yellow-400" />
+                <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0" />
               )}
-              <span className="text-gray-300">
-                {linkedin.configured ? 'Connected' : 'Not configured'}
-              </span>
+              <div>
+                <span className="text-white font-medium block">
+                  {linkedin.configured ? 'Connected' : 'Not configured'}
+                </span>
+                <span className="text-gray-400 text-xs">
+                  {linkedin.configured ? 'Ready to post' : 'Set up required'}
+                </span>
+              </div>
             </div>
             {linkedin.mock && (
-              <p className="text-yellow-400 text-sm">⚠️ Mock mode enabled</p>
+              <div className="flex items-center gap-2 text-yellow-400 text-sm bg-yellow-500/10 rounded-lg p-2">
+                <AlertCircle className="w-4 h-4" />
+                Mock mode enabled
+              </div>
             )}
           </div>
         </Card>
@@ -299,39 +348,44 @@ function ScheduleTab({ status, onSetSchedule, loading }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <Card>
-        <h3 className="text-lg font-semibold text-white mb-6">Daily Post Schedule</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="flex items-center gap-3 mb-4 sm:mb-6">
+          <div className="p-2 bg-amber-500/20 rounded-lg">
+            <Clock className="w-5 h-5 text-amber-400" />
+          </div>
+          <h3 className="text-base sm:text-lg font-semibold text-white">Daily Post Schedule</h3>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-6">
           <div>
-            <label className="block text-gray-400 text-sm mb-2">Hour (0-23)</label>
+            <label className="block text-gray-400 text-xs sm:text-sm mb-1.5 sm:mb-2">Hour (0-23)</label>
             <input
               type="number"
               min="0"
               max="23"
               value={hour}
               onChange={(e) => setHour(parseInt(e.target.value))}
-              className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none"
+              className="w-full bg-white/5 border border-white/20 rounded-lg px-3 sm:px-4 py-2.5 sm:py-2 text-white text-base focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all"
             />
           </div>
           <div>
-            <label className="block text-gray-400 text-sm mb-2">Minute (0-59)</label>
+            <label className="block text-gray-400 text-xs sm:text-sm mb-1.5 sm:mb-2">Minute (0-59)</label>
             <input
               type="number"
               min="0"
               max="59"
               value={minute}
               onChange={(e) => setMinute(parseInt(e.target.value))}
-              className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none"
+              className="w-full bg-white/5 border border-white/20 rounded-lg px-3 sm:px-4 py-2.5 sm:py-2 text-white text-base focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all"
             />
           </div>
-          <div>
-            <label className="block text-gray-400 text-sm mb-2">Timezone</label>
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-gray-400 text-xs sm:text-sm mb-1.5 sm:mb-2">Timezone</label>
             <select
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-2 text-white focus:border-amber-500 focus:outline-none"
+              className="w-full bg-white/5 border border-white/20 rounded-lg px-3 sm:px-4 py-2.5 sm:py-2 text-white text-base focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all appearance-none cursor-pointer"
             >
               <option value="America/New_York">Eastern (New York)</option>
               <option value="America/Chicago">Central (Chicago)</option>
@@ -342,24 +396,30 @@ function ScheduleTab({ status, onSetSchedule, loading }) {
           </div>
         </div>
 
-        <div className="mt-6 flex items-center justify-between">
-          <p className="text-gray-400">
-            Posts will be published daily at{' '}
-            <span className="text-amber-400 font-medium">
-              {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')}
-            </span>{' '}
-            {timezone}
-          </p>
-          <Button onClick={handleSave} variant="primary" loading={loading}>
-            <Calendar className="w-4 h-4" /> Save Schedule
-          </Button>
+        <div className="mt-4 sm:mt-6 pt-4 border-t border-white/10">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div className="bg-amber-500/10 rounded-lg p-3 flex-1">
+              <p className="text-gray-300 text-sm">
+                Posts will be published daily at{' '}
+                <span className="text-amber-400 font-semibold">
+                  {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')}
+                </span>{' '}
+                <span className="text-gray-400 text-xs block sm:inline mt-1 sm:mt-0">
+                  ({timezone})
+                </span>
+              </p>
+            </div>
+            <Button onClick={handleSave} variant="primary" loading={loading} fullWidth className="sm:w-auto">
+              <Calendar className="w-4 h-4" /> Save Schedule
+            </Button>
+          </div>
         </div>
       </Card>
     </div>
   );
 }
 
-function QueueTab({ queue, onGenerate, onRemove, loading }) {
+function QueueTab({ queue, onGenerate, onRemove, onPostNow, loading }) {
   const posts = queue?.posts || [];
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [selectedMediaType, setSelectedMediaType] = useState('image');
@@ -386,34 +446,40 @@ function QueueTab({ queue, onGenerate, onRemove, loading }) {
   };
 
   // Calculate estimated cost
-  const estimatedCost = useVideo 
+  const estimatedCost = useVideo
     ? (numPosts * 1.05).toFixed(2)
     : (numPosts * 0.08).toFixed(2);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Media Modal */}
       {selectedMedia && (
-        <MediaModal 
+        <MediaModal
           mediaUrl={selectedMedia}
           mediaType={selectedMediaType}
-          onClose={() => setSelectedMedia(null)} 
+          onClose={() => setSelectedMedia(null)}
         />
       )}
 
       {/* Generate Controls */}
       <Card>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h3 className="text-lg font-semibold text-white">Generate Content</h3>
-          
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-amber-500/20 rounded-lg">
+            <Sparkles className="w-5 h-5 text-amber-400" />
+          </div>
+          <h3 className="text-base sm:text-lg font-semibold text-white">Generate Content</h3>
+        </div>
+
+        <div className="space-y-4">
+          {/* Controls row */}
+          <div className="flex flex-wrap items-center gap-3">
             {/* Number of posts */}
-            <div className="flex items-center gap-2">
-              <label className="text-gray-400 text-sm">Posts:</label>
+            <div className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2 border border-white/10">
+              <label className="text-gray-400 text-xs sm:text-sm">Posts:</label>
               <select
                 value={numPosts}
                 onChange={(e) => setNumPosts(parseInt(e.target.value))}
-                className="bg-white/5 border border-white/20 rounded-lg px-3 py-1.5 text-white text-sm focus:border-amber-500 focus:outline-none"
+                className="bg-transparent text-white text-sm focus:outline-none cursor-pointer"
               >
                 {[1, 2, 3, 4, 5].map(n => (
                   <option key={n} value={n}>{n}</option>
@@ -422,164 +488,183 @@ function QueueTab({ queue, onGenerate, onRemove, loading }) {
             </div>
 
             {/* Video toggle */}
-            <div className="flex items-center gap-3 px-3 py-2 bg-white/5 rounded-lg border border-white/10">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useVideo}
-                  onChange={(e) => setUseVideo(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-500 text-amber-500 focus:ring-amber-500 focus:ring-offset-0 bg-white/10"
-                />
-                <span className="text-sm text-gray-300 flex items-center gap-1.5">
-                  {useVideo ? <Video className="w-4 h-4 text-purple-400" /> : <Image className="w-4 h-4 text-blue-400" />}
-                  {useVideo ? 'Video' : 'Image'}
-                </span>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  useVideo 
-                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
-                    : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                }`}>
-                  {useVideo ? '~$1.00' : '$0.03'}
-                </span>
-              </label>
-            </div>
+            <label className="flex items-center gap-2 cursor-pointer bg-white/5 rounded-lg px-3 py-2 border border-white/10 transition-all hover:bg-white/10">
+              <input
+                type="checkbox"
+                checked={useVideo}
+                onChange={(e) => setUseVideo(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-500 text-amber-500 focus:ring-amber-500 focus:ring-offset-0 bg-white/10"
+              />
+              <span className="text-xs sm:text-sm text-gray-300 flex items-center gap-1.5">
+                {useVideo ? <Video className="w-4 h-4 text-purple-400" /> : <Image className="w-4 h-4 text-blue-400" />}
+                <span className="hidden xs:inline">{useVideo ? 'Video' : 'Image'}</span>
+              </span>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                useVideo
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+              }`}>
+                {useVideo ? '~$1' : '$0.03'}
+              </span>
+            </label>
 
             {/* Generate button */}
-            <Button 
-              onClick={() => onGenerate(numPosts, useVideo)} 
-              variant="primary" 
+            <Button
+              onClick={() => onGenerate(numPosts, useVideo)}
+              variant="primary"
               loading={loading}
+              className="flex-1 sm:flex-none"
             >
-              <Sparkles className="w-4 h-4" /> 
-              Generate {useVideo ? 'Video' : 'Image'}
+              <Sparkles className="w-4 h-4" />
+              <span className="hidden sm:inline">Generate</span> {useVideo ? 'Video' : 'Image'}
             </Button>
           </div>
-        </div>
 
-        {/* Video info banner */}
-        {useVideo && (
-          <div className="mt-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
-            <p className="text-purple-300 text-sm flex items-center gap-2">
-              <Video className="w-4 h-4" />
-              <span>
-                <strong>Video mode:</strong> 8-second cinematic video with Veo 3.1 Fast • 
-                Est. cost: <strong>${estimatedCost}</strong>
-              </span>
-            </p>
-          </div>
-        )}
+          {/* Video info banner */}
+          {useVideo && (
+            <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+              <p className="text-purple-300 text-xs sm:text-sm flex items-start sm:items-center gap-2">
+                <Video className="w-4 h-4 flex-shrink-0 mt-0.5 sm:mt-0" />
+                <span>
+                  <strong>Video mode:</strong> 8-second cinematic video with Veo 3.1 Fast •
+                  Est. cost: <strong>${estimatedCost}</strong>
+                </span>
+              </p>
+            </div>
+          )}
+        </div>
       </Card>
 
-      {/* Queue List */}
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-white">Post Queue ({posts.length})</h3>
+      {/* Queue List Header */}
+      <div className="flex justify-between items-center px-1">
+        <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+          <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+          Post Queue
+          <span className="text-sm font-normal text-gray-400">({posts.length})</span>
+        </h3>
       </div>
 
       {posts.length === 0 ? (
         <Card>
-          <div className="text-center py-8">
-            <FileText className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-gray-400">Queue is empty</p>
+          <div className="text-center py-8 sm:py-12">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FileText className="w-8 h-8 sm:w-10 sm:h-10 text-gray-600" />
+            </div>
+            <p className="text-gray-400 font-medium">Queue is empty</p>
             <p className="text-gray-500 text-sm mt-1">Generate content to add posts to the queue</p>
           </div>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {posts.map((post, index) => {
             const isVideo = post.media_type === 'video' || post.image_url?.includes('/videos/') || post.image_url?.endsWith('.mp4');
             const mediaUrl = isVideo ? getVideoUrl(post.image_url) : getImageUrl(post.image_url);
-            
+
             return (
-              <Card key={post.id || index}>
-                <div className="flex gap-4">
+              <Card key={post.id || index} hover>
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   {/* Media Preview */}
                   {mediaUrl && (
-                    <div 
-                      className="flex-shrink-0 w-32 h-32 md:w-40 md:h-40 relative group cursor-pointer"
+                    <div
+                      className="flex-shrink-0 w-full sm:w-28 md:w-36 lg:w-40 h-40 sm:h-28 md:h-36 lg:h-40 relative group cursor-pointer rounded-lg overflow-hidden"
                       onClick={() => handleMediaClick(post)}
                     >
                       {isVideo ? (
                         <>
-                          <video 
+                          <video
                             src={mediaUrl}
-                            className="w-full h-full object-cover rounded-lg border border-white/10"
+                            className="w-full h-full object-cover"
                             muted
                             onError={(e) => {
                               e.target.style.display = 'none';
                               e.target.nextSibling.style.display = 'flex';
                             }}
                           />
-                          <div 
-                            className="hidden w-full h-full bg-white/5 rounded-lg border border-white/10 items-center justify-center"
+                          <div
+                            className="hidden w-full h-full bg-white/5 items-center justify-center"
                           >
                             <Video className="w-8 h-8 text-gray-500" />
                           </div>
                           {/* Play icon overlay */}
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-12 h-12 bg-black/50 rounded-full flex items-center justify-center">
-                              <Play className="w-6 h-6 text-white ml-1" />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-black/60 rounded-full flex items-center justify-center backdrop-blur-sm">
+                              <Play className="w-5 h-5 sm:w-6 sm:h-6 text-white ml-0.5" />
                             </div>
                           </div>
                         </>
                       ) : (
                         <>
-                          <img 
-                            src={mediaUrl} 
-                            alt="Post image" 
-                            className="w-full h-full object-cover rounded-lg border border-white/10"
+                          <img
+                            src={mediaUrl}
+                            alt="Post image"
+                            className="w-full h-full object-cover"
                             onError={(e) => {
                               e.target.style.display = 'none';
                               e.target.nextSibling.style.display = 'flex';
                             }}
                           />
-                          <div 
-                            className="hidden w-full h-full bg-white/5 rounded-lg border border-white/10 items-center justify-center"
+                          <div
+                            className="hidden w-full h-full bg-white/5 items-center justify-center"
                           >
                             <Image className="w-8 h-8 text-gray-500" />
                           </div>
                         </>
                       )}
                       {/* Zoom overlay */}
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
-                        <ZoomIn className="w-8 h-8 text-white" />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <ZoomIn className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                       </div>
                     </div>
                   )}
 
                   {/* Content */}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 flex flex-col">
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <StatusBadge active={post.status === 'pending'} label={post.status} />
                       {post.image_url && (
-                        <span className={`text-sm flex items-center gap-1 ${isVideo ? 'text-purple-400' : 'text-blue-400'}`}>
-                          {isVideo ? <Video className="w-4 h-4" /> : <Image className="w-4 h-4" />}
-                          {isVideo ? 'Has video' : 'Has image'}
+                        <span className={`text-xs sm:text-sm flex items-center gap-1 ${isVideo ? 'text-purple-400' : 'text-blue-400'}`}>
+                          {isVideo ? <Video className="w-3 h-3 sm:w-4 sm:h-4" /> : <Image className="w-3 h-3 sm:w-4 sm:h-4" />}
+                          <span className="hidden xs:inline">{isVideo ? 'Video' : 'Image'}</span>
                         </span>
                       )}
                       {(post.validation_score || post.average_score) && (
-                        <span className="text-amber-400 text-sm">
-                          Score: {(post.validation_score || post.average_score).toFixed(1)}/10
+                        <span className="text-amber-400 text-xs sm:text-sm flex items-center gap-1">
+                          <Zap className="w-3 h-3" />
+                          {(post.validation_score || post.average_score).toFixed(1)}/10
                         </span>
                       )}
                     </div>
-                    <p className="text-gray-300 leading-relaxed mb-2">{post.content}</p>
+
+                    {/* Post content */}
+                    <p className="text-gray-300 text-sm sm:text-base leading-relaxed mb-2 line-clamp-3 sm:line-clamp-none">
+                      {post.content}
+                    </p>
+
                     {post.hashtags?.length > 0 && (
-                      <p className="text-amber-400 text-sm">
+                      <p className="text-amber-400 text-xs sm:text-sm truncate">
                         {post.hashtags.map(h => h.startsWith('#') ? h : `#${h}`).join(' ')}
                       </p>
                     )}
                     {post.cultural_reference && (
-                      <p className="text-purple-400 text-xs mt-2">
+                      <p className="text-purple-400 text-xs mt-2 truncate">
                         📺 {renderCulturalReference(post.cultural_reference)}
                       </p>
                     )}
-                  </div>
 
-                  {/* Actions */}
-                  <div className="flex-shrink-0">
-                    <Button onClick={() => onRemove(post.id)} variant="danger">
-                      Remove
-                    </Button>
+                    {/* Actions - moved to bottom on mobile */}
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-white/5 sm:border-0 sm:mt-auto sm:pt-0">
+                      {post.status === 'pending' && (
+                        <Button onClick={() => onPostNow(post.id)} disabled={loading} size="small" fullWidth className="sm:w-auto">
+                          <Send className="w-3.5 h-3.5" />
+                          <span className="sm:hidden">Post</span>
+                          <span className="hidden sm:inline">Post Now</span>
+                        </Button>
+                      )}
+                      <Button onClick={() => onRemove(post.id)} variant="danger" size="small" fullWidth className="sm:w-auto">
+                        <X className="w-3.5 h-3.5" />
+                        Remove
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -608,95 +693,107 @@ function HistoryTab({ history }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Media Modal */}
       {selectedMedia && (
-        <MediaModal 
+        <MediaModal
           mediaUrl={selectedMedia}
           mediaType={selectedMediaType}
-          onClose={() => setSelectedMedia(null)} 
+          onClose={() => setSelectedMedia(null)}
         />
       )}
 
-      <h3 className="text-lg font-semibold text-white">Published Posts</h3>
+      {/* Header */}
+      <div className="flex items-center gap-3 px-1">
+        <History className="w-5 h-5 text-gray-400" />
+        <h3 className="text-base sm:text-lg font-semibold text-white">Published Posts</h3>
+        <span className="text-sm text-gray-500">({posts.length})</span>
+      </div>
 
       {posts.length === 0 ? (
         <Card>
-          <div className="text-center py-8">
-            <History className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-gray-400">No posts published yet</p>
+          <div className="text-center py-8 sm:py-12">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+              <History className="w-8 h-8 sm:w-10 sm:h-10 text-gray-600" />
+            </div>
+            <p className="text-gray-400 font-medium">No posts published yet</p>
+            <p className="text-gray-500 text-sm mt-1">Published posts will appear here</p>
           </div>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {posts.map((post, index) => {
             const isVideo = post.media_type === 'video' || post.image_url?.includes('/videos/') || post.image_url?.endsWith('.mp4');
             const mediaUrl = isVideo ? getVideoUrl(post.image_url) : getImageUrl(post.image_url);
-            
+
             return (
-              <Card key={post.id || index}>
-                <div className="flex gap-4">
+              <Card key={post.id || index} hover>
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   {/* Media Preview */}
                   {mediaUrl && (
-                    <div 
-                      className="flex-shrink-0 w-24 h-24 relative group cursor-pointer"
+                    <div
+                      className="flex-shrink-0 w-full sm:w-20 md:w-24 h-32 sm:h-20 md:h-24 relative group cursor-pointer rounded-lg overflow-hidden"
                       onClick={() => handleMediaClick(post)}
                     >
                       {isVideo ? (
                         <>
-                          <video 
+                          <video
                             src={mediaUrl}
-                            className="w-full h-full object-cover rounded-lg border border-white/10"
+                            className="w-full h-full object-cover"
                             muted
                             onError={(e) => { e.target.style.display = 'none'; }}
                           />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-8 h-8 bg-black/50 rounded-full flex items-center justify-center">
-                              <Play className="w-4 h-4 text-white ml-0.5" />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                            <div className="w-10 h-10 sm:w-8 sm:h-8 bg-black/60 rounded-full flex items-center justify-center backdrop-blur-sm">
+                              <Play className="w-5 h-5 sm:w-4 sm:h-4 text-white ml-0.5" />
                             </div>
                           </div>
                         </>
                       ) : (
-                        <img 
-                          src={mediaUrl} 
-                          alt="Post image" 
-                          className="w-full h-full object-cover rounded-lg border border-white/10"
+                        <img
+                          src={mediaUrl}
+                          alt="Post image"
+                          className="w-full h-full object-cover"
                           onError={(e) => { e.target.style.display = 'none'; }}
                         />
                       )}
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <ZoomIn className="w-6 h-6 text-white" />
                       </div>
                     </div>
                   )}
 
                   {/* Content */}
-                  <div className="flex-1">
-                    <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-2 sm:gap-3">
                       {post.status === 'success' ? (
-                        <CheckCircle className="w-5 h-5 text-green-400 mt-1 flex-shrink-0" />
+                        <div className="p-1.5 bg-green-500/20 rounded-full flex-shrink-0">
+                          <CheckCircle className="w-4 h-4 text-green-400" />
+                        </div>
                       ) : (
-                        <AlertCircle className="w-5 h-5 text-red-400 mt-1 flex-shrink-0" />
+                        <div className="p-1.5 bg-red-500/20 rounded-full flex-shrink-0">
+                          <AlertCircle className="w-4 h-4 text-red-400" />
+                        </div>
                       )}
-                      <div className="flex-1">
-                        <div className="flex flex-wrap items-center gap-3 mb-2">
-                          <span className="text-gray-400 text-sm">
-                            {new Date(post.published_at).toLocaleString()}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                          <span className="text-gray-400 text-xs sm:text-sm">
+                            {new Date(post.published_at).toLocaleDateString()} {new Date(post.published_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                           </span>
                           {post.linkedin_post_id && (
-                            <span className="text-blue-400 text-sm">
-                              ID: {post.linkedin_post_id}
+                            <span className="text-blue-400 text-xs bg-blue-500/10 px-2 py-0.5 rounded-full truncate max-w-[120px] sm:max-w-none">
+                              {post.linkedin_post_id}
                             </span>
                           )}
                           {isVideo && (
-                            <span className="text-purple-400 text-sm flex items-center gap-1">
+                            <span className="text-purple-400 text-xs flex items-center gap-1 bg-purple-500/10 px-2 py-0.5 rounded-full">
                               <Video className="w-3 h-3" /> Video
                             </span>
                           )}
                         </div>
-                        <p className="text-gray-300">{post.content}</p>
+                        <p className="text-gray-300 text-sm sm:text-base line-clamp-2 sm:line-clamp-none">{post.content}</p>
                         {post.error_message && (
-                          <p className="text-red-400 text-sm mt-2">{post.error_message}</p>
+                          <p className="text-red-400 text-xs sm:text-sm mt-2 bg-red-500/10 p-2 rounded-lg">{post.error_message}</p>
                         )}
                       </div>
                     </div>
@@ -870,11 +967,13 @@ function CommentsTab() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Local Message Toast */}
       {message && (
-        <div className="fixed top-20 right-6 z-50 bg-gray-800 border border-white/20 rounded-lg px-4 py-3 shadow-xl">
-          <p className="text-white">{message}</p>
+        <div className="fixed top-16 sm:top-20 right-2 sm:right-6 left-2 sm:left-auto z-50 animate-slide-in">
+          <div className="bg-gray-800/95 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 shadow-2xl max-w-sm mx-auto sm:mx-0">
+            <p className="text-white text-sm sm:text-base">{message}</p>
+          </div>
         </div>
       )}
 
@@ -927,40 +1026,40 @@ function CommentsTab() {
 
       {/* Generator Modal */}
       {showGenerator && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-white">Generate Comment</h3>
-              <button onClick={() => setShowGenerator(false)} className="text-gray-400 hover:text-white">
-                <X className="w-6 h-6" />
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <Card className="w-full sm:max-w-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-xl">
+            <div className="flex justify-between items-center mb-4 sticky top-0 bg-inherit pb-2">
+              <h3 className="text-base sm:text-lg font-semibold text-white">Generate Comment</h3>
+              <button onClick={() => setShowGenerator(false)} className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors">
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
-            
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">LinkedIn Post URL *</label>
+                <label className="block text-xs sm:text-sm text-gray-400 mb-1.5">LinkedIn Post URL *</label>
                 <input
                   type="url"
                   value={postUrl}
                   onChange={(e) => setPostUrl(e.target.value)}
                   placeholder="https://www.linkedin.com/feed/update/..."
-                  className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:border-amber-500 focus:outline-none"
+                  className="w-full bg-white/5 border border-white/20 rounded-lg px-3 sm:px-4 py-2.5 sm:py-2 text-white text-base placeholder-gray-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Post Content *</label>
+                <label className="block text-xs sm:text-sm text-gray-400 mb-1.5">Post Content *</label>
                 <textarea
                   value={postContent}
                   onChange={(e) => setPostContent(e.target.value)}
                   placeholder="Paste the post content here..."
-                  rows={6}
-                  className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:border-amber-500 focus:outline-none resize-none"
+                  rows={5}
+                  className="w-full bg-white/5 border border-white/20 rounded-lg px-3 sm:px-4 py-2.5 sm:py-2 text-white text-base placeholder-gray-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 resize-none"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Author Name</label>
+                <label className="block text-xs sm:text-sm text-gray-400 mb-1.5">Author Name</label>
                 <input
                   type="text"
                   value={authorName}
@@ -1233,14 +1332,19 @@ export default function App() {
     setLoading(false);
   };
 
-  const handlePostNow = async () => {
+  const handlePostNow = async (postId = null) => {
     setLoading(true);
     try {
-      await api.post('/api/automation/post-now');
-      showMessage('✅ Post triggered! Check history for results.');
-      setTimeout(refresh, 2000);
+      const endpoint = postId
+        ? `/api/automation/queue/post/${postId}`
+        : '/api/automation/post-now';
+      const response = await api.post(endpoint);
+      const linkedinId = response.data?.linkedin_post_id;
+      showMessage(`✅ Posted successfully!${linkedinId ? ' ID: ' + linkedinId : ''}`);
+      await fetchQueue();
+      await fetchHistory();
     } catch (err) {
-      showMessage(`❌ Failed: ${err.message}`);
+      showMessage(`❌ Post failed: ${err.response?.data?.detail || err.message}`);
     }
     setLoading(false);
   };
@@ -1286,6 +1390,8 @@ export default function App() {
     }
   };
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'schedule', label: 'Schedule', icon: Calendar },
@@ -1295,60 +1401,98 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
       {/* Header */}
-      <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+      <header className="border-b border-white/10 bg-black/40 backdrop-blur-md sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-600 rounded-lg flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-black" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
+                <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-black" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">Jesse A. Eisenbalm</h1>
-                <p className="text-gray-400 text-sm">Automation Dashboard</p>
+                <h1 className="text-lg sm:text-xl font-bold text-white">Jesse A. Eisenbalm</h1>
+                <p className="text-gray-400 text-xs sm:text-sm hidden xs:block">Automation Dashboard</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <StatusBadge 
-                active={status?.scheduler?.running} 
-                label={status?.scheduler?.running ? 'Running' : 'Stopped'} 
+            <div className="flex items-center gap-2 sm:gap-4">
+              <StatusBadge
+                active={status?.scheduler?.running}
+                label={status?.scheduler?.running ? 'Running' : 'Stopped'}
               />
+              {/* Mobile menu button */}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="sm:hidden p-2 text-gray-400 hover:text-white transition-colors"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
             </div>
           </div>
         </div>
       </header>
 
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-30 sm:hidden">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+          <div className="absolute top-[57px] left-0 right-0 bg-gray-900 border-b border-white/10 shadow-xl">
+            <nav className="flex flex-col p-2">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`px-4 py-3 flex items-center gap-3 rounded-lg transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-amber-500/20 text-amber-400'
+                      : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <tab.icon className="w-5 h-5" />
+                  {tab.label}
+                  {activeTab === tab.id && <ChevronRight className="w-4 h-4 ml-auto" />}
+                </button>
+              ))}
+            </nav>
+          </div>
+        </div>
+      )}
+
       {/* Message Toast */}
       {message && (
-        <div className="fixed top-20 right-6 z-50 bg-gray-800 border border-white/20 rounded-lg px-4 py-3 shadow-xl">
-          <p className="text-white">{message}</p>
+        <div className="fixed top-16 sm:top-20 right-2 sm:right-6 left-2 sm:left-auto z-50 animate-slide-in">
+          <div className="bg-gray-800/95 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 shadow-2xl max-w-sm sm:max-w-md mx-auto sm:mx-0">
+            <p className="text-white text-sm sm:text-base">{message}</p>
+          </div>
         </div>
       )}
 
       {/* Error Banner */}
       {error && (
-        <div className="bg-red-500/10 border-b border-red-500/30 px-6 py-3">
-          <div className="max-w-7xl mx-auto flex items-center gap-3 text-red-400">
-            <AlertCircle className="w-5 h-5" />
-            <span>{error}</span>
-            <button onClick={refresh} className="ml-auto text-sm underline">Retry</button>
+        <div className="bg-red-500/10 border-b border-red-500/30 px-4 sm:px-6 py-2 sm:py-3">
+          <div className="max-w-7xl mx-auto flex items-center gap-2 sm:gap-3 text-red-400">
+            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+            <span className="text-sm sm:text-base flex-1 truncate">{error}</span>
+            <button onClick={refresh} className="text-xs sm:text-sm underline flex-shrink-0">Retry</button>
           </div>
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="border-b border-white/10">
+      {/* Desktop Tabs */}
+      <div className="border-b border-white/10 hidden sm:block">
         <div className="max-w-7xl mx-auto px-6">
-          <nav className="flex gap-1">
+          <nav className="flex gap-1 overflow-x-auto scrollbar-hide">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-3 flex items-center gap-2 border-b-2 transition-colors ${
+                className={`px-4 py-3 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${
                   activeTab === tab.id
-                    ? 'border-amber-500 text-amber-400'
-                    : 'border-transparent text-gray-400 hover:text-white'
+                    ? 'border-amber-500 text-amber-400 bg-amber-500/5'
+                    : 'border-transparent text-gray-400 hover:text-white hover:bg-white/5'
                 }`}
               >
                 <tab.icon className="w-4 h-4" />
@@ -1359,8 +1503,23 @@ export default function App() {
         </div>
       </div>
 
+      {/* Mobile Tab Indicator */}
+      <div className="sm:hidden border-b border-white/10 px-4 py-2">
+        <div className="flex items-center gap-2 text-amber-400">
+          {(() => {
+            const currentTab = tabs.find(t => t.id === activeTab);
+            return currentTab ? (
+              <>
+                <currentTab.icon className="w-4 h-4" />
+                <span className="font-medium text-sm">{currentTab.label}</span>
+              </>
+            ) : null;
+          })()}
+        </div>
+      </div>
+
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8 w-full flex-1">
         {activeTab === 'overview' && (
           <OverviewTab
             status={status}
@@ -1383,6 +1542,7 @@ export default function App() {
             queue={queue}
             onGenerate={handleGenerate}
             onRemove={handleRemoveFromQueue}
+            onPostNow={handlePostNow}
             loading={loading}
           />
         )}
@@ -1395,9 +1555,14 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 py-6 mt-auto">
-        <div className="max-w-7xl mx-auto px-6 text-center text-gray-500 text-sm">
-          <p>Jesse A. Eisenbalm Automation v2.0 • "The only business lip balm that keeps you human in an AI world"</p>
+      <footer className="border-t border-white/10 py-4 sm:py-6 mt-auto bg-black/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
+          <p className="text-gray-500 text-xs sm:text-sm">
+            <span className="text-amber-500/80 font-medium">Jesse A. Eisenbalm</span> Automation v2.0
+          </p>
+          <p className="text-gray-600 text-xs mt-1 hidden sm:block">
+            "The only business lip balm that keeps you human in an AI world"
+          </p>
         </div>
       </footer>
     </div>
