@@ -111,23 +111,30 @@ class PostQueueManager:
     
     def add_to_queue(self, post_data: Dict[str, Any], priority: int = 0) -> str:
         """Add a post to the queue"""
-        
+
         post_id = post_data.get("id", str(uuid4()))
-        
+
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            
+
             # Handle cultural reference
             cultural_ref = post_data.get("cultural_reference")
             if cultural_ref and isinstance(cultural_ref, dict):
                 cultural_ref = json.dumps(cultural_ref)
             elif cultural_ref and hasattr(cultural_ref, "dict"):
                 cultural_ref = json.dumps(cultural_ref.dict())
-            
+
+            # Merge media_type into metadata for persistence
+            metadata = post_data.get("metadata", {})
+            if post_data.get("media_type"):
+                metadata["media_type"] = post_data.get("media_type")
+            if post_data.get("video_url"):
+                metadata["video_url"] = post_data.get("video_url")
+
             cursor.execute("""
-                INSERT INTO post_queue 
+                INSERT INTO post_queue
                 (id, content, hashtags, image_url, image_description, image_prompt,
-                 cultural_reference, target_audience, priority, status, batch_id, 
+                 cultural_reference, target_audience, priority, status, batch_id,
                  validation_score, metadata)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
             """, (
@@ -142,7 +149,7 @@ class PostQueueManager:
                 priority,
                 post_data.get("batch_id"),
                 post_data.get("average_score") or post_data.get("validation_score"),
-                json.dumps(post_data.get("metadata", {}))
+                json.dumps(metadata)
             ))
             
             conn.commit()
@@ -438,16 +445,31 @@ class PostQueueManager:
         self.update_status(post_id, "publishing")
 
         try:
-            # Publish to LinkedIn
+            # Determine media type from post data or metadata
+            metadata = post_data.get("metadata", {})
+            media_type = metadata.get("media_type")
+            media_url = post_data.get("image_url")
+
+            # Auto-detect video from URL if media_type not set
+            if not media_type and media_url:
+                if media_url.endswith('.mp4') or '/videos/' in media_url:
+                    media_type = 'video'
+                else:
+                    media_type = 'image'
+
+            # Publish to LinkedIn with appropriate media type
             result = linkedin_poster.publish_post(
                 content=post_data.get("content", ""),
-                image_path=post_data.get("image_url"),
+                image_path=media_url if media_type != 'video' else None,
+                video_path=media_url if media_type == 'video' else None,
+                media_type=media_type,
                 hashtags=post_data.get("hashtags", [])
             )
 
             if result.get("success"):
                 linkedin_post_id = result.get("post_id")
-                logger.info(f"✅ Posted successfully: {linkedin_post_id}")
+                posted_media_type = result.get("media_type", media_type)
+                logger.info(f"✅ Posted successfully: {linkedin_post_id} (media: {posted_media_type})")
 
                 # Update queue status
                 self.update_status(post_id, "published")
@@ -463,7 +485,9 @@ class PostQueueManager:
                     "post_id": post_id,
                     "linkedin_post_id": linkedin_post_id,
                     "content": post_data.get("content", "")[:100] + "...",
-                    "message": "Post published successfully from queue"
+                    "media_type": posted_media_type,
+                    "had_video": result.get("had_video", False),
+                    "message": f"Post published successfully from queue{' (with video)' if posted_media_type == 'video' else ''}"
                 }
             else:
                 error_msg = result.get("error", "Unknown error")
