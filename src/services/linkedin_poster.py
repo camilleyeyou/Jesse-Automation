@@ -256,8 +256,12 @@ class LinkedInPoster:
                             }]
                             logger.info("Video attached to post")
                         else:
-                            logger.warning(f"Video upload failed: {video_result.get('error')}")
-                            # Continue posting without video
+                            logger.error(f"Video upload failed: {video_result.get('error')}")
+                            return {
+                                "success": False,
+                                "error": f"Video upload to LinkedIn failed: {video_result.get('error')}",
+                                "details": video_result.get("details")
+                            }
                     else:
                         # Upload image using Assets API
                         image_result = self._upload_image(actual_file_path, author, headers)
@@ -273,6 +277,12 @@ class LinkedInPoster:
                             logger.warning(f"Image upload failed: {image_result.get('error')}")
                 else:
                     logger.warning(f"Media file not found: {actual_file_path}")
+                    # Fail if video was expected - don't silently post without it
+                    if actual_media_type == 'video':
+                        return {
+                            "success": False,
+                            "error": f"Video file not found: {actual_file_path}. Railway ephemeral storage may have deleted it on restart."
+                        }
             
             response = requests.post(
                 f"{self.api_base}/ugcPosts",
