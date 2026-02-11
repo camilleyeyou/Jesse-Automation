@@ -389,88 +389,74 @@ class OpenAIClient:
                     config=types.GenerateVideosConfig(**config_params)
                 )
                 
-                # Poll the operation until complete
-                max_wait = 600  # 10 minutes
-                poll_interval = 5
-                waited = 0
+                # Wait for video generation using result() in executor
+                # This handles polling internally and works with the SDK properly
                 operation_name = operation.name if hasattr(operation, 'name') else str(operation)
-                
                 logger.info(f"   Operation name: {operation_name}")
-                
-                while waited < max_wait:
-                    try:
-                        # CRITICAL FIX: Fetch fresh operation status from server
-                        # Don't check the stale operation object, get a fresh one
-                        fresh_operation = self.gemini_client.operations.get(operation_name)
-                        is_done = getattr(fresh_operation, 'done', False)
-                        
-                        if is_done:
-                            logger.info(f"   Video generation completed after {waited}s!")
-                            operation = fresh_operation
-                            break
-                        
-                        # Check for error
-                        if hasattr(fresh_operation, 'error') and fresh_operation.error:
-                            error_msg = str(fresh_operation.error)
-                            logger.error(f"   Video generation error: {error_msg}")
-                            return {"error": f"Video generation failed: {error_msg}", "video_data": None}
-                        
-                        # Wait and poll again
-                        await asyncio.sleep(poll_interval)
-                        waited += poll_interval
-                        logger.info(f"   Still generating... ({waited}s)")
-                        
-                    except TypeError as e:
-                        # If get() has issues with string argument, try alternative approach
-                        if "get() got an unexpected keyword argument" in str(e):
-                            logger.warning(f"   SDK operations.get() incompatible, using fallback wait method")
-                            try:
-                                operation = self.gemini_client.operations.wait(operation_name)
-                                is_done = getattr(operation, 'done', False)
-                                if is_done:
-                                    logger.info(f"   Video generation completed!")
-                                    break
-                            except Exception as wait_err:
-                                logger.error(f"   Fallback wait failed: {wait_err}")
-                                raise
-                        else:
-                            raise
-                
-                if not is_done and waited >= max_wait:
-                    return {"error": "Video generation timed out after 5 minutes", "video_data": None}
+
+                import concurrent.futures
+
+                def wait_for_result():
+                    """Blocking call to wait for operation result"""
+                    return operation.result(timeout=600)  # 10 minute timeout
+
+                try:
+                    loop = asyncio.get_event_loop()
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        # Run the blocking result() call in a thread pool
+                        logger.info("   Waiting for video generation (this may take 1-3 minutes)...")
+                        result = await loop.run_in_executor(executor, wait_for_result)
+                        operation._result = result  # Store result on operation for later access
+                        logger.info("   Video generation completed!")
+                except concurrent.futures.TimeoutError:
+                    return {"error": "Video generation timed out after 10 minutes", "video_data": None}
+                except Exception as wait_error:
+                    logger.error(f"   Error waiting for video: {wait_error}")
+                    return {"error": f"Video generation failed: {wait_error}", "video_data": None}
                 
                 video_data = None
-                
-                # Extract video from completed operation response
-                logger.info(f"   Operation response type: {type(operation.response)}")
-                logger.info(f"   Operation response dir: {dir(operation.response) if operation.response else 'None'}")
-                
-                if hasattr(operation, 'response') and operation.response:
-                    response = operation.response
-                    logger.info(f"   Response object: {response}")
-                    
+
+                # Extract video from the result
+                # The result could be on operation._result or operation.response
+                response = getattr(operation, '_result', None) or getattr(operation, 'response', None)
+
+                logger.info(f"   Response type: {type(response)}")
+                logger.info(f"   Response attributes: {[attr for attr in dir(response) if not attr.startswith('_')] if response else 'None'}")
+
+                if response:
                     # Try different possible response structures
                     if hasattr(response, 'generated_videos') and response.generated_videos:
                         logger.info(f"   Found generated_videos: {len(response.generated_videos)}")
                         video = response.generated_videos[0]
-                        
+
                         if hasattr(video, 'video'):
-                            if hasattr(video.video, 'video_bytes'):
+                            if hasattr(video.video, 'video_bytes') and video.video.video_bytes:
                                 video_data = video.video.video_bytes
                                 logger.info(f"   Extracted video_bytes: {len(video_data)} bytes")
-                            elif hasattr(video.video, 'uri'):
+                            elif hasattr(video.video, 'uri') and video.video.uri:
                                 video_uri = video.video.uri
                                 logger.info(f"   Found video URI: {video_uri}")
                                 video_data = await self._download_video(video_uri)
+                        elif hasattr(video, 'video_bytes') and video.video_bytes:
+                            video_data = video.video_bytes
+                            logger.info(f"   Extracted video_bytes directly: {len(video_data)} bytes")
+                        elif hasattr(video, 'uri') and video.uri:
+                            video_uri = video.uri
+                            logger.info(f"   Found video URI directly: {video_uri}")
+                            video_data = await self._download_video(video_uri)
                     else:
                         logger.warning(f"   No generated_videos in response")
-                        logger.info(f"   Response attributes: {[attr for attr in dir(response) if not attr.startswith('_')]}")
+                        # Try to find video data in other attributes
+                        if hasattr(response, 'video_bytes') and response.video_bytes:
+                            video_data = response.video_bytes
+                        elif hasattr(response, 'uri') and response.uri:
+                            video_data = await self._download_video(response.uri)
                 else:
-                    logger.error(f"   No response in operation")
-                
+                    logger.error(f"   No response from operation")
+
                 if not video_data:
                     logger.error("No video data extracted from Veo response")
-                    logger.info(f"   Full operation: {operation}")
+                    logger.info(f"   Full response: {response}")
                     return {"error": "No video generated by Veo", "video_data": None}
                     
             except Exception as gen_error:
