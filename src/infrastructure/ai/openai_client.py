@@ -577,19 +577,26 @@ class OpenAIClient:
         """Download video from Google Cloud Storage URI with redirect support"""
         try:
             import httpx
-            
+
             # The URI might be a GCS URI or a direct download URL
             if uri.startswith("gs://"):
                 # Convert GCS URI to download URL
                 # gs://bucket/path -> https://storage.googleapis.com/bucket/path
                 uri = uri.replace("gs://", "https://storage.googleapis.com/")
-            
-            # FIXED: Add follow_redirects=True to handle 302 responses
+
+            # Add API key for Google GenAI URLs (required for authentication)
+            if "generativelanguage.googleapis.com" in uri:
+                api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+                if api_key and "key=" not in uri:
+                    separator = "&" if "?" in uri else "?"
+                    uri = f"{uri}{separator}key={api_key}"
+
+            # Follow redirects to handle 302 responses
             async with httpx.AsyncClient(follow_redirects=True) as client:
                 response = await client.get(uri, timeout=60.0)
                 response.raise_for_status()
                 return response.content
-                
+
         except Exception as e:
             logger.error(f"Failed to download video from {uri}: {e}")
             return None
