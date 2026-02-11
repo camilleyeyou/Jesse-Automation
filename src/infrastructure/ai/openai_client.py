@@ -456,15 +456,30 @@ class OpenAIClient:
                 if response:
                     # Handle dict response from raw API polling
                     if isinstance(response, dict):
-                        # Raw API uses camelCase: generatedVideos
-                        generated_videos = response.get("generatedVideos", [])
-                        if generated_videos:
-                            logger.info(f"   Found generatedVideos (dict): {len(generated_videos)}")
-                            video = generated_videos[0]
+                        # Try multiple response structures:
+                        # 1. generateVideoResponse.generatedSamples (actual API response)
+                        # 2. generatedVideos (alternative format)
+                        generated_samples = []
 
-                            # Video data could be in video.uri or video.video.uri
-                            video_obj = video.get("video", video)
-                            video_uri = video_obj.get("uri")
+                        # Check for generateVideoResponse wrapper (actual format from API)
+                        gen_video_resp = response.get("generateVideoResponse", {})
+                        if gen_video_resp:
+                            generated_samples = gen_video_resp.get("generatedSamples", [])
+                            logger.info(f"   Found generateVideoResponse with {len(generated_samples)} samples")
+
+                        # Fallback to generatedVideos
+                        if not generated_samples:
+                            generated_samples = response.get("generatedVideos", [])
+                            if generated_samples:
+                                logger.info(f"   Found generatedVideos: {len(generated_samples)}")
+
+                        if generated_samples:
+                            sample = generated_samples[0]
+                            logger.info(f"   Sample structure: {list(sample.keys()) if isinstance(sample, dict) else type(sample)}")
+
+                            # Video data is in sample.video.uri
+                            video_obj = sample.get("video", sample) if isinstance(sample, dict) else sample
+                            video_uri = video_obj.get("uri") if isinstance(video_obj, dict) else None
 
                             if video_uri:
                                 logger.info(f"   Found video URI: {video_uri}")
@@ -472,7 +487,7 @@ class OpenAIClient:
                             else:
                                 logger.warning(f"   No URI in video object: {video_obj}")
                         else:
-                            logger.warning(f"   No generatedVideos in dict response: {list(response.keys())}")
+                            logger.warning(f"   No video samples found in dict response: {list(response.keys())}")
 
                     # Handle SDK object response
                     elif hasattr(response, 'generated_videos') and response.generated_videos:
