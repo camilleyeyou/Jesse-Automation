@@ -133,19 +133,21 @@ class ImageGeneratorAgent(BaseAgent):
         # ═══════════════════════════════════════════════════════════════════════
         self.jesse_character = {
             "physical": {
-                "hair": "curly brown hair, slightly disheveled",
+                "hair": "tight, defined curly brown hair, medium length, voluminous and natural",
+                "face": "defined facial features, light stubble, warm complexion",
                 "build": "slim, average height",
-                "expression": "thoughtful, slightly bemused, deadpan",
+                "expression": "warm but knowing smirk, approachable yet enigmatic, slight mischievous quality",
                 "age_appearance": "late 20s to early 30s"
             },
             "fashion_styles": {
                 "intellectual": "black turtleneck, navy blazer, brown tweed jacket",
+                "casual_dark": "dark button-up shirt, black or charcoal jacket, understated elegance",
                 "casual_autumn": "fair isle sweater, gray hoodie, tan corduroy jacket, camel coat",
                 "sporty_casual": "white t-shirt under jacket, chambray shirt",
                 "accessories": "occasionally leather gloves (brown or black)"
             },
             "signature_pose": "holding or applying Jesse A. Eisenbalm lip balm tube",
-            "expression_range": "calm, contemplative, slight smile, direct eye contact with camera"
+            "expression_range": "warm knowing smile, slight smirk, approachable confidence, direct eye contact with camera"
         }
         
         # ═══════════════════════════════════════════════════════════════════════
@@ -481,18 +483,20 @@ CRITICAL: The product MUST look exactly as described above."""
     def _get_jesse_character_description(self) -> str:
         """Generate Jesse A. Eisenbalm character description for lifestyle shots"""
         char = self.jesse_character
-        
+
         return f"""JESSE A. EISENBALM - CHARACTER SPECIFICATION:
 (IMPORTANT: This is Jesse A. Eisenbalm the lip balm entrepreneur, NOT Jesse Eisenberg the actor)
 
 PHYSICAL APPEARANCE:
 - Hair: {char['physical']['hair']}
+- Face: {char['physical']['face']}
 - Build: {char['physical']['build']}
 - Expression: {char['physical']['expression']}
 - Age: {char['physical']['age_appearance']}
 
 FASHION STYLES:
 - Intellectual: {char['fashion_styles']['intellectual']}
+- Casual Dark: {char['fashion_styles']['casual_dark']}
 - Casual Autumn: {char['fashion_styles']['casual_autumn']}
 - Sporty Casual: {char['fashion_styles']['sporty_casual']}
 - Accessories: {char['fashion_styles']['accessories']}

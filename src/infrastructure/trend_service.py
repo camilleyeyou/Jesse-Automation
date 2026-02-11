@@ -65,6 +65,51 @@ class TrendService:
     # Days to prevent topic reuse
     TOPIC_COOLDOWN_DAYS = 7
 
+    # Regional/local story indicators to SKIP (these don't go viral internationally)
+    REGIONAL_SKIP_PATTERNS = [
+        # US local news patterns
+        r'\b(local|county|sheriff|mayor|city council|township|municipal)\b',
+        r'\b(police department|fire department|school board|district court)\b',
+        r'\b(I-\d+|Route \d+|Highway \d+)\b',  # Highway numbers
+        r'\b(weather alert|traffic|road closure|power outage)\b',
+        # Regional crime/accidents (unless major)
+        r'\b(arrested|charged|convicted|sentenced)\b.*\b(local|county)\b',
+        r'\b(crash|accident|collision)\b.*\b(injured|killed)\b(?!.*mass|multiple|dozens)',
+        # Local politics (unless national figures)
+        r'\b(state senator|state rep|alderman|commissioner)\b',
+        # Local business (unless major brand)
+        r'\b(opens|closes|relocates)\b.*\b(location|store|restaurant)\b',
+        # Weather (unless major disaster)
+        r'\b(forecast|temperatures|rain|snow|cloudy)\b(?!.*hurricane|tornado|earthquake|flood)',
+        # Sports (local teams, minor leagues)
+        r'\b(high school|minor league|AAA|AA|college)\b.*\b(sports|game|season)\b',
+    ]
+
+    # Keywords that indicate VIRAL/INTERNATIONAL potential (prioritize these)
+    VIRAL_BOOST_KEYWORDS = [
+        # Major tech/companies
+        'apple', 'google', 'microsoft', 'amazon', 'meta', 'facebook', 'tesla', 'openai',
+        'nvidia', 'tiktok', 'netflix', 'spotify', 'disney', 'twitter', 'x.com',
+        # Major cultural figures
+        'taylor swift', 'beyonce', 'drake', 'elon musk', 'mark zuckerberg', 'tim cook',
+        'oprah', 'rihanna', 'kanye', 'kardashian', 'lebron', 'messi', 'ronaldo',
+        # Viral indicators
+        'viral', 'million views', 'trending', 'internet', 'social media', 'goes viral',
+        'everyone is talking', 'breaks the internet', 'meme', 'backlash', 'controversy',
+        # Global events
+        'super bowl', 'oscars', 'grammy', 'world cup', 'olympics', 'coachella',
+        'met gala', 'fashion week', 'comic con', 'ces', 'wwdc', 'f1', 'formula 1',
+        # Tech/AI (always relevant)
+        'ai', 'artificial intelligence', 'chatgpt', 'gpt', 'automation', 'robot',
+        'breakthrough', 'launch', 'announces', 'reveals', 'releases',
+        # Workplace/culture (our sweet spot)
+        'layoffs', 'remote work', 'return to office', 'quiet quitting', 'burnout',
+        'hustle culture', 'work-life', 'linkedin', 'corporate', 'ceo',
+        # Entertainment
+        'movie', 'film', 'album', 'tour', 'concert', 'premiere', 'trailer',
+        'season', 'finale', 'streaming', 'box office',
+    ]
+
     # Brave Search category queries — balanced mix of positive, neutral, and critical
     CATEGORY_QUERIES = {
         "ai_innovation": "AI breakthrough innovation announcement today",
@@ -147,6 +192,27 @@ class TrendService:
                 self.logger.info(f"📊 Topic tracking database initialized at {self.db_path}")
         except Exception as e:
             self.logger.error(f"Failed to initialize database: {e}")
+
+    def _is_regional_story(self, headline: str, summary: str = "") -> bool:
+        """Check if a story is too regional/local to have viral potential"""
+        text = f"{headline} {summary}".lower()
+
+        for pattern in self.REGIONAL_SKIP_PATTERNS:
+            if re.search(pattern, text, re.IGNORECASE):
+                self.logger.debug(f"⏭️ Skipping regional story: {headline[:50]}...")
+                return True
+        return False
+
+    def _calculate_viral_score(self, headline: str, summary: str = "") -> int:
+        """Calculate viral potential score (higher = more likely to resonate globally)"""
+        text = f"{headline} {summary}".lower()
+        score = 0
+
+        for keyword in self.VIRAL_BOOST_KEYWORDS:
+            if keyword in text:
+                score += 1
+
+        return score
 
     def _generate_fingerprint(self, headline: str, summary: str = "") -> str:
         """Generate a fingerprint to identify similar topics"""
@@ -279,6 +345,8 @@ class TrendService:
                     if not results:
                         continue
 
+                    # Score and filter results for viral potential
+                    scored_results = []
                     for result in results:
                         title = result.get("title", "")
                         description = result.get("description", "")
@@ -286,6 +354,22 @@ class TrendService:
 
                         if not title:
                             continue
+
+                        # Skip regional/local stories that won't resonate broadly
+                        if self._is_regional_story(title, description):
+                            continue
+
+                        # Calculate viral potential
+                        viral_score = self._calculate_viral_score(title, description)
+                        scored_results.append((viral_score, result))
+
+                    # Sort by viral score (highest first)
+                    scored_results.sort(key=lambda x: x[0], reverse=True)
+
+                    for viral_score, result in scored_results:
+                        title = result.get("title", "")
+                        description = result.get("description", "")
+                        url = result.get("url", "")
 
                         trend = TrendingNews(
                             headline=title,
@@ -308,7 +392,7 @@ class TrendService:
 
                         if not self._is_topic_used(trend.fingerprint):
                             self._record_used_topic(trend, post_id)
-                            self.logger.info(f"✅ Selected Brave news [{category_name}]: {title[:70]}...")
+                            self.logger.info(f"✅ Selected Brave news [{category_name}] (viral score: {viral_score}): {title[:70]}...")
                             return trend
 
             except Exception as e:
@@ -376,9 +460,19 @@ class TrendService:
 
             self.logger.info(f"📈 Found {len(trending_topics)} trending topics from Google Trends")
 
-            random.shuffle(trending_topics)
-
+            # Score topics by viral potential and filter regional ones
+            scored_topics = []
             for topic in trending_topics:
+                # Skip regional topics
+                if self._is_regional_story(topic, ""):
+                    continue
+                viral_score = self._calculate_viral_score(topic, "")
+                scored_topics.append((viral_score, topic))
+
+            # Sort by viral score (highest first), then shuffle within same score
+            scored_topics.sort(key=lambda x: x[0], reverse=True)
+
+            for viral_score, topic in scored_topics:
                 trend = TrendingNews(
                     headline=topic,
                     summary=f"Currently trending on Google: {topic}",
@@ -390,7 +484,7 @@ class TrendService:
 
                 if not self._is_topic_used(trend.fingerprint):
                     self._record_used_topic(trend, post_id)
-                    self.logger.info(f"✅ Selected Google Trend: {topic}")
+                    self.logger.info(f"✅ Selected Google Trend (viral score: {viral_score}): {topic}")
                     return trend
                 else:
                     self.logger.debug(f"⏭️ Skipping used topic: {topic}")
