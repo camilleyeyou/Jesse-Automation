@@ -206,7 +206,10 @@ app = FastAPI(
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
 origins = [origin.strip() for origin in cors_origins.split(",")]
 
-# Add common Vercel patterns
+# Always include production Vercel URL
+origins.append("https://jesse-automation.vercel.app")
+
+# Add common Vercel patterns (preview deployments)
 if os.getenv("VERCEL_URL"):
     origins.append(f"https://{os.getenv('VERCEL_URL')}")
 
