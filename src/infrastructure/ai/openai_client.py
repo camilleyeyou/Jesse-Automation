@@ -389,44 +389,94 @@ class OpenAIClient:
                     config=types.GenerateVideosConfig(**config_params)
                 )
                 
-                # Wait for video generation using result() in executor
-                # This handles polling internally and works with the SDK properly
+                # Poll the operation until complete using raw API calls
                 operation_name = operation.name if hasattr(operation, 'name') else str(operation)
                 logger.info(f"   Operation name: {operation_name}")
+                logger.info("   Waiting for video generation (this may take 1-3 minutes)...")
 
-                import concurrent.futures
+                import httpx
 
-                def wait_for_result():
-                    """Blocking call to wait for operation result"""
-                    return operation.result(timeout=600)  # 10 minute timeout
+                max_wait = 600  # 10 minutes
+                poll_interval = 10  # Check every 10 seconds
+                waited = 0
+                is_done = False
+                final_response = None
 
-                try:
-                    loop = asyncio.get_event_loop()
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        # Run the blocking result() call in a thread pool
-                        logger.info("   Waiting for video generation (this may take 1-3 minutes)...")
-                        result = await loop.run_in_executor(executor, wait_for_result)
-                        operation._result = result  # Store result on operation for later access
-                        logger.info("   Video generation completed!")
-                except concurrent.futures.TimeoutError:
+                # Get API key for polling
+                api_key = os.getenv("GOOGLE_API_KEY")
+                poll_url = f"https://generativelanguage.googleapis.com/v1beta/{operation_name}?key={api_key}"
+
+                async with httpx.AsyncClient() as client:
+                    while waited < max_wait:
+                        try:
+                            # Poll the operation status
+                            poll_response = await client.get(poll_url, timeout=30.0)
+
+                            if poll_response.status_code == 200:
+                                op_data = poll_response.json()
+                                is_done = op_data.get("done", False)
+
+                                if is_done:
+                                    logger.info(f"   Video generation completed after {waited}s!")
+                                    final_response = op_data.get("response", {})
+                                    break
+
+                                # Check for error
+                                if "error" in op_data:
+                                    error_msg = op_data["error"].get("message", str(op_data["error"]))
+                                    logger.error(f"   Video generation error: {error_msg}")
+                                    return {"error": f"Video generation failed: {error_msg}", "video_data": None}
+                            else:
+                                logger.warning(f"   Poll request failed: {poll_response.status_code}")
+
+                        except Exception as poll_err:
+                            logger.warning(f"   Poll error: {poll_err}")
+
+                        # Wait before next poll
+                        await asyncio.sleep(poll_interval)
+                        waited += poll_interval
+
+                        if waited % 30 == 0:  # Log progress every 30 seconds
+                            logger.info(f"   Still generating... ({waited}s elapsed)")
+
+                if not is_done:
                     return {"error": "Video generation timed out after 10 minutes", "video_data": None}
-                except Exception as wait_error:
-                    logger.error(f"   Error waiting for video: {wait_error}")
-                    return {"error": f"Video generation failed: {wait_error}", "video_data": None}
                 
                 video_data = None
 
-                # Extract video from the result
-                # The result could be on operation._result or operation.response
-                response = getattr(operation, '_result', None) or getattr(operation, 'response', None)
+                # Extract video from the polling response or operation object
+                response = final_response or getattr(operation, 'response', None)
 
                 logger.info(f"   Response type: {type(response)}")
-                logger.info(f"   Response attributes: {[attr for attr in dir(response) if not attr.startswith('_')] if response else 'None'}")
+                if isinstance(response, dict):
+                    logger.info(f"   Response keys: {list(response.keys())}")
+                else:
+                    logger.info(f"   Response attributes: {[attr for attr in dir(response) if not attr.startswith('_')] if response else 'None'}")
 
                 if response:
-                    # Try different possible response structures
-                    if hasattr(response, 'generated_videos') and response.generated_videos:
-                        logger.info(f"   Found generated_videos: {len(response.generated_videos)}")
+                    # Handle dict response from raw API polling
+                    if isinstance(response, dict):
+                        # Raw API uses camelCase: generatedVideos
+                        generated_videos = response.get("generatedVideos", [])
+                        if generated_videos:
+                            logger.info(f"   Found generatedVideos (dict): {len(generated_videos)}")
+                            video = generated_videos[0]
+
+                            # Video data could be in video.uri or video.video.uri
+                            video_obj = video.get("video", video)
+                            video_uri = video_obj.get("uri")
+
+                            if video_uri:
+                                logger.info(f"   Found video URI: {video_uri}")
+                                video_data = await self._download_video(video_uri)
+                            else:
+                                logger.warning(f"   No URI in video object: {video_obj}")
+                        else:
+                            logger.warning(f"   No generatedVideos in dict response: {list(response.keys())}")
+
+                    # Handle SDK object response
+                    elif hasattr(response, 'generated_videos') and response.generated_videos:
+                        logger.info(f"   Found generated_videos (object): {len(response.generated_videos)}")
                         video = response.generated_videos[0]
 
                         if hasattr(video, 'video'):
@@ -445,7 +495,7 @@ class OpenAIClient:
                             logger.info(f"   Found video URI directly: {video_uri}")
                             video_data = await self._download_video(video_uri)
                     else:
-                        logger.warning(f"   No generated_videos in response")
+                        logger.warning(f"   Unknown response format")
                         # Try to find video data in other attributes
                         if hasattr(response, 'video_bytes') and response.video_bytes:
                             video_data = response.video_bytes
