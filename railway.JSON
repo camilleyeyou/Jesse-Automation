@@ -4,8 +4,8 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "cd api && python -m uvicorn main:app --host 0.0.0.0 --port $PORT",
-    "restartPolicyType": "ON_FAILURE",
+    "startCommand": "cd api && python -m uvicorn main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 120",
+    "restartPolicyType": "ALWAYS",
     "restartPolicyMaxRetries": 10
   }
 }
