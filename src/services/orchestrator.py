@@ -417,10 +417,12 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
             logger.info(f"✅ Content generated: {post.content[:50]}...")
 
             # Step 4: Post to LinkedIn
-            logger.info("📤 Posting to LinkedIn...")
+            logger.info(f"📤 Posting to LinkedIn... (media_type: {post.media_type})")
             linkedin_result = linkedin_poster.publish_post(
                 content=post.content,
-                image_path=post.image_url,
+                image_path=post.image_url if post.media_type != 'video' else None,
+                video_path=post.video_url if post.media_type == 'video' else None,
+                media_type=post.media_type,
                 hashtags=[]  # No hashtags per client request
             )
 

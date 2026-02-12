@@ -367,7 +367,20 @@ class PostQueueManager:
                 data["metadata"] = json.loads(data["metadata"])
             except:
                 data["metadata"] = {}
-        
+
+        # Expose media_type at top level for dashboard
+        metadata = data.get("metadata", {})
+        if metadata.get("media_type"):
+            data["media_type"] = metadata["media_type"]
+        elif data.get("image_url"):
+            # Auto-detect from URL
+            if '/videos/' in data["image_url"] or data["image_url"].endswith('.mp4'):
+                data["media_type"] = "video"
+            else:
+                data["media_type"] = "image"
+        else:
+            data["media_type"] = "text"
+
         return data
     
     def _log_activity(self, action: str, details: Dict[str, Any], status: str):
