@@ -249,8 +249,11 @@ function OverviewTab({ status, onRefresh, onStartScheduler, onStopScheduler, onP
               <Play className="w-4 h-4" /> <span className="hidden xs:inline">Start</span> Scheduler
             </Button>
           )}
-          <Button onClick={onPostNow} variant="primary" loading={loading} fullWidth className="sm:w-auto">
-            <Send className="w-4 h-4" /> Post Now
+          <Button onClick={() => onPostNow(null, false)} variant="primary" loading={loading} fullWidth className="sm:w-auto">
+            <Image className="w-4 h-4" /> Post with Image
+          </Button>
+          <Button onClick={() => onPostNow(null, true)} variant="primary" loading={loading} fullWidth className="sm:w-auto" style={{background: 'linear-gradient(to right, #a855f7, #9333ea)'}}>
+            <Video className="w-4 h-4" /> Post with Video
           </Button>
           <Button onClick={onRefresh} variant="secondary" loading={loading} fullWidth className="col-span-2 sm:w-auto sm:col-span-1">
             <RefreshCw className="w-4 h-4" /> Refresh
@@ -1332,14 +1335,21 @@ export default function App() {
     setLoading(false);
   };
 
-  const handlePostNow = async (postId = null) => {
+  const handlePostNow = async (postId = null, useVideo = false) => {
     setLoading(true);
     try {
-      const endpoint = postId
-        ? `/api/automation/queue/post/${postId}`
-        : '/api/automation/post-now';
-      const response = await api.post(endpoint);
-      const linkedinId = response.data?.linkedin_post_id;
+      let response;
+      if (postId) {
+        // Posting from queue - use specific post ID
+        response = await api.post(`/api/automation/queue/post/${postId}`);
+      } else {
+        // Generate and post now - specify media type
+        const mediaType = useVideo ? 'video' : 'image';
+        showMessage(`🔄 Generating ${mediaType} post and publishing...`, 60000);
+        // Use the synchronous generate-and-post endpoint which returns full result
+        response = await api.post(`/api/automation/generate-and-post?use_video=${useVideo}`);
+      }
+      const linkedinId = response.linkedin?.post_id || response.data?.linkedin_post_id;
       showMessage(`✅ Posted successfully!${linkedinId ? ' ID: ' + linkedinId : ''}`);
       await fetchQueue();
       await fetchHistory();
