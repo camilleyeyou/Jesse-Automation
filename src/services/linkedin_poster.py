@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 VIDEO_UPLOAD_CHUNK_SIZE = 4 * 1024 * 1024  # 4MB chunks (LinkedIn recommended)
 VIDEO_POLL_INTERVAL = 5  # seconds between status checks
 VIDEO_POLL_MAX_ATTEMPTS = 60  # 5 min timeout (60 * 5 = 300 seconds)
-VIDEO_API_VERSION = "202401"  # LinkedIn API version YYYYMM format (Jan 2024 - stable)
+VIDEO_API_VERSION = "202406"  # LinkedIn API version YYYYMM format (June 2024)
 
 
 def web_url_to_file_path(url: str) -> Optional[str]:
@@ -472,6 +472,8 @@ class LinkedInPoster:
                 **headers,
                 "LinkedIn-Version": VIDEO_API_VERSION
             }
+
+            logger.info(f"Using LinkedIn-Version: {VIDEO_API_VERSION}")
 
             init_response = requests.post(
                 "https://api.linkedin.com/rest/videos?action=initializeUpload",
