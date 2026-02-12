@@ -249,12 +249,14 @@ class LinkedInPoster:
                         video_result = self._upload_video(actual_file_path, author, headers)
 
                         if video_result.get("success"):
-                            post_body["specificContent"]["com.linkedin.ugc.ShareContent"]["shareMediaCategory"] = "VIDEO"
-                            post_body["specificContent"]["com.linkedin.ugc.ShareContent"]["media"] = [{
-                                "status": "READY",
-                                "media": video_result["video_urn"]
-                            }]
-                            logger.info("Video attached to post")
+                            # Use the new REST Posts API for video posts (ugcPosts is legacy)
+                            logger.info("Using REST Posts API for video post...")
+                            return self._create_video_post(
+                                author=author,
+                                text=post_text,
+                                video_urn=video_result["video_urn"],
+                                post_to_company=post_to_company
+                            )
                         else:
                             logger.error(f"Video upload failed: {video_result.get('error')}")
                             return {
@@ -574,6 +576,75 @@ class LinkedInPoster:
             import traceback
             traceback.print_exc()
             return {"success": False, "error": str(e)}
+
+    def _create_video_post(self, author: str, text: str, video_urn: str, post_to_company: bool) -> Dict[str, Any]:
+        """
+        Create a post with video using the new REST Posts API.
+
+        The ugcPosts API is legacy - videos uploaded via REST Videos API
+        must be posted via REST Posts API to avoid ownership errors.
+        """
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.access_token}",
+                "Content-Type": "application/json",
+                "X-Restli-Protocol-Version": "2.0.0",
+                "LinkedIn-Version": VIDEO_API_VERSION
+            }
+
+            # Build the post body for REST Posts API
+            post_body = {
+                "author": author,
+                "commentary": text,
+                "visibility": "PUBLIC",
+                "distribution": {
+                    "feedDistribution": "MAIN_FEED",
+                    "targetEntities": [],
+                    "thirdPartyDistributionChannels": []
+                },
+                "content": {
+                    "media": {
+                        "id": video_urn
+                    }
+                },
+                "lifecycleState": "PUBLISHED",
+                "isReshareDisabledByAuthor": False
+            }
+
+            logger.info(f"Creating video post via REST Posts API with video: {video_urn}")
+
+            response = requests.post(
+                "https://api.linkedin.com/rest/posts",
+                headers=headers,
+                json=post_body,
+                timeout=30
+            )
+
+            if response.status_code in [200, 201]:
+                post_id = response.headers.get("x-restli-id", response.headers.get("X-RestLi-Id"))
+                logger.info(f"✅ Successfully posted video to LinkedIn: {post_id}")
+                return {
+                    "success": True,
+                    "post_id": post_id,
+                    "url": f"https://www.linkedin.com/feed/update/{post_id}",
+                    "posted_to": "company" if post_to_company else "personal",
+                    "had_video": True,
+                    "media_type": "video"
+                }
+            else:
+                logger.error(f"LinkedIn video post failed: {response.status_code} - {response.text}")
+                return {
+                    "success": False,
+                    "error": f"REST Posts API returned {response.status_code}",
+                    "details": response.text
+                }
+
+        except Exception as e:
+            logger.error(f"Video post creation failed: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
     def get_company_info(self) -> Dict[str, Any]:
         """Get company page info (if configured)"""
