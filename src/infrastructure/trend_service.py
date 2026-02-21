@@ -110,18 +110,18 @@ class TrendService:
         'season', 'finale', 'streaming', 'box office',
     ]
 
-    # Brave Search category queries — balanced mix of positive, neutral, and critical
+    # Brave Search category queries — focused on topics relevant to working professionals
     CATEGORY_QUERIES = {
-        "ai_innovation": "AI breakthrough innovation announcement today",
-        "ai_news": "AI news update today",
-        "workplace_culture": "workplace culture trend this week",
-        "tech_news": "tech industry news today",
-        "pop_culture": "trending pop culture news today",
-        "startup_success": "startup launch success funding news today",
-        "creative_tech": "creative technology art design trending today",
-        "wellness_trend": "wellness trend self-care popular today",
-        "business_milestone": "company milestone achievement announcement today",
-        "viral_moment": "viral moment feel good story trending today",
+        "ai_workplace": "AI tools changing how people work today",
+        "ai_news": "AI news announcement launch today",
+        "workplace_culture": "workplace culture remote work trend this week",
+        "tech_business": "tech company business news today",
+        "career_workforce": "career hiring layoffs workforce news today",
+        "leadership_management": "leadership management corporate news today",
+        "burnout_wellness": "burnout wellness work-life balance trending",
+        "viral_linkedin": "viral LinkedIn post professional discussion today",
+        "economy_business": "economy business market news impact workers today",
+        "productivity_tools": "productivity tools software launch trending today",
     }
 
     def __init__(self, db_path: str = "data/automation/queue.db"):
@@ -286,6 +286,261 @@ class TrendService:
     def mark_topic_used_permanent(self, trend: TrendingNews, post_id: str = None):
         """Public method to mark a topic as used (called after successful post)"""
         self._record_used_topic(trend, post_id)
+
+    async def get_candidate_trends(self, count: int = 8) -> List[TrendingNews]:
+        """
+        Fetch multiple candidate trending topics for AI-powered curation.
+
+        Unlike get_one_fresh_trend(), this does NOT record topics as used.
+        The caller (NewsCuratorAgent) picks the best one and records it.
+
+        Returns:
+            List of TrendingNews candidates, scored but unrecorded.
+        """
+        candidates = []
+
+        # Collect from Brave Search (richest context)
+        if self.brave_api_key and HTTPX_AVAILABLE:
+            brave_candidates = await self._get_brave_candidates(count)
+            candidates.extend(brave_candidates)
+
+        # Collect from Google Trends
+        if self.pytrends and len(candidates) < count:
+            google_candidates = await self._get_google_candidates(count - len(candidates))
+            # Enrich bare topics with Brave context
+            if self.brave_api_key and HTTPX_AVAILABLE:
+                for i, trend in enumerate(google_candidates):
+                    google_candidates[i] = await self._enrich_with_brave(trend)
+            candidates.extend(google_candidates)
+
+        # Add fallbacks if we still don't have enough
+        if len(candidates) < 3:
+            fallback_candidates = await self._get_fallback_candidates(3 - len(candidates))
+            candidates.extend(fallback_candidates)
+
+        self.logger.info(f"📋 Collected {len(candidates)} candidate trends for curation")
+        return candidates[:count]
+
+    async def _get_brave_candidates(self, count: int = 8) -> List[TrendingNews]:
+        """Fetch multiple candidate trends from Brave Search without recording them."""
+        candidates = []
+
+        categories = list(self.CATEGORY_QUERIES.items())
+        random.shuffle(categories)
+
+        for category_name, query in categories:
+            if len(candidates) >= count:
+                break
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(
+                        "https://api.search.brave.com/res/v1/news/search",
+                        params={"q": query, "count": 5, "freshness": "pd"},
+                        headers={
+                            "X-Subscription-Token": self.brave_api_key,
+                            "Accept": "application/json"
+                        },
+                        timeout=10.0
+                    )
+
+                    if response.status_code != 200:
+                        continue
+
+                    data = response.json()
+                    results = data.get("results", [])
+
+                    for result in results:
+                        title = result.get("title", "")
+                        description = result.get("description", "")
+                        url = result.get("url", "")
+
+                        if not title:
+                            continue
+                        if self._is_regional_story(title, description):
+                            continue
+
+                        trend = TrendingNews(
+                            headline=title,
+                            summary=description[:200] if description else f"Trending: {title}",
+                            description=description,
+                            source="brave_search",
+                            url=url,
+                            category=category_name,
+                            news_freshness="today",
+                            related_articles=[
+                                {
+                                    "title": r.get("title", ""),
+                                    "snippet": r.get("description", "")[:100],
+                                    "url": r.get("url", "")
+                                }
+                                for r in results[1:4]
+                            ]
+                        )
+                        trend.fingerprint = self._generate_fingerprint(trend.headline, trend.summary)
+
+                        if not self._is_topic_used(trend.fingerprint):
+                            candidates.append(trend)
+
+            except Exception as e:
+                self.logger.error(f"Brave candidate fetch error for {category_name}: {e}")
+                continue
+
+        return candidates
+
+    async def _get_google_candidates(self, count: int = 5) -> List[TrendingNews]:
+        """Fetch multiple candidate trends from Google Trends without recording them."""
+        candidates = []
+        try:
+            trending_df = self.pytrends.trending_searches(pn='united_states')
+            if trending_df is None or trending_df.empty:
+                return candidates
+
+            trending_topics = trending_df[0].tolist()
+
+            for topic in trending_topics:
+                if len(candidates) >= count:
+                    break
+                if self._is_regional_story(topic, ""):
+                    continue
+
+                trend = TrendingNews(
+                    headline=topic,
+                    summary=f"Currently trending on Google: {topic}",
+                    source="google_trends",
+                    category="trending",
+                    url=f"https://trends.google.com/trends/explore?q={topic.replace(' ', '%20')}&geo=US"
+                )
+                trend.fingerprint = self._generate_fingerprint(trend.headline, trend.summary)
+
+                if not self._is_topic_used(trend.fingerprint):
+                    candidates.append(trend)
+
+        except Exception as e:
+            self.logger.error(f"Google Trends candidate fetch error: {e}")
+
+        return candidates
+
+    async def _get_fallback_candidates(self, count: int = 3) -> List[TrendingNews]:
+        """Get fallback candidates without recording them."""
+        fallbacks = self._get_fallback_list()
+        random.shuffle(fallbacks)
+
+        candidates = []
+        for fb in fallbacks:
+            if len(candidates) >= count:
+                break
+            if not self._is_topic_used(fb.fingerprint):
+                candidates.append(fb)
+
+        return candidates
+
+    def _get_fallback_list(self) -> List[TrendingNews]:
+        """Return the curated fallback list with fingerprints set."""
+        fallbacks = [
+            TrendingNews(
+                headline="Taylor Swift",
+                summary="Taylor Swift continues to dominate headlines with tour and music news",
+                source="fallback", category="celebrity",
+            ),
+            TrendingNews(
+                headline="Beyoncé",
+                summary="Beyoncé remains in the spotlight with new projects and appearances",
+                source="fallback", category="celebrity",
+            ),
+            TrendingNews(
+                headline="Travis Kelce",
+                summary="NFL star Travis Kelce trending for football and personal life",
+                source="fallback", category="sports",
+            ),
+            TrendingNews(
+                headline="Drake",
+                summary="Drake making headlines in music industry",
+                source="fallback", category="music",
+            ),
+            TrendingNews(
+                headline="Kendrick Lamar",
+                summary="Kendrick Lamar trending for music releases and cultural impact",
+                source="fallback", category="music",
+            ),
+            TrendingNews(
+                headline="NFL Playoffs",
+                summary="NFL playoff drama captivates fans nationwide",
+                source="fallback", category="sports",
+            ),
+            TrendingNews(
+                headline="NBA Trade Rumors",
+                summary="NBA teams making moves as trade deadline approaches",
+                source="fallback", category="sports",
+            ),
+            TrendingNews(
+                headline="LeBron James",
+                summary="LeBron James continues to make basketball history",
+                source="fallback", category="sports",
+            ),
+            TrendingNews(
+                headline="Netflix",
+                summary="Netflix releases new hit show that everyone is watching",
+                source="fallback", category="entertainment",
+            ),
+            TrendingNews(
+                headline="Oscar Nominations",
+                summary="Hollywood buzzing about award season predictions",
+                source="fallback", category="entertainment",
+            ),
+            TrendingNews(
+                headline="Timothée Chalamet",
+                summary="Timothée Chalamet trending for new film project",
+                source="fallback", category="celebrity",
+            ),
+            TrendingNews(
+                headline="Zendaya",
+                summary="Zendaya making headlines for fashion and film",
+                source="fallback", category="celebrity",
+            ),
+            TrendingNews(
+                headline="iPhone",
+                summary="Apple iPhone news continues to trend among consumers",
+                source="fallback", category="tech",
+            ),
+            TrendingNews(
+                headline="Elon Musk",
+                summary="Elon Musk creates controversy with latest statements",
+                source="fallback", category="tech",
+            ),
+            TrendingNews(
+                headline="ChatGPT",
+                summary="AI chatbot continues to spark debates about technology",
+                source="fallback", category="tech",
+            ),
+            TrendingNews(
+                headline="TikTok Trend",
+                summary="New viral TikTok challenge takes over social media",
+                source="fallback", category="viral",
+            ),
+            TrendingNews(
+                headline="Super Bowl",
+                summary="Super Bowl anticipation builds as teams compete",
+                source="fallback", category="sports",
+            ),
+            TrendingNews(
+                headline="Coachella",
+                summary="Music festival announcements generate excitement",
+                source="fallback", category="entertainment",
+            ),
+            TrendingNews(
+                headline="The Bachelor",
+                summary="Reality TV drama unfolds on latest season",
+                source="fallback", category="entertainment",
+            ),
+            TrendingNews(
+                headline="Real Housewives",
+                summary="Reality TV franchise drama trending on social media",
+                source="fallback", category="entertainment",
+            ),
+        ]
+        for fb in fallbacks:
+            fb.fingerprint = self._generate_fingerprint(fb.headline, fb.summary)
+        return fallbacks
 
     async def get_one_fresh_trend(self, post_id: str = None) -> Optional[TrendingNews]:
         """
@@ -533,112 +788,7 @@ class TrendService:
     async def _get_fallback_trend(self, post_id: str = None) -> TrendingNews:
         """Return a curated fallback trend when all APIs fail"""
 
-        fallbacks = [
-            TrendingNews(
-                headline="Taylor Swift",
-                summary="Taylor Swift continues to dominate headlines with tour and music news",
-                source="fallback", category="celebrity",
-            ),
-            TrendingNews(
-                headline="Beyoncé",
-                summary="Beyoncé remains in the spotlight with new projects and appearances",
-                source="fallback", category="celebrity",
-            ),
-            TrendingNews(
-                headline="Travis Kelce",
-                summary="NFL star Travis Kelce trending for football and personal life",
-                source="fallback", category="sports",
-            ),
-            TrendingNews(
-                headline="Drake",
-                summary="Drake making headlines in music industry",
-                source="fallback", category="music",
-            ),
-            TrendingNews(
-                headline="Kendrick Lamar",
-                summary="Kendrick Lamar trending for music releases and cultural impact",
-                source="fallback", category="music",
-            ),
-            TrendingNews(
-                headline="NFL Playoffs",
-                summary="NFL playoff drama captivates fans nationwide",
-                source="fallback", category="sports",
-            ),
-            TrendingNews(
-                headline="NBA Trade Rumors",
-                summary="NBA teams making moves as trade deadline approaches",
-                source="fallback", category="sports",
-            ),
-            TrendingNews(
-                headline="LeBron James",
-                summary="LeBron James continues to make basketball history",
-                source="fallback", category="sports",
-            ),
-            TrendingNews(
-                headline="Netflix",
-                summary="Netflix releases new hit show that everyone is watching",
-                source="fallback", category="entertainment",
-            ),
-            TrendingNews(
-                headline="Oscar Nominations",
-                summary="Hollywood buzzing about award season predictions",
-                source="fallback", category="entertainment",
-            ),
-            TrendingNews(
-                headline="Timothée Chalamet",
-                summary="Timothée Chalamet trending for new film project",
-                source="fallback", category="celebrity",
-            ),
-            TrendingNews(
-                headline="Zendaya",
-                summary="Zendaya making headlines for fashion and film",
-                source="fallback", category="celebrity",
-            ),
-            TrendingNews(
-                headline="iPhone",
-                summary="Apple iPhone news continues to trend among consumers",
-                source="fallback", category="tech",
-            ),
-            TrendingNews(
-                headline="Elon Musk",
-                summary="Elon Musk creates controversy with latest statements",
-                source="fallback", category="tech",
-            ),
-            TrendingNews(
-                headline="ChatGPT",
-                summary="AI chatbot continues to spark debates about technology",
-                source="fallback", category="tech",
-            ),
-            TrendingNews(
-                headline="TikTok Trend",
-                summary="New viral TikTok challenge takes over social media",
-                source="fallback", category="viral",
-            ),
-            TrendingNews(
-                headline="Super Bowl",
-                summary="Super Bowl anticipation builds as teams compete",
-                source="fallback", category="sports",
-            ),
-            TrendingNews(
-                headline="Coachella",
-                summary="Music festival announcements generate excitement",
-                source="fallback", category="entertainment",
-            ),
-            TrendingNews(
-                headline="The Bachelor",
-                summary="Reality TV drama unfolds on latest season",
-                source="fallback", category="entertainment",
-            ),
-            TrendingNews(
-                headline="Real Housewives",
-                summary="Reality TV franchise drama trending on social media",
-                source="fallback", category="entertainment",
-            ),
-        ]
-
-        for fb in fallbacks:
-            fb.fingerprint = self._generate_fingerprint(fb.headline, fb.summary)
-
+        fallbacks = self._get_fallback_list()
         random.shuffle(fallbacks)
 
         for fb in fallbacks:

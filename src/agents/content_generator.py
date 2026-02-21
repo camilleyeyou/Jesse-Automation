@@ -17,7 +17,7 @@ import logging
 import random
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Any
+from typing import TYPE_CHECKING, Dict, Optional, Any
 from dataclasses import dataclass
 
 from .base_agent import BaseAgent
@@ -32,6 +32,9 @@ except ImportError:
         # If both fail, we'll raise a clear error at runtime
         LinkedInPost = None
         CulturalReference = None
+
+if TYPE_CHECKING:
+    from ..models.post import LinkedInPost, CulturalReference
 
 
 class ContentPillar(Enum):
@@ -152,6 +155,26 @@ The brand voice is your SMART, WEIRD FRIEND who:
 - Is genuinely warm but never saccharine
 - Can be sincere about small moments without being cringe
 - Uses specific, concrete details instead of vague platitudes
+
+═══════════════════════════════════════════════════════════════════════════════
+OUR AUDIENCE (THIS MATTERS — READ IT)
+═══════════════════════════════════════════════════════════════════════════════
+
+Working professionals across ALL industries — not just tech. Our audience:
+- Managers, ICs, executives, freelancers, founders, creatives
+- Healthcare workers, teachers, lawyers, engineers, marketers, designers
+- People who live in meetings, Slack, email, and deadline pressure
+- Experiencing burnout, imposter syndrome, calendar overwhelm
+- Tired of generic LinkedIn "thought leadership" and hustle culture
+- Appreciate humor about the shared absurdity of professional life
+- Thoughtful about how AI, automation, and tech change their work
+- Value authenticity and human connection over corporate performance
+
+EVERY POST must connect to something this audience feels, experiences, or
+recognizes. If a trending topic can't connect to professional life or the
+universal human experience of being a person who works — find the human
+angle instead. Ask yourself: "Would someone sitting in their 4th meeting
+today nod at this?"
 
 ═══════════════════════════════════════════════════════════════════════════════
 CREATIVE PRINCIPLES (READ THESE CAREFULLY)
@@ -743,7 +766,15 @@ TRENDING TOPIC TO REACT TO
 
 {trending_context}
 
-Find the Jesse angle. What does this mean for humans trying to stay human?
+AUDIENCE CONNECTION (CRITICAL):
+Your post MUST connect this trend to something working professionals experience.
+Don't just comment on the news — find the angle that makes a manager, an engineer,
+a designer, a nurse, a freelancer nod and think "that's exactly how it feels."
+
+If the trend has a SUGGESTED ANGLE above, use it as your starting point — it was
+chosen specifically for audience relevance. Build on it, don't ignore it.
+
+What does this mean for humans trying to stay human at work?
 What's the observation nobody else is making? Where does lip balm fit (creatively, unexpectedly)?
 """
         
@@ -801,12 +832,14 @@ REQUIREMENTS
 LENGTH: 60-150 words (punchy, not essay)
 
 MUST:
+- Connect to something working professionals recognize or feel
 - Surprise the reader in the first line
 - Use at least one specific, concrete detail
 - End with the style specified above (NOT the usual)
 - Feel like a smart friend's observation, not a brand
 
 MUST NOT:
+- Write about topics that have no connection to professional life or human experience
 - Be generic or predictable
 - Target individuals negatively
 - Use hashtags

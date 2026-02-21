@@ -18,6 +18,12 @@ from ..agents.revision_generator import RevisionGeneratorAgent
 from ..agents.validators import SarahChenValidator, MarcusWilliamsValidator, JordanParkValidator
 
 try:
+    from ..agents.news_curator import NewsCuratorAgent
+    NEWS_CURATOR_AVAILABLE = True
+except ImportError:
+    NEWS_CURATOR_AVAILABLE = False
+
+try:
     from ..infrastructure.trend_service import get_trend_service
     TREND_SERVICE_AVAILABLE = True
 except ImportError:
@@ -89,10 +95,18 @@ class ContentOrchestrator:
         ]
         
         self.trend_service = None
+        self.news_curator = None
         if TREND_SERVICE_AVAILABLE:
             # Use same database as queue manager for consistency
             self.trend_service = get_trend_service("data/automation/queue.db")
             logger.info("✅ Trend service initialized - content will react to real news")
+
+            # Initialize AI-powered news curator
+            if NEWS_CURATOR_AVAILABLE:
+                self.news_curator = NewsCuratorAgent(ai_client, config, self.trend_service)
+                logger.info("✅ News curator initialized - AI-powered trend curation enabled")
+            else:
+                logger.warning("⚠️ NewsCuratorAgent not available, using direct trend selection")
 
         # Initialize memory system
         self.memory = None
@@ -131,9 +145,13 @@ class ContentOrchestrator:
             post_id = f"{batch_id[:8]}_{post_number}"  # Create tracking ID
             logger.info(f"\n--- Post {post_number}/{num_posts} ---")
 
-            # Fetch ONE fresh trend for THIS post (with tracking)
+            # Fetch curated trend for THIS post
             trend = None
-            if self.trend_service:
+            if self.news_curator:
+                trend = await self.news_curator.execute(post_id=post_id)
+                if trend:
+                    logger.info(f"📰 Curated trend ({trend.category}): {trend.headline[:70]}...")
+            elif self.trend_service:
                 trend = await self.trend_service.get_one_fresh_trend(post_id=post_id)
                 if trend:
                     logger.info(f"📰 Trend ({trend.category}): {trend.headline[:70]}...")
@@ -385,10 +403,16 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
             if self.trend_service:
                 self.trend_service.reset_for_new_batch()
 
-            # Step 2: Get fresh trending topic
+            # Step 2: Get curated trending topic
             post_id = f"live_{uuid.uuid4().hex[:8]}"
             trend = None
-            if self.trend_service:
+            if self.news_curator:
+                trend = await self.news_curator.execute(post_id=post_id)
+                if trend:
+                    logger.info(f"📰 Curated trend ({trend.category}): {trend.headline[:70]}...")
+                else:
+                    logger.warning("⚠️ No curated trend available, generating without trend")
+            elif self.trend_service:
                 trend = await self.trend_service.get_one_fresh_trend(post_id=post_id)
                 if trend:
                     logger.info(f"📰 Fresh trend ({trend.category}): {trend.headline[:70]}...")
@@ -479,6 +503,7 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
         stats = {
             "validators": [v.name for v in self.validators],
             "trend_service": self.trend_service is not None,
+            "news_curator": self.news_curator is not None,
             "image_generator": self.image_generator is not None,
             "memory": self.memory is not None
         }
