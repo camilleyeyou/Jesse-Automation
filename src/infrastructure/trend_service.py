@@ -14,7 +14,7 @@ import sqlite3
 import logging
 import random
 import hashlib
-from typing import Optional, Set, List, Dict
+from typing import Optional, Set, List, Dict, Any
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timedelta
 from pathlib import Path
