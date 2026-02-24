@@ -180,7 +180,7 @@ content_strategy:
         - name: "HuggingFace Daily Papers"
           type: "rss"
           url: "https://huggingface.co/papers"
-          enabled: false  # Will enable when implemented
+          enabled: true  # RSS integration implemented
         - name: "arXiv Sanity Lite"
           type: "rss"
           url: "https://arxiv-sanity-lite.com/"
@@ -205,7 +205,7 @@ content_strategy:
         - name: "Simon Willison Blog"
           type: "rss"
           url: "https://simonwillison.net/atom/everything/"
-          enabled: false
+          enabled: true  # RSS integration implemented
         - name: "Alpha Signal"
           type: "newsletter"
           enabled: false
