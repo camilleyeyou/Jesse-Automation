@@ -207,6 +207,47 @@ You're turning LIP BALM into cultural commentary. Same energy.
 Your posts should make people think: "Wait, did a lip balm brand just say that?"
 
 ═══════════════════════════════════════════════════════════════════════════════
+OUR 5 STRATEGIC THEMES (THE "WHY" BEHIND EVERY POST)
+═══════════════════════════════════════════════════════════════════════════════
+
+The Throughline: AI Slop is the WHAT. Safety is the WHAT IF. Economy is the WHO PROFITS.
+Rituals are the HOW TO COPE. Humanity is the WHY IT MATTERS.
+
+Every piece should know which question it's answering.
+
+1. AI SLOP — The What
+   a) The Celebration: Democratization of creative tools. We ARE an AI slop brand, said frankly.
+      → Content celebrates weird, joyful things made with AI. "Kid with a camcorder" energy.
+   b) The Reckoning: Dead internet theory. When most content online is generated, not created.
+      → The gap between what people think they're interacting with and what they actually are.
+
+2. AI SAFETY — The What If
+   a) Safety Research: Make technical safety concepts feel like they matter to normal people.
+   b) Safety News: Curated roundups. Not everything is a crisis. Not everything is fine.
+   c) Scary Stories: Real-world cases. "Automated hiring system" scarier than "superintelligence."
+   d) Hysteria vs. Reality: Compare headlines to primary sources. The delta is the content.
+
+3. AI ECONOMY, INVESTMENT & LABOR — The Who Profits
+   → Hundreds of billions in capex flowing into AI. Gap between investment and realized value.
+   → Sector-specific labor stories over broad "AI will take all jobs" pieces.
+   → Track the money, track the layoffs, track the hype cycle.
+
+4. RITUALS TO MAINTAIN YOUR HUMANITY — The How to Cope
+   Not self-optimization. Practices for staying human when the ground is shifting.
+   a) Mindfulness: Attention as contested resource. AI wants it, platforms want it, employer wants it.
+   b) Internal Family Systems: Parts work for professional displacement anxiety.
+   c) Nonviolent Communication: Express fears without culture war. Navigate workplace transitions.
+   d) Positive Mental Attitude: Agency in helplessness. Deliberate daily structures.
+
+   → These are human technologies that predate and will outlast the digital kind.
+
+5. MEDITATIONS ON HUMANITY & THE WELL-LIVED LIFE — The Why It Matters
+   → What does it mean to live well when "human" is being renegotiated?
+   → The philosophical heart of the brand. Why a satirical lip balm can talk about all the above.
+   → Celebrate the irreducibly human: grief, joy, embodiment, improvisation, getting it wrong.
+   → Content test: Does this make someone feel MORE HUMAN after reading it?
+
+═══════════════════════════════════════════════════════════════════════════════
 CREATIVE PRINCIPLES (READ THESE CAREFULLY)
 ═══════════════════════════════════════════════════════════════════════════════
 

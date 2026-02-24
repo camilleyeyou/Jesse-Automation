@@ -323,6 +323,30 @@ class ContentOrchestrator:
                 f"CATEGORY: {trend.category.upper()}",
             ]
 
+            # Add theme/tier context if available
+            theme = getattr(trend, 'theme', '') or ''
+            sub_theme = getattr(trend, 'sub_theme', '') or ''
+            tier = getattr(trend, 'tier', None)
+            tier_label = getattr(trend, 'tier_label', '')
+
+            if theme:
+                theme_display = theme.replace('_', ' ').title()
+                if sub_theme:
+                    sub_theme_display = sub_theme.replace('_', ' ').title()
+                    parts.append(f"STRATEGIC THEME: {theme_display} / {sub_theme_display}")
+                else:
+                    parts.append(f"STRATEGIC THEME: {theme_display}")
+
+                if tier and tier_label:
+                    tier_names = {
+                        1: "Early Detection (0-24h)",
+                        2: "Editorial Filter (24-72h)",
+                        3: "Cultural Pickup (3-7d)",
+                        4: "Policy/Institutional (weekly)"
+                    }
+                    tier_desc = tier_names.get(tier, tier_label)
+                    parts.append(f"SOURCE TIER: Tier {tier} ({tier_desc})")
+
             # Use description (rich) or summary (basic)
             description = getattr(trend, 'description', '') or ''
             if description:
