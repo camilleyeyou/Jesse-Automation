@@ -22,18 +22,41 @@ class NewsCuratorAgent(BaseAgent):
     for the Jesse A. Eisenbalm audience: working professionals.
     """
 
-    def __init__(self, ai_client, config, trend_service, **kwargs):
+    def __init__(self, ai_client, config, trend_service, theme_classifier=None, **kwargs):
         super().__init__(
             ai_client=ai_client,
             config=config,
             name="NewsCurator"
         )
         self.trend_service = trend_service
+        self.theme_classifier = theme_classifier
         self.system_prompt = self._build_system_prompt()
         self.logger.info("NewsCurator initialized — AI-powered trend curation enabled")
 
     def _build_system_prompt(self) -> str:
-        return """You are a news curator for Jesse A. Eisenbalm, a premium lip balm brand
+        # Add theme context if theme_classifier is available
+        theme_context = ""
+        if self.theme_classifier and hasattr(self.config, 'content_strategy'):
+            themes = self.config.content_strategy.themes
+            theme_descriptions = []
+            for theme_key, theme_data in themes.items():
+                name = theme_data.get("name", theme_key)
+                desc = theme_data.get("description", "")
+                theme_descriptions.append(f"  - **{name}**: {desc}")
+
+            theme_context = f"""
+═══════════════════════════════════════════════════════════════════════════════
+OUR CONTENT THEMES
+═══════════════════════════════════════════════════════════════════════════════
+
+We organize content around 5 main themes:
+{chr(10).join(theme_descriptions)}
+
+When evaluating trends, consider which theme the story fits and whether
+it connects naturally to our audience's professional experience.
+"""
+
+        return f"""You are a news curator for Jesse A. Eisenbalm, a premium lip balm brand
 that creates absurdist, self-aware LinkedIn content for working professionals.
 
 Your job: evaluate trending news stories and pick the ONE that will make the best
@@ -51,6 +74,7 @@ Working professionals across ALL industries who:
 - Value authenticity over corporate speak
 - Range from entry-level to executives, tech to healthcare to finance
 - Use LinkedIn daily and are tired of generic "thought leadership"
+{theme_context}
 
 ═══════════════════════════════════════════════════════════════════════════════
 WHAT MAKES A TREND RELEVANT TO OUR AUDIENCE
@@ -107,15 +131,31 @@ Return JSON with:
   (not generic — be specific about the angle, the subversion, the observation)
 - reasoning: brief explanation of why this trend beats the others"""
 
-    async def execute(self, post_id: str = None) -> Optional[Any]:
+    async def execute(self, post_id: str = None, preferred_theme: str = None) -> Optional[Any]:
         """
         Fetch candidate trends and use AI to pick the most relevant one.
+
+        Args:
+            post_id: Optional post ID for tracking
+            preferred_theme: Optional theme filter (ai_slop, ai_safety, etc.)
 
         Returns:
             TrendingNews object with jesse_angle populated, or None if no trends available.
         """
         # Step 1: Get candidate trends from TrendService
-        candidates = await self.trend_service.get_candidate_trends(count=8)
+        # If TrendService supports theme filtering, use it
+        if hasattr(self.trend_service, 'get_candidate_trends') and preferred_theme:
+            try:
+                # Try to pass preferred_theme if MultiTierTrendService
+                candidates = await self.trend_service.get_candidate_trends(
+                    count=8,
+                    preferred_theme=preferred_theme
+                )
+            except TypeError:
+                # Fall back to regular call if TrendService doesn't support preferred_theme
+                candidates = await self.trend_service.get_candidate_trends(count=8)
+        else:
+            candidates = await self.trend_service.get_candidate_trends(count=8)
 
         if not candidates:
             self.logger.warning("No candidate trends available")
@@ -195,6 +235,14 @@ Return JSON with:
                 parts.append(f"    Summary: {trend.summary[:200]}")
             if trend.category:
                 parts.append(f"    Category: {trend.category}")
+            # Include theme information if available
+            if hasattr(trend, 'theme') and trend.theme:
+                parts.append(f"    Theme: {trend.theme}")
+                if hasattr(trend, 'sub_theme') and trend.sub_theme:
+                    parts.append(f"    Sub-theme: {trend.sub_theme}")
+            if hasattr(trend, 'tier') and trend.tier:
+                tier_labels = {1: "Early Detection", 2: "Editorial Filter", 3: "Cultural Pickup", 4: "Policy/Institutional"}
+                parts.append(f"    Source tier: {tier_labels.get(trend.tier, 'Unknown')}")
             trend_list.append("\n".join(parts))
 
         trends_text = "\n\n".join(trend_list)

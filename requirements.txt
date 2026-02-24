@@ -39,6 +39,12 @@ structlog>=24.1.0
 # Utilities
 python-dateutil>=2.8.0
 
+# Content Source Integrations
+feedparser>=6.0.11  # RSS parsing (HuggingFace, arXiv, blogs)
+praw>=7.8.0  # Reddit API
+beautifulsoup4>=4.12.3  # Web scraping (Techmeme, arXiv)
+lxml>=5.2.1  # XML/HTML parsing
+
 # Optional: Development
 # pytest>=7.4.0
 # pytest-asyncio>=0.23.0

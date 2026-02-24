@@ -24,10 +24,15 @@ except ImportError:
     NEWS_CURATOR_AVAILABLE = False
 
 try:
-    from ..infrastructure.trend_service import get_trend_service
+    from ..infrastructure.trend_service import get_trend_service, MultiTierTrendService
+    from ..infrastructure.theme_classifier import ThemeClassifier
     TREND_SERVICE_AVAILABLE = True
+    MULTI_TIER_AVAILABLE = True
 except ImportError:
     TREND_SERVICE_AVAILABLE = False
+    MULTI_TIER_AVAILABLE = False
+    MultiTierTrendService = None
+    ThemeClassifier = None
 
 try:
     from ..infrastructure.memory import get_memory
@@ -96,15 +101,50 @@ class ContentOrchestrator:
         
         self.trend_service = None
         self.news_curator = None
-        if TREND_SERVICE_AVAILABLE:
-            # Use same database as queue manager for consistency
-            self.trend_service = get_trend_service("data/automation/queue.db")
-            logger.info("✅ Trend service initialized - content will react to real news")
+        self.theme_classifier = None
 
-            # Initialize AI-powered news curator
+        if TREND_SERVICE_AVAILABLE:
+            # Initialize theme classifier if content strategy is available
+            if MULTI_TIER_AVAILABLE and hasattr(config, 'content_strategy'):
+                try:
+                    self.theme_classifier = ThemeClassifier(ai_client, config, db_path="data/automation/queue.db")
+                    logger.info("✅ Theme classifier initialized - AI-powered theme classification enabled")
+
+                    # Initialize MultiTierTrendService with theme classification
+                    import os
+                    self.trend_service = MultiTierTrendService(
+                        config=config,
+                        theme_classifier=self.theme_classifier,
+                        db_path="data/automation/queue.db",
+                        brave_api_key=os.getenv('BRAVE_API_KEY')
+                    )
+                    logger.info("✅ Multi-tier trend service initialized - 5 themes, 4 sourcing tiers active")
+
+                    # Check enabled sources
+                    tier_dist = self.trend_service.get_tier_distribution()
+                    enabled_sources = sum(tier_dist.values())
+                    logger.info(f"📊 Source distribution: {enabled_sources} sources enabled across tiers {list(tier_dist.keys())}")
+
+                except Exception as e:
+                    logger.warning(f"⚠️ MultiTierTrendService initialization failed: {e}, falling back to legacy TrendService")
+                    self.trend_service = get_trend_service("data/automation/queue.db")
+            else:
+                # Fall back to legacy TrendService
+                self.trend_service = get_trend_service("data/automation/queue.db")
+                logger.info("✅ Trend service initialized - content will react to real news")
+
+            # Initialize AI-powered news curator with theme classifier
             if NEWS_CURATOR_AVAILABLE:
-                self.news_curator = NewsCuratorAgent(ai_client, config, self.trend_service)
-                logger.info("✅ News curator initialized - AI-powered trend curation enabled")
+                self.news_curator = NewsCuratorAgent(
+                    ai_client,
+                    config,
+                    self.trend_service,
+                    theme_classifier=self.theme_classifier  # Pass theme classifier
+                )
+                if self.theme_classifier:
+                    logger.info("✅ News curator initialized - AI-powered trend curation + theme classification enabled")
+                else:
+                    logger.info("✅ News curator initialized - AI-powered trend curation enabled")
             else:
                 logger.warning("⚠️ NewsCuratorAgent not available, using direct trend selection")
 
@@ -234,6 +274,20 @@ class ContentOrchestrator:
                         'weaknesses': getattr(vs, 'weaknesses', [])
                     })
 
+                # Extract theme/tier info from trend if available
+                theme_metadata = {}
+                if trend:
+                    if hasattr(trend, 'theme') and trend.theme:
+                        theme_metadata['theme'] = trend.theme
+                    if hasattr(trend, 'sub_theme') and trend.sub_theme:
+                        theme_metadata['sub_theme'] = trend.sub_theme
+                    if hasattr(trend, 'tier') and trend.tier:
+                        theme_metadata['tier'] = trend.tier
+                    if hasattr(trend, 'source_type') and trend.source_type:
+                        theme_metadata['source_type'] = trend.source_type
+                    if hasattr(trend, 'confidence_score') and trend.confidence_score:
+                        theme_metadata['theme_confidence'] = trend.confidence_score
+
                 self.memory.remember_post(
                     post_id=post_id,
                     batch_id=batch_id,
@@ -242,7 +296,8 @@ class ContentOrchestrator:
                     trending_topic=trend.headline if trend else None,
                     was_approved=was_approved,
                     average_score=avg_score,
-                    validation_scores=scores_as_dicts
+                    validation_scores=scores_as_dicts,
+                    metadata=theme_metadata if theme_metadata else None
                 )
                 logger.debug(f"📝 Stored post {post_id} in memory (approved={was_approved})")
 

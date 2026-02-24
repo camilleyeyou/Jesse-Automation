@@ -79,5 +79,176 @@ cultural_references:
     - summer Fridays
     - back to office
 
+# Content strategy with 5 themes and 4 sourcing tiers
+content_strategy:
+  # Five main themes aligned with brand philosophy
+  themes:
+    ai_slop:
+      name: "AI Slop"
+      description: "Democratization of creative tools vs. dead internet theory"
+      sub_themes:
+        - celebration  # It's fun and lets anyone be a creator
+        - reckoning    # It will create a dead internet
+      keywords:
+        - ai generated
+        - synthetic media
+        - dead internet
+        - creative tools
+        - authentic
+        - bot
+        - generated content
+
+    ai_safety:
+      name: "AI Safety"
+      description: "Research, news, scary stories, hysteria vs. reality"
+      sub_themes:
+        - safety_research       # Technical safety concepts made accessible
+        - safety_news          # Curated roundups of developments
+        - scary_stories        # Speculative fiction and real-world cases
+        - hysteria_vs_reality  # Comparing headlines to primary sources
+      keywords:
+        - alignment
+        - safety
+        - risk
+        - existential
+        - AGI
+        - regulation
+        - oversight
+        - responsible AI
+
+    ai_economy:
+      name: "AI Economy, Investment & Labor"
+      description: "Capex, investment trends, and workforce impact"
+      sub_themes:
+        - capex         # Massive infrastructure investment
+        - investment    # Funding rounds, valuations, bubble concerns
+        - labor_impact  # Jobs, automation, workforce restructuring
+      keywords:
+        - layoffs
+        - automation
+        - jobs
+        - funding
+        - investment
+        - workforce
+        - hiring
+        - remote work
+        - capex
+
+    rituals:
+      name: "Rituals to Maintain Your Humanity"
+      description: "Practices for staying human when ground is shifting"
+      sub_themes:
+        - mindfulness                # Attention as contested resource
+        - ifs                        # Internal Family Systems
+        - nvc                        # Nonviolent Communication
+        - positive_mental_attitude   # Agency in era of helplessness
+      keywords:
+        - meditation
+        - self-care
+        - mental health
+        - therapy
+        - ritual
+        - mindfulness
+        - habit
+        - wellness
+
+    meditations:
+      name: "Meditations on Humanity & the Well-Lived Life"
+      description: "Philosophy, embodiment, and what AI can't replace"
+      sub_themes:
+        - philosophy        # Engaging technology and meaning
+        - embodiment        # Physical, present, improvised
+        - well_lived_life   # Irreducibly human experiences
+      keywords:
+        - human
+        - meaning
+        - purpose
+        - philosophy
+        - embodied
+        - joy
+        - grief
+        - connection
+
+  # Four sourcing tiers with different time horizons and sources
+  sourcing_tiers:
+    tier_1:
+      name: "Early Detection (0-24 hours)"
+      description: "Where stories originate - scanning for velocity"
+      refresh_minutes: 60
+      weight: 0.4  # 40% of candidate trends
+      sources:
+        - name: "HuggingFace Daily Papers"
+          type: "rss"
+          url: "https://huggingface.co/papers"
+          enabled: false  # Will enable when implemented
+        - name: "arXiv Sanity Lite"
+          type: "rss"
+          url: "https://arxiv-sanity-lite.com/"
+          enabled: false
+        - name: "Reddit r/MachineLearning"
+          type: "api"
+          subreddit: "MachineLearning"
+          sort: "rising"
+          enabled: false
+        - name: "Reddit r/LocalLLaMA"
+          type: "api"
+          subreddit: "LocalLLaMA"
+          sort: "rising"
+          enabled: false
+
+    tier_2:
+      name: "Editorial Filter (24-72 hours)"
+      description: "Where raw stories get framed into takes"
+      refresh_minutes: 360  # 6 hours
+      weight: 0.3  # 30% of candidate trends
+      sources:
+        - name: "Simon Willison Blog"
+          type: "rss"
+          url: "https://simonwillison.net/atom/everything/"
+          enabled: false
+        - name: "Alpha Signal"
+          type: "newsletter"
+          enabled: false
+          note: "Newsletter integration deferred"
+        - name: "Import AI"
+          type: "newsletter"
+          enabled: false
+          note: "Newsletter integration deferred"
+
+    tier_3:
+      name: "Cultural Pickup (3-7 days)"
+      description: "Where stories cross into mainstream"
+      refresh_minutes: 720  # 12 hours
+      weight: 0.2  # 20% of candidate trends
+      sources:
+        - name: "Brave Search"
+          type: "api"
+          enabled: true  # Already implemented
+        - name: "Google Trends"
+          type: "api"
+          enabled: true  # Already implemented
+        - name: "Techmeme"
+          type: "scrape"
+          url: "https://www.techmeme.com/"
+          enabled: false
+
+    tier_4:
+      name: "Policy & Institutional (weekly)"
+      description: "Slower but essential for depth and credibility"
+      refresh_minutes: 10080  # 1 week
+      weight: 0.1  # 10% of candidate trends
+      sources:
+        - name: "CSET Georgetown"
+          type: "rss"
+          url: "https://cset.georgetown.edu/feed/"
+          enabled: false
+        - name: "AI Now Institute"
+          type: "rss"
+          url: "https://ainowinstitute.org/feed"
+          enabled: false
+        - name: "AIAAIC Repository"
+          type: "rss"
+          enabled: false
+
 logging_level: INFO
 environment: development

@@ -90,6 +90,40 @@ class SchedulerConfig(BaseModel):
     auto_generate: bool = True
 
 
+class SourceConfig(BaseModel):
+    """Configuration for a single content source"""
+    name: str
+    type: str  # api, rss, scrape, newsletter
+    enabled: bool = False
+    url: str = ""
+    subreddit: str = ""
+    sort: str = "rising"
+    note: str = ""
+
+
+class TierConfig(BaseModel):
+    """Configuration for a sourcing tier"""
+    name: str
+    description: str = ""
+    refresh_minutes: int = 60
+    weight: float = 0.25
+    sources: List[SourceConfig] = Field(default_factory=list)
+
+
+class ThemeConfig(BaseModel):
+    """Configuration for a content theme"""
+    name: str
+    description: str = ""
+    sub_themes: List[str] = Field(default_factory=list)
+    keywords: List[str] = Field(default_factory=list)
+
+
+class ContentStrategyConfig(BaseModel):
+    """Content strategy with themes and sourcing tiers"""
+    themes: dict = Field(default_factory=dict)  # Dict[str, ThemeConfig]
+    sourcing_tiers: dict = Field(default_factory=dict)  # Dict[str, TierConfig]
+
+
 @dataclass
 class AppConfig:
     """Main application configuration"""
@@ -101,7 +135,8 @@ class AppConfig:
     cultural_references: CulturalReferencesConfig
     linkedin: LinkedInConfig
     scheduler: SchedulerConfig
-    
+    content_strategy: ContentStrategyConfig
+
     logging_level: str = "INFO"
     environment: str = "development"
     
@@ -142,6 +177,7 @@ class AppConfig:
             cultural_references=CulturalReferencesConfig(**data.get('cultural_references', {})),
             linkedin=LinkedInConfig(**data.get('linkedin', {})),
             scheduler=SchedulerConfig(**data.get('scheduler', {})),
+            content_strategy=ContentStrategyConfig(**data.get('content_strategy', {})),
             logging_level=data.get('logging_level', 'INFO'),
             environment=data.get('environment', 'development')
         )

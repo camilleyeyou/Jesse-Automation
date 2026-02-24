@@ -39,10 +39,10 @@ except ImportError:
 
 @dataclass
 class TrendingNews:
-    """A trending news item with rich context"""
+    """A trending news item with rich context and theme/tier metadata"""
     headline: str
     summary: str = ""
-    source: str = "google_trends"
+    source: str = "google_trends"  # Technical source: brave_search, google_trends, reddit, etc.
     url: str = ""
     category: str = "trending"
     fingerprint: str = ""
@@ -50,6 +50,15 @@ class TrendingNews:
     related_articles: list = field(default_factory=list)
     jesse_angle: str = ""
     news_freshness: str = "today"
+    # Theme and tier metadata (added for content strategy)
+    theme: str = ""  # Maps to 5 main themes (ai_slop, ai_safety, ai_economy, rituals, meditations)
+    sub_theme: str = ""  # Specific sub-theme within main theme
+    tier: int = 3  # 1-4 sourcing tier (1=early detection, 4=policy/institutional)
+    tier_label: str = "cultural_pickup"  # Human-readable tier name
+    source_type: str = "api"  # How source is accessed: api, rss, scrape, newsletter
+    confidence_score: float = 0.0  # AI theme classification confidence (0-1)
+    detected_at: str = ""  # When trend was first detected
+    viral_indicators: list = field(default_factory=list)  # Keywords/signals of viral potential
 
 
 class TrendService:
@@ -258,14 +267,21 @@ class TrendService:
             return False
 
     def _record_used_topic(self, trend: TrendingNews, post_id: str = None):
-        """Record a used topic in the database"""
+        """Record a used topic in the database with theme/tier metadata"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
+
+                # Extract theme/tier info if available
+                theme = getattr(trend, 'theme', None) or None
+                sub_theme = getattr(trend, 'sub_theme', None) or None
+                tier = getattr(trend, 'tier', None) or None
+                source_type = getattr(trend, 'source_type', None) or None
+
                 cursor.execute("""
                     INSERT OR REPLACE INTO used_topics
-                    (headline, fingerprint, category, source, url, used_at, post_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (headline, fingerprint, category, source, url, used_at, post_id, theme, sub_theme, tier, source_type)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     trend.headline[:500],
                     trend.fingerprint,
@@ -273,12 +289,20 @@ class TrendService:
                     trend.source,
                     trend.url,
                     datetime.now().isoformat(),
-                    post_id
+                    post_id,
+                    theme,
+                    sub_theme,
+                    tier,
+                    source_type
                 ))
                 conn.commit()
 
             self.batch_used_headlines.add(trend.fingerprint)
-            self.logger.info(f"📝 Recorded used topic: {trend.headline[:50]}...")
+
+            # Log with theme info if available
+            theme_info = f" [{theme}/{sub_theme}]" if theme else ""
+            tier_info = f" tier-{tier}" if tier else ""
+            self.logger.info(f"📝 Recorded used topic{theme_info}{tier_info}: {trend.headline[:50]}...")
 
         except Exception as e:
             self.logger.error(f"Error recording used topic: {e}")
@@ -875,6 +899,273 @@ class TrendService:
         except Exception as e:
             self.logger.error(f"Error getting stats: {e}")
             return {"error": str(e)}
+
+
+class MultiTierTrendService(TrendService):
+    """
+    Multi-tier trend service with theme classification.
+
+    Extends TrendService with:
+    - Tier-based fetching from multiple sources
+    - Weighted distribution across 4 tiers
+    - AI theme classification
+    - Source health tracking
+    - Support for RSS feeds, APIs, scraping
+
+    Tiers:
+    - Tier 1 (40%): Early Detection (0-24h) - HuggingFace, arXiv, Reddit
+    - Tier 2 (30%): Editorial Filter (24-72h) - Blogs, newsletters
+    - Tier 3 (20%): Cultural Pickup (3-7d) - Brave Search, Google Trends
+    - Tier 4 (10%): Policy/Institutional (weekly) - Research institutes
+    """
+
+    def __init__(
+        self,
+        config,
+        theme_classifier,
+        db_path: str = "data/automation/queue.db",
+        brave_api_key: str = None
+    ):
+        """
+        Initialize multi-tier trend service.
+
+        Args:
+            config: AppConfig with content_strategy section
+            theme_classifier: ThemeClassifier instance
+            db_path: Database path
+            brave_api_key: Brave Search API key (optional)
+        """
+        super().__init__(db_path=db_path, brave_api_key=brave_api_key)
+
+        self.config = config
+        self.theme_classifier = theme_classifier
+
+        # Load tier weights from config
+        self.tier_weights = {}
+        for tier_key, tier_data in config.content_strategy.sourcing_tiers.items():
+            tier_num = int(tier_key.split('_')[1])  # Extract tier number
+            self.tier_weights[tier_num] = tier_data.get('weight', 0.25)
+
+        # Initialize source integrations
+        self._source_registry = {}
+        self._init_sources()
+
+        self.logger.info(f"MultiTierTrendService initialized with {len(self._source_registry)} sources")
+
+    def _init_sources(self):
+        """Initialize all source integrations from config"""
+        from .source_integrations.rss_source import RSSSource, HuggingFaceSource, ArxivSource
+
+        for tier_key, tier_data in self.config.content_strategy.sourcing_tiers.items():
+            tier_num = int(tier_key.split('_')[1])
+            sources = tier_data.get('sources', [])
+
+            for source_config in sources:
+                source_name = source_config.get('name', '')
+                source_type = source_config.get('type', 'unknown')
+                enabled = source_config.get('enabled', False)
+
+                if not enabled:
+                    self.logger.debug(f"Skipping disabled source: {source_name}")
+                    continue
+
+                try:
+                    # Create appropriate source integration
+                    if source_type == 'rss':
+                        if 'huggingface' in source_name.lower():
+                            source = HuggingFaceSource(source_config, tier=tier_num)
+                        elif 'arxiv' in source_name.lower():
+                            source = ArxivSource(source_config, tier=tier_num)
+                        else:
+                            source = RSSSource(source_config, tier=tier_num)
+
+                        self._source_registry[source_name] = source
+                        self.logger.info(f"Registered {source_type} source: {source_name} (tier {tier_num})")
+
+                    # TODO: Add Reddit, Techmeme, etc. when implemented
+                    elif source_type == 'api':
+                        self.logger.debug(f"API source {source_name} not yet implemented")
+                    elif source_type == 'scrape':
+                        self.logger.debug(f"Scrape source {source_name} not yet implemented")
+
+                except Exception as e:
+                    self.logger.error(f"Failed to initialize source {source_name}: {e}")
+
+    async def get_candidate_trends(
+        self,
+        count: int = 8,
+        tier_weights: Dict[int, float] = None,
+        preferred_theme: str = None
+    ) -> List[TrendingNews]:
+        """
+        Fetch candidate trends across all tiers with weighted distribution.
+
+        Args:
+            count: Total number of candidates to fetch
+            tier_weights: Optional tier weight override {1: 0.4, 2: 0.3, ...}
+            preferred_theme: Optional theme filter
+
+        Returns:
+            List of TrendingNews with theme classifications
+        """
+        tier_weights = tier_weights or self.tier_weights
+
+        candidates = []
+
+        # Fetch from each tier based on weights
+        for tier_num, weight in sorted(tier_weights.items()):
+            tier_count = max(1, int(count * weight))
+
+            try:
+                tier_candidates = await self.get_candidate_trends_by_tier(
+                    tier=tier_num,
+                    count=tier_count
+                )
+                candidates.extend(tier_candidates)
+            except Exception as e:
+                self.logger.warning(f"Failed to fetch from tier {tier_num}: {e}")
+
+        # Classify themes for all candidates
+        for candidate in candidates:
+            if not candidate.theme:  # Only classify if not already classified
+                try:
+                    classification = await self.theme_classifier.classify_trend(
+                        headline=candidate.headline,
+                        summary=candidate.summary,
+                        description=candidate.description,
+                        fingerprint=candidate.fingerprint
+                    )
+
+                    candidate.theme = classification.theme
+                    candidate.sub_theme = classification.sub_theme
+                    candidate.confidence_score = classification.confidence
+
+                except Exception as e:
+                    self.logger.warning(f"Theme classification failed: {e}")
+
+        # Filter by preferred theme if specified
+        if preferred_theme:
+            candidates = [c for c in candidates if c.theme == preferred_theme]
+
+        # Deduplicate and limit
+        unique_candidates = self._deduplicate_candidates(candidates)
+
+        return unique_candidates[:count]
+
+    async def get_candidate_trends_by_tier(
+        self,
+        tier: int,
+        count: int = 5
+    ) -> List[TrendingNews]:
+        """
+        Fetch trends from sources in a specific tier.
+
+        Args:
+            tier: Tier number (1-4)
+            count: Number of trends to fetch
+
+        Returns:
+            List of TrendingNews from tier sources
+        """
+        tier_sources = [
+            source for source in self._source_registry.values()
+            if source.get_tier() == tier and source.is_enabled()
+        ]
+
+        if not tier_sources:
+            # Fallback to existing TrendService for tier 3
+            if tier == 3:
+                self.logger.debug(f"No custom sources for tier {tier}, using legacy TrendService")
+                return await super().get_candidate_trends(count=count)
+            return []
+
+        trends = []
+
+        # Fetch from each source in tier
+        per_source = max(1, count // len(tier_sources))
+
+        for source in tier_sources:
+            try:
+                source_trends = await source.fetch_with_health_tracking(limit=per_source)
+                trends.extend(source_trends)
+            except Exception as e:
+                self.logger.error(f"Source fetch failed for {source.source_name}: {e}")
+
+        return trends[:count]
+
+    def _deduplicate_candidates(self, candidates: List[TrendingNews]) -> List[TrendingNews]:
+        """Remove duplicate trends based on fingerprint"""
+        seen = set()
+        unique = []
+
+        for candidate in candidates:
+            if candidate.fingerprint not in seen:
+                seen.add(candidate.fingerprint)
+                unique.append(candidate)
+
+        return unique
+
+    async def fetch_from_source(self, source_name: str, limit: int = 10) -> List[TrendingNews]:
+        """
+        Fetch from a specific source by name.
+
+        Args:
+            source_name: Name of source
+            limit: Max trends to fetch
+
+        Returns:
+            List of TrendingNews
+        """
+        source = self._source_registry.get(source_name)
+
+        if not source:
+            raise ValueError(f"Source not found: {source_name}")
+
+        return await source.fetch_with_health_tracking(limit=limit)
+
+    def get_source_health(self, source_name: str = None) -> Dict[str, Any]:
+        """
+        Get health status for sources.
+
+        Args:
+            source_name: Optional specific source name
+
+        Returns:
+            Dict of source health stats
+        """
+        if source_name:
+            source = self._source_registry.get(source_name)
+            if source:
+                health = source.get_health_status()
+                return {
+                    "source": health.source_name,
+                    "healthy": health.is_healthy,
+                    "success_rate": health.success_rate,
+                    "fetch_count": health.fetch_count,
+                    "last_error": health.last_error
+                }
+            return {"error": f"Source not found: {source_name}"}
+
+        # Return all sources
+        return {
+            name: {
+                "healthy": source.get_health_status().is_healthy,
+                "success_rate": source.get_health_status().success_rate,
+                "fetch_count": source.get_health_status().fetch_count
+            }
+            for name, source in self._source_registry.items()
+        }
+
+    def get_tier_distribution(self) -> Dict[int, int]:
+        """Get count of enabled sources by tier"""
+        distribution = {1: 0, 2: 0, 3: 0, 4: 0}
+
+        for source in self._source_registry.values():
+            if source.is_enabled():
+                tier = source.get_tier()
+                distribution[tier] = distribution.get(tier, 0) + 1
+
+        return distribution
 
 
 def get_trend_service(db_path: str = "data/automation/queue.db") -> TrendService:
