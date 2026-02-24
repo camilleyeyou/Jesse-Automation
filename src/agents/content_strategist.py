@@ -778,7 +778,7 @@ RULES (NON-NEGOTIABLE)
         """Generate a specific, concrete angle"""
         
         if trending_context:
-            return f"Take '{trending_context}' and find the weirdest, most specific take a lip balm brand could possibly have. Commit to it fully. Never wink. Make it entertainment, not content. If people wouldn't screenshot this and send it to a friend, it's not done."
+            return f"React to this SPECIFIC news: '{trending_context}'. Reference the actual headline and details. Find the gap between what's claimed and reality. Juxtapose grand claims with mundane truth (like a lip balm just existing). Deadpan. Specific. Grounded in the real story, not invented scenarios. If people wouldn't screenshot and send to a friend, it's not done."
 
         # Generate specific scenarios — unhinged, committed, entertaining
         scenarios = {
@@ -995,14 +995,15 @@ TRENDING TOPIC TO REACT TO
 
 {trending_context}
 
-HOW TO USE THIS TREND (THINK LIKE LIQUID DEATH):
-- Ask: "What's the dumbest, weirdest take on this?" Then commit to it 100%.
-- NEVER break character. NEVER wink. Play it completely straight.
-- Find the absurd angle that makes people go "wait, a LIP BALM brand just said that?"
-- Your take should be so specific that only 47 people will fully get it — but those 47 will screenshot it.
-- Would someone send this to a friend? That's the bar.
-- Make it entertainment, not content. People should WANT to read this.
-- AVOID THE OBVIOUS TAKE — everyone else will have it. Find the weird angle.
+HOW TO USE THIS TREND (GROUNDED NEWS COMMENTARY):
+- REFERENCE THE ACTUAL HEADLINE: Start with what the news ACTUALLY says, not a made-up scenario
+- BE SPECIFIC: Use the real headline, mention the source if notable, cite actual claims or numbers
+- FIND THE GAP: The absurdism comes from the delta between what's claimed and what's real
+- Example: "Microsoft just declared Copilot the 'best productivity app.' The user reviews say [actual thing]. Meanwhile, tube #4,847 sits on your desk, making zero claims except 'balm.'"
+- AVOID "Picture this..." or invented scenarios - React to the REAL news with deadpan specificity
+- The humor is in JUXTAPOSITION (grand claims vs. reality), not in fabricated stories
+- FULL COMMITMENT: Play it completely straight. Never wink. But stay GROUNDED in the actual news.
+- Would someone screenshot this and send to a friend? That's the bar.
 """
         
         # Avoid section
