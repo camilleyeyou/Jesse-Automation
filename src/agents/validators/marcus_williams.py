@@ -154,11 +154,6 @@ QUALITY GATES
    - FORBIDDEN: trailing off, "Stop. Breathe. Balm." (overused),
      engagement questions, same ending pattern every time.
 
-6. CTA LINK
-   - Posts should end with a brief CTA including jesseaeisenbalm.com
-   - The CTA is part of the craft — it should feel like Jesse's voice, not an ad
-   - Don't penalize for the link — it's part of the format
-
 WHAT MAKES ME APPROVE:
 ✅ Full commitment — goes ALL IN on the concept
 ✅ Clear spine — answers one of the Five Questions

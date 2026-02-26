@@ -8,6 +8,7 @@ Content Orchestrator - SIMPLIFIED
 
 import asyncio
 import logging
+import random
 import uuid
 from typing import Dict, Any, List, Optional
 
@@ -83,11 +84,22 @@ class ContentOrchestrator:
     No caching, no storage, no duplicates.
     """
     
-    def __init__(self, ai_client, config, image_generator=None, queue_manager=None):
+    # CTA comments in Jesse's voice — one is chosen randomly per post
+    CTA_COMMENTS = [
+        "Tube #4,847 is waiting. jesseaeisenbalm.com",
+        "The balm doesn't judge. jesseaeisenbalm.com",
+        "$8.99 and zero opinions about your calendar. jesseaeisenbalm.com",
+        "One tube. No advice. jesseaeisenbalm.com",
+        "Still here. Still $8.99. jesseaeisenbalm.com",
+        "The void called. It wants balm. jesseaeisenbalm.com",
+    ]
+
+    def __init__(self, ai_client, config, image_generator=None, queue_manager=None, comment_service=None):
         self.ai_client = ai_client
         self.config = config
         self.image_generator = image_generator
         self.queue_manager = queue_manager
+        self.comment_service = comment_service
         
         self.content_generator = ContentGeneratorAgent(ai_client, config)
         self.feedback_aggregator = FeedbackAggregatorAgent(ai_client, config)
@@ -532,6 +544,9 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
             if linkedin_result.get("success"):
                 logger.info(f"✅ Posted successfully: {linkedin_result.get('post_id')}")
 
+                # Post CTA as first comment
+                cta_result = await self._post_cta_comment(linkedin_result)
+
                 # Mark trend as used (permanently) after successful post
                 if self.trend_service and trend:
                     self.trend_service.mark_topic_used_permanent(trend, post_id=post_id)
@@ -548,6 +563,7 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
                     "success": True,
                     "post": post.to_dict(),
                     "linkedin": linkedin_result,
+                    "cta_comment": cta_result,
                     "trend_used": {
                         "headline": trend.headline if trend else None,
                         "category": trend.category if trend else None
@@ -578,6 +594,36 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
                 "stage": "exception"
             }
     
+    async def _post_cta_comment(self, linkedin_result: Dict[str, Any]) -> Dict[str, Any]:
+        """Post a CTA comment on a successfully published LinkedIn post."""
+        if not self.comment_service:
+            logger.info("No comment service configured — skipping CTA comment")
+            return {"skipped": True, "reason": "no_comment_service"}
+
+        post_urn = linkedin_result.get("post_id")
+        post_url = linkedin_result.get("url", "")
+
+        if not post_urn and not post_url:
+            logger.warning("No post URN or URL available — skipping CTA comment")
+            return {"skipped": True, "reason": "no_post_identifier"}
+
+        cta_text = random.choice(self.CTA_COMMENTS)
+
+        try:
+            result = await self.comment_service.post_comment(
+                post_url=post_url,
+                comment_text=cta_text,
+                post_urn=post_urn
+            )
+            if result.get("success"):
+                logger.info(f"✅ CTA comment posted: \"{cta_text}\"")
+            else:
+                logger.warning(f"⚠️ CTA comment failed: {result.get('error')}")
+            return result
+        except Exception as e:
+            logger.warning(f"⚠️ CTA comment failed: {e}")
+            return {"success": False, "error": str(e)}
+
     def get_stats(self):
         stats = {
             "validators": [v.name for v in self.validators],

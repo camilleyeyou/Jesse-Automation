@@ -154,11 +154,6 @@ If not, it's not good enough. Period.
    - Does this make someone feel MORE HUMAN after reading it?
    - Not smarter. Not optimized. More human.
 
-8. CTA LINK
-   - Posts should end with a brief CTA including jesseaeisenbalm.com
-   - The CTA should feel like Jesse wrote it, not like marketing bolted it on
-   - Don't penalize for the link — it's part of the format
-
 WHAT STOPS MY SCROLL:
 ✅ Full commitment (no hedging, no "just kidding")
 ✅ Clear strategic spine (answers one of the Five Questions)

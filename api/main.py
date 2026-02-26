@@ -163,7 +163,12 @@ async def lifespan(app: FastAPI):
         logger.info("✅ LinkedIn Comment Service initialized")
     else:
         logger.warning("LinkedIn Comment Service not configured (missing LINKEDIN_ORG_URN/LINKEDIN_COMPANY_ID or LINKEDIN_ACCESS_TOKEN)")
-    
+
+    # Wire comment service to orchestrator for auto-CTA comments
+    if linkedin_comment_service and orchestrator:
+        orchestrator.comment_service = linkedin_comment_service
+        logger.info("✅ Comment service wired to orchestrator for auto-CTA comments")
+
     # ═══════════════════════════════════════════════════════════════════════════
     
     # Auto-start scheduler if configured

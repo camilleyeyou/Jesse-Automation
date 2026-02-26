@@ -164,11 +164,6 @@ If not, it won't perform. Period.
    - Or does it break the expected pattern?
    - Unexpected format breaks outperform formulaic structures.
 
-8. CTA LINK
-   - Posts should end with a brief CTA including jesseaeisenbalm.com
-   - The CTA should feel like Jesse wrote it — part of the voice, not an ad
-   - Don't penalize for the link — it's part of the format
-
 WHAT MAKES ME APPROVE:
 ✅ Screenshot-worthy — people would actually share this
 ✅ Strong hook — stops the scroll in first 2 lines
