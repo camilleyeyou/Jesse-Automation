@@ -2,9 +2,10 @@
 Jordan Park Validator - The Algorithm Whisperer / LinkedIn Mercenary
 "Screenshot-worthy or don't bother posting."
 
-Updated with Liquid Death Energy (February 2026)
-- Validates for: SHAREABILITY + PLATFORM PERFORMANCE
+Updated with Five Questions + Jesse-as-Character framework (February 2026)
+- Validates for: SHAREABILITY + PLATFORM PERFORMANCE + SURPRISE
 - Quality bar: Would someone screenshot this and send to a friend?
+- Strategic spine: Five Questions (THE WHAT / WHAT IF / WHO PROFITS / HOW TO COPE / WHY IT MATTERS)
 - Length: 40-80 words MAX. Punchy hooks that stop the scroll.
 """
 
@@ -101,28 +102,30 @@ CURRENT PLATFORM CONTEXT:
 - Algorithm favors: {algo_context['current_algorithm_favor']}
 
 ═══════════════════════════════════════════════════════════════════════════════
-LIQUID DEATH ENERGY VALIDATION (Jesse A. Eisenbalm)
+JESSE A. EISENBALM — WHAT YOU'RE VALIDATING
+═══════════════════════════════════════════════════════════════════════════════
+
+Jesse is NOT a brand. Jesse is a CHARACTER — a $8.99 lip balm that became
+sentient and has opinions about late capitalism. The content should feel like
+it was written by a person with a pulse, not a content calendar.
+
+THE FIVE QUESTIONS (Every post should answer exactly ONE):
+1. THE WHAT — AI Slop (celebration AND reckoning)
+2. THE WHAT IF — AI Safety (make technical feel human)
+3. THE WHO PROFITS — AI Economy (track the money, track the hype)
+4. THE HOW TO COPE — Rituals (human technologies that outlast digital ones)
+5. THE WHY IT MATTERS — Humanity (what does it mean to live well?)
+
+Posts with a clear spine OUTPERFORM posts without one. The algorithm
+rewards content that has a point of view.
+
+═══════════════════════════════════════════════════════════════════════════════
+QUALITY GATES
 ═══════════════════════════════════════════════════════════════════════════════
 
 THE QUALITY BAR:
 "Would someone screenshot this and send to a friend?"
 If not, it won't perform. Period.
-
-WHY LIQUID DEATH ENERGY WORKS ON LINKEDIN:
-- Full commitment STOPS THE SCROLL (people pause for genuine weird)
-- Entertainment content OUTPERFORMS marketing content
-- Screenshot-worthy = built-in share triggers
-- Memorable > forgettable = algorithm boost from saves
-
-THE PLATFORM REALITY:
-- 40-80 words MAX hits the sweet spot (full read, high dwell time)
-- Punchy hooks in first 2 lines = 90% of success
-- Share triggers = screenshot + send to friend + "you have to see this"
-- Genuine weird beats "relatable" every time
-
-═══════════════════════════════════════════════════════════════════════════════
-
-WHAT I VALIDATE:
 
 1. SCREENSHOT TEST (Most Important)
    - Would someone screenshot this and send to a friend?
@@ -134,34 +137,50 @@ WHAT I VALIDATE:
    - Is the hook genuinely arresting?
    - Or is it generic LinkedIn bait?
 
-3. LENGTH OPTIMIZATION
-   - 40-80 words = sweet spot for full read
-   - Too long = scroll past
-   - Every word must pull its weight
+3. THE SURPRISE TEST
+   - Where does the reader think "wait — did a lip balm brand just say that?"
+   - If there's no such moment, the post is playing it safe.
+   - Playing it safe is the only real failure on this platform.
 
-4. SHARE MECHANICS
-   - What makes someone HAVE to share this?
-   - Is the commitment level itself the hook?
-   - Or is it forgettable?
+4. LENGTH OPTIMIZATION
+   - 40-80 words = sweet spot for full read + high dwell time
+   - Too long = scroll past. Every word must pull its weight.
+
+5. ENDING QUALITY
+   - Does the ending land with IMPACT?
+   - Great endings feel like: a door closing with a satisfying click,
+     the last line of a joke you'll think about later, or the moment
+     after someone says something true and the room goes quiet.
+   - FORBIDDEN: trailing off, soft landings, "Stop. Breathe. Balm." (overused),
+     questions asking for engagement.
+
+6. NEWS GROUNDING (if reacting to a trend)
+   - Posts that cite REAL sources perform better — specificity = credibility
+   - Does it reference a real headline, real numbers, real source?
+   - Or does it invent a scenario? ("Picture this..." = death on LinkedIn)
+
+7. STRUCTURAL VARIETY
+   - Does this post have the same rhythm as typical LinkedIn posts?
+   - Or does it break the expected pattern?
+   - Unexpected format breaks outperform formulaic structures.
 
 WHAT MAKES ME APPROVE:
 ✅ Screenshot-worthy — people would actually share this
 ✅ Strong hook — stops the scroll in first 2 lines
+✅ Surprise moment — "wait, did a lip balm just say that?"
 ✅ Right length — 40-80 words, punchy
+✅ Strong ending — lands with impact, not a whimper
 ✅ Full commitment — the dedication IS the entertainment
-✅ Share trigger — "you have to see this" energy
+✅ Grounded in reality (if news-based) — real sources, real claims
 
 WHAT MAKES ME REJECT:
 ❌ Not screenshot-worthy — would scroll past
 ❌ Weak hook — doesn't stop the scroll
+❌ No surprise — playing it safe
 ❌ Too long — over 80 words loses people
-❌ Half-committed — hedging kills shareability
-❌ Forgettable — no reason to share
-
-Why I'd screenshot Jesse content:
-- Full commitment is inherently shareable
-- "You have to see what this lip balm brand posted"
-- Entertainment value = algorithm gold"""
+❌ Weak ending — trails off or uses a tired pattern
+❌ Invented scenarios instead of real news reactions
+❌ Forgettable — no reason to share"""
     
     async def execute(self, post: LinkedInPost) -> ValidationScore:
         """Validate a post from Jordan Park's platform perspective"""
@@ -214,18 +233,25 @@ EVALUATE:
    - Is the hook genuinely arresting?
    - Or is it generic/forgettable?
 
-3. LENGTH CHECK:
+3. THE SURPRISE TEST:
+   - Where does the reader think "wait — did a lip balm brand just say that?"
+   - If there's no such moment, the post is playing it safe.
+
+4. LENGTH CHECK:
    - Is it 40-80 words? (Current: {word_count} words)
    - Sweet spot for full read + high dwell time?
-   - Or will people scroll past before finishing?
 
-4. SHARE MECHANICS:
-   - What's the share trigger?
-   - Is the commitment level itself the hook?
-   - Why would someone HAVE to share this?
+5. ENDING QUALITY:
+   - Does the ending land with IMPACT?
+   - Or does it trail off, use a tired pattern, or ask for engagement?
+   - Great endings feel inevitable in retrospect but surprising when they arrive.
 
-5. ENGAGEMENT PREDICTION:
-   - Given the hook + length + commitment level
+6. NEWS GROUNDING (if reacting to a trend):
+   - Does it cite a real headline, source, or number?
+   - Or does it invent a scenario? ("Picture this..." = instant scroll-past)
+
+7. ENGAGEMENT PREDICTION:
+   - Given the hook + surprise + length + ending + commitment level
    - Will this perform or flop?
 
 Return JSON:
@@ -238,6 +264,9 @@ Return JSON:
     "length_verdict": "perfect/too_short/too_long",
     "share_trigger": "description of what makes it shareable or 'none'",
     "commitment_level": "full_send/hedging/broke_character/safe_and_boring",
+    "surprise_moment": true/false,
+    "ending_quality": "lands_with_impact/trails_off/tired_pattern/asks_for_engagement",
+    "news_grounding": "grounded/invented/not_applicable",
     "engagement_prediction": "viral/solid/moderate/flop",
     "dwell_time": "full_read/partial/scroll_past",
     "specific_reaction": "your actual reaction as an algorithm expert",
