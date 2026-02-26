@@ -299,7 +299,7 @@ HARD RULES (Break these and the content is dead)
 ✗ NEVER:
 - Target individuals negatively
 - Use hashtags
-- Include external links
+- Include external links (EXCEPT the official CTA: jesseaeisenbalm.com)
 - Ask for engagement ("like if you agree," "thoughts?", "share this")
 - Be generic or predictable
 - End every post the same way

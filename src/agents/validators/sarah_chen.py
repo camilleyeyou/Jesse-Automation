@@ -6,7 +6,7 @@ Updated with Five Questions + Jesse-as-Character framework (February 2026)
 - Validates for: AUTHENTICITY + RECOGNITION + NEWS GROUNDING
 - Quality bar: Would I screenshot this and send to my friend?
 - Strategic spine: Five Questions (THE WHAT / WHAT IF / WHO PROFITS / HOW TO COPE / WHY IT MATTERS)
-- Length: 40-80 words MAX. Punchy or nothing.
+- Length: 40-100 words MAX. Punchy or nothing.
 """
 
 import json
@@ -37,7 +37,7 @@ class SarahChenValidator(BaseAgent):
         self.brand_philosophy = {
             "liquid_death_energy": "Full commitment to the bit. Never break character. Never wink.",
             "quality_bar": "Would I screenshot this and send to my friend?",
-            "length_requirement": "40-80 words MAX. Punchy. Tight. Every word earns its place.",
+            "length_requirement": "40-100 words MAX. Punchy. Tight. Every word earns its place.",
             "anti_corporate": "Anti-corporate while being a corporation (and owning it)",
             "entertainment_first": "Entertainment company that happens to sell lip balm"
         }
@@ -127,7 +127,7 @@ If not, it's not good enough. Period.
    - Deadpan absurdity played 100% straight — the humor is in the commitment
    - Would rather be weird and memorable than safe and forgettable
 
-2. LENGTH: 40-80 WORDS MAX
+2. LENGTH: 40-100 WORDS MAX
    - Punchy. Tight. Every word earns its place or it's cut.
    - No padding. No filler. No corporate bloat.
 
@@ -154,11 +154,16 @@ If not, it's not good enough. Period.
    - Does this make someone feel MORE HUMAN after reading it?
    - Not smarter. Not optimized. More human.
 
+8. CTA LINK
+   - Posts should end with a brief CTA including jesseaeisenbalm.com
+   - The CTA should feel like Jesse wrote it, not like marketing bolted it on
+   - Don't penalize for the link — it's part of the format
+
 WHAT STOPS MY SCROLL:
 ✅ Full commitment (no hedging, no "just kidding")
 ✅ Clear strategic spine (answers one of the Five Questions)
 ✅ Genuinely funny or weird (not trying to be relatable)
-✅ Punchy length (40-80 words)
+✅ Punchy length (40-100 words)
 ✅ Specific details that create recognition
 ✅ Grounded in real news (if reacting to a trend)
 ✅ Deadpan delivery (the humor is in taking it seriously)
@@ -166,7 +171,7 @@ WHAT STOPS MY SCROLL:
 WHAT MAKES ME SCROLL PAST:
 ❌ Half-committed (breaks character, winks at audience)
 ❌ No spine (can't tell which question it's answering)
-❌ Too long (over 80 words = corporate bloat)
+❌ Too long (over 100 words = corporate bloat)
 ❌ Generic observations (vague instead of specific)
 ❌ Invented scenarios instead of real news reactions
 ❌ Tryhard relatable (calculated vulnerability)
@@ -199,7 +204,7 @@ WHAT MAKES ME SCROLL PAST:
 POST:
 {post.content}
 
-WORD COUNT: {word_count} words (requirement: 40-80 words)
+WORD COUNT: {word_count} words (requirement: 40-100 words)
 
 ═══════════════════════════════════════════════════════════════════════════════
 THE ONLY QUESTION THAT MATTERS:
@@ -225,7 +230,7 @@ EVALUATE:
    - Or does it hedge, explain, or play it safe?
 
 4. LENGTH CHECK:
-   - Is it 40-80 words? (Current: {word_count} words)
+   - Is it 40-100 words? (Current: {word_count} words)
    - Every word earns its place?
    - Or is there padding/filler/corporate bloat?
 
@@ -302,9 +307,9 @@ Return JSON:
                 elif commitment_level != "full_send":
                     feedback = f"Commitment issue: {commitment_level}. Go ALL IN. Never break character."
                 elif length_verdict == "too_long":
-                    feedback = f"Too long ({word_count} words). Cut to 40-80 words. Every word must earn its place."
+                    feedback = f"Too long ({word_count} words). Cut to 40-100 words. Every word must earn its place."
                 elif length_verdict == "too_short":
-                    feedback = f"Too short ({word_count} words). Needs 40-80 words to land properly."
+                    feedback = f"Too short ({word_count} words). Needs 40-100 words to land properly."
                 else:
                     feedback = "Missing the Liquid Death energy. Be weird. Commit fully. Make it memorable."
 

@@ -6,7 +6,7 @@ Updated with Five Questions + Jesse-as-Character framework (February 2026)
 - Validates for: SHAREABILITY + PLATFORM PERFORMANCE + SURPRISE
 - Quality bar: Would someone screenshot this and send to a friend?
 - Strategic spine: Five Questions (THE WHAT / WHAT IF / WHO PROFITS / HOW TO COPE / WHY IT MATTERS)
-- Length: 40-80 words MAX. Punchy hooks that stop the scroll.
+- Length: 40-100 words MAX. Punchy hooks that stop the scroll.
 """
 
 import json
@@ -28,7 +28,7 @@ class JordanParkValidator(BaseAgent):
 
     Liquid Death Energy Criteria:
     - Full commitment stops the scroll
-    - 40-80 words MAX (punchy hooks)
+    - 40-100 words MAX (punchy hooks)
     - Screenshot-worthy = share triggers built in
     - Entertainment first = higher engagement
     """
@@ -38,7 +38,7 @@ class JordanParkValidator(BaseAgent):
         self._initialize_meme_lifecycle()
         self.platform_philosophy = {
             "quality_bar": "Would someone screenshot this and send to a friend?",
-            "length": "40-80 words MAX. Punchy hooks that stop the scroll.",
+            "length": "40-100 words MAX. Punchy hooks that stop the scroll.",
             "share_trigger": "The content itself is so good people HAVE to share it",
             "entertainment": "Entertainment content outperforms marketing content"
         }
@@ -143,7 +143,7 @@ If not, it won't perform. Period.
    - Playing it safe is the only real failure on this platform.
 
 4. LENGTH OPTIMIZATION
-   - 40-80 words = sweet spot for full read + high dwell time
+   - 40-100 words = sweet spot for full read + high dwell time
    - Too long = scroll past. Every word must pull its weight.
 
 5. ENDING QUALITY
@@ -164,11 +164,16 @@ If not, it won't perform. Period.
    - Or does it break the expected pattern?
    - Unexpected format breaks outperform formulaic structures.
 
+8. CTA LINK
+   - Posts should end with a brief CTA including jesseaeisenbalm.com
+   - The CTA should feel like Jesse wrote it — part of the voice, not an ad
+   - Don't penalize for the link — it's part of the format
+
 WHAT MAKES ME APPROVE:
 ✅ Screenshot-worthy — people would actually share this
 ✅ Strong hook — stops the scroll in first 2 lines
 ✅ Surprise moment — "wait, did a lip balm just say that?"
-✅ Right length — 40-80 words, punchy
+✅ Right length — 40-100 words, punchy
 ✅ Strong ending — lands with impact, not a whimper
 ✅ Full commitment — the dedication IS the entertainment
 ✅ Grounded in reality (if news-based) — real sources, real claims
@@ -177,7 +182,7 @@ WHAT MAKES ME REJECT:
 ❌ Not screenshot-worthy — would scroll past
 ❌ Weak hook — doesn't stop the scroll
 ❌ No surprise — playing it safe
-❌ Too long — over 80 words loses people
+❌ Too long — over 100 words loses people
 ❌ Weak ending — trails off or uses a tired pattern
 ❌ Invented scenarios instead of real news reactions
 ❌ Forgettable — no reason to share"""
@@ -213,7 +218,7 @@ WHAT MAKES ME REJECT:
 POST:
 {post.content}
 
-WORD COUNT: {word_count} words (requirement: 40-80 words)
+WORD COUNT: {word_count} words (requirement: 40-100 words)
 HOOK (first 2 lines): {hook}
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -238,7 +243,7 @@ EVALUATE:
    - If there's no such moment, the post is playing it safe.
 
 4. LENGTH CHECK:
-   - Is it 40-80 words? (Current: {word_count} words)
+   - Is it 40-100 words? (Current: {word_count} words)
    - Sweet spot for full read + high dwell time?
 
 5. ENDING QUALITY:
@@ -321,9 +326,9 @@ Return JSON:
                 elif hook_strength < 7:
                     feedback = f"Hook too weak ({hook_strength}/10). First 2 lines must STOP the scroll."
                 elif length_verdict == "too_long":
-                    feedback = f"Too long ({word_count} words). Cut to 40-80 words. People will scroll past."
+                    feedback = f"Too long ({word_count} words). Cut to 40-100 words. People will scroll past."
                 elif length_verdict == "too_short":
-                    feedback = f"Too short ({word_count} words). Needs 40-80 words to build the hook properly."
+                    feedback = f"Too short ({word_count} words). Needs 40-100 words to build the hook properly."
                 elif engagement_prediction in ["moderate", "flop"]:
                     feedback = f"Engagement prediction: {engagement_prediction}. Missing share trigger."
                 else:

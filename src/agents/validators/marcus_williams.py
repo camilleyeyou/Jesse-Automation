@@ -6,7 +6,7 @@ Updated with Five Questions + Jesse-as-Character framework (February 2026)
 - Validates for: CONCEPTUAL COMMITMENT + CRAFT + SPECIFICITY
 - Quality bar: Would I put this in my portfolio of unhinged work?
 - Strategic spine: Five Questions (THE WHAT / WHAT IF / WHO PROFITS / HOW TO COPE / WHY IT MATTERS)
-- Length: 40-80 words MAX. Tight copy or nothing.
+- Length: 40-100 words MAX. Tight copy or nothing.
 """
 
 import json
@@ -27,7 +27,7 @@ class MarcusWilliamsValidator(BaseAgent):
 
     Liquid Death Energy Criteria:
     - Full commitment to the bit (never break character, never wink)
-    - 40-80 words MAX (tight copy, every word earns its place)
+    - 40-100 words MAX (tight copy, every word earns its place)
     - Genuine weird > performative quirky
     - Entertainment first, marketing second
     """
@@ -37,7 +37,7 @@ class MarcusWilliamsValidator(BaseAgent):
         self.creative_philosophy = {
             "core_principle": "Go with the dumbest idea. Then commit 100%.",
             "commitment": "Full send or don't send at all. No hedging. No winking.",
-            "length": "40-80 words MAX. Tight copy. Every word earns its place.",
+            "length": "40-100 words MAX. Tight copy. Every word earns its place.",
             "entertainment": "Entertainment company that happens to sell lip balm",
             "memorability": "Would rather be weird and memorable than safe and forgettable",
             "quality_bar": "Would I put this in my portfolio of genuinely unhinged work?"
@@ -130,7 +130,7 @@ QUALITY GATES
    - Or does it hedge, qualify, or wink?
 
 2. COPY CRAFT
-   - 40-80 words MAX. Punchy. Tight.
+   - 40-100 words MAX. Punchy. Tight.
    - Every word earns its place or it's cut.
    - Sounds like one person with a voice, not a committee.
    - Signature punctuation: em dashes — they're Jesse's thing.
@@ -154,10 +154,15 @@ QUALITY GATES
    - FORBIDDEN: trailing off, "Stop. Breathe. Balm." (overused),
      engagement questions, same ending pattern every time.
 
+6. CTA LINK
+   - Posts should end with a brief CTA including jesseaeisenbalm.com
+   - The CTA is part of the craft — it should feel like Jesse's voice, not an ad
+   - Don't penalize for the link — it's part of the format
+
 WHAT MAKES ME APPROVE:
 ✅ Full commitment — goes ALL IN on the concept
 ✅ Clear spine — answers one of the Five Questions
-✅ Tight copy — 40-80 words, every word works
+✅ Tight copy — 40-100 words, every word works
 ✅ Specificity — concrete details, not vague observations
 ✅ Genuinely weird — not performatively quirky
 ✅ Strong ending — lands with impact
@@ -167,7 +172,7 @@ WHAT MAKES ME APPROVE:
 WHAT MAKES ME REJECT:
 ❌ Half-committed — hedges, qualifies, breaks character
 ❌ No spine — can't tell which question it's answering
-❌ Too long — over 80 words is bloat
+❌ Too long — over 100 words is bloat
 ❌ Vague and generic — no specific details
 ❌ Weak ending — trails off or uses a tired pattern
 ❌ One-note — always the same snarky tone
@@ -201,7 +206,7 @@ WHAT MAKES ME REJECT:
 POST:
 {post.content}
 
-WORD COUNT: {word_count} words (requirement: 40-80 words)
+WORD COUNT: {word_count} words (requirement: 40-100 words)
 
 ═══════════════════════════════════════════════════════════════════════════════
 THE ONLY QUESTION THAT MATTERS:
@@ -222,7 +227,7 @@ EVALUATE:
    - Or does it hedge, qualify, play it safe?
 
 3. COPY CRAFT:
-   - Is it 40-80 words? (Current: {word_count} words)
+   - Is it 40-100 words? (Current: {word_count} words)
    - Every word earns its place?
    - Sounds like one person, not a committee?
    - Uses em dashes (Jesse's signature punctuation)?
@@ -301,9 +306,9 @@ Return JSON:
                 elif commitment_level != "full_send":
                     feedback = f"Commitment issue: {commitment_level}. Go ALL IN. No hedging."
                 elif length_verdict == "too_long":
-                    feedback = f"Too long ({word_count} words). Cut to 40-80 words. Every word must earn its place."
+                    feedback = f"Too long ({word_count} words). Cut to 40-100 words. Every word must earn its place."
                 elif length_verdict == "too_short":
-                    feedback = f"Too short ({word_count} words). Needs 40-80 words to land properly."
+                    feedback = f"Too short ({word_count} words). Needs 40-100 words to land properly."
                 elif criteria_breakdown["weird_factor"] == "performative_quirky":
                     feedback = "Performative quirky. Be genuinely weird or don't bother."
                 else:
