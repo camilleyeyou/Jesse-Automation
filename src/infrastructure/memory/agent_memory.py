@@ -153,7 +153,10 @@ class AgentMemory:
                     linkedin_post_id TEXT,
                     linkedin_engagement TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    metadata TEXT
+                    metadata TEXT,
+                    theme TEXT,
+                    sub_theme TEXT,
+                    trend_tier INTEGER
                 )
             """)
 

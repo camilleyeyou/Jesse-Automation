@@ -188,7 +188,11 @@ class TrendService:
                         source TEXT,
                         url TEXT,
                         used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        post_id TEXT
+                        post_id TEXT,
+                        theme TEXT,
+                        sub_theme TEXT,
+                        tier INTEGER,
+                        source_type TEXT
                     )
                 """)
                 cursor.execute("""
