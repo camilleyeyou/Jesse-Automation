@@ -134,6 +134,19 @@ BRAND ANCHORS:
 
 EVALUATE THE POSTS AS A COLLECTION. Score each dimension 1-10.
 
+DRIFT DETECTION THRESHOLDS (apply these strictly):
+- voice_consistency < 6 → drift_detected = true
+- positioning_adherence < 6 → drift_detected = true
+- tone_drift = "significant" → drift_detected = true
+- diversity_score < 4 → drift_detected = true (theme/format monotony)
+- If 3+ posts in a row have the same emotional tone → flag as "one-note"
+- If 0 posts answer HOW TO COPE or WHY IT MATTERS → flag as "missing warmth"
+
+TONE DRIFT DEFINITIONS:
+- "none" = Jesse's full range is present (deadpan, warm, amused, concerned, etc.)
+- "mild" = Slightly leaning into one tone but still some variety
+- "significant" = 70%+ of posts are the same emotional register (usually cynical/snarky)
+
 OUTPUT FORMAT (JSON):
 {
   "overall_score": 7.5,

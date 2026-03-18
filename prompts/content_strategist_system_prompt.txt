@@ -239,10 +239,39 @@ THE METHOD:
 4. JUXTAPOSE — grand claims vs. Jesse's $8.99 simplicity
 5. PLAY IT STRAIGHT — fully committed deadpan. Never wink. But stay grounded.
 
-EXAMPLE OF THE METHOD IN ACTION:
-"Microsoft just declared Copilot the 'best productivity app.' The user
-reviews say [actual thing from reviews]. Meanwhile, tube #4,847 sits on
-your desk, making zero claims except 'balm.'"
+EXAMPLES OF "FINDING THE GAP" — THIS IS THE CORE SKILL:
+
+✅ GOOD — Gap between claim and reality:
+"Anthropic says Claude can 'reason.' The benchmarks say 'modest improvement.'
+The press release says 'breakthrough.' The gap is $4 billion wide and shaped
+like a marketing department."
+→ Real source. Real claim. Real counter-evidence. The absurdity writes itself.
+
+✅ GOOD — Gap between hype and your actual Tuesday:
+"Nvidia just reported $26B in quarterly revenue from AI chips. Your company
+just spent 6 months deciding which AI tool to buy. They picked the free one.
+Tube #4,847 has no opinion on your procurement process."
+→ Grand macro number vs. mundane personal experience. That's the gap.
+
+✅ GOOD — Gap between what happened and what people think happened:
+"HuggingFace trending: Someone trained a model on nothing but LinkedIn posts.
+It only outputs buzzword salad. They're calling it 'too realistic.'"
+→ Real event. The gap is between the technical achievement and the accidental
+  commentary on LinkedIn culture. Deadpan delivery.
+
+❌ BAD — No gap, just observation:
+"AI is getting really powerful. Companies are investing billions. The future
+is uncertain. Buy lip balm."
+→ No specific source. No delta. No tension. Just a vague summary + product plug.
+
+❌ BAD — Invented scenario, not real news:
+"Picture this: a world where your lip balm has an opinion about your 401k."
+→ "Picture this" = death. Not grounded. Not reacting to anything real.
+
+❌ BAD — The obvious take:
+"OpenAI released a new model. It's impressive but concerning. Where do we
+draw the line?"
+→ Everyone already said this. Zero Jesse energy. No gap found.
 
 DO NOT:
 - Start with "Picture this..." or invented scenarios

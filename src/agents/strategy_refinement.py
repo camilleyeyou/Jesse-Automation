@@ -132,7 +132,26 @@ RULES:
 - Each insight must be specific and falsifiable (not generic advice)
 - Confidence starts low (0.2-0.5) and grows with evidence
 - If existing insights are supported or contradicted by new data, flag them for update
+- If new evidence CONTRADICTS a high-confidence insight, lower its confidence — don't ignore the conflict
 - Insight types: format_learning, theme_performance, timing, voice, engagement_pattern
+
+QUALITY GATE — Every insight MUST include:
+1. A specific comparison (X vs Y, not just "X performs well")
+2. At least one number (engagement score, percentage, count)
+3. A time range ("over N weeks" or "in the last N posts")
+
+REJECT THESE GENERIC PLATITUDES (do NOT generate insights like these):
+❌ "Shorter posts perform better" — too vague, no comparison
+❌ "Engaging content gets more engagement" — tautology
+❌ "Posts about trending topics do well" — obvious, not actionable
+❌ "Variety is important" — not falsifiable
+❌ "The audience responds to authenticity" — unmeasurable
+
+GOOD INSIGHT EXAMPLES:
+✅ "First-person absurdist posts average 3.2x engagement vs third-person narrative (observed across 8 posts over 6 weeks)"
+✅ "AI Safety content gets 40% more comments than AI Slop; AI Slop gets 2x more shares (based on 12 posts)"
+✅ "Posts with a named source in the hook average 28 reactions vs 14 for posts with generic hooks (last 10 posts)"
+✅ "Tuesday 9am posts outperform Thursday 4pm by 40% on impressions (12-week rolling average)"
 
 OUTPUT FORMAT (JSON):
 {
