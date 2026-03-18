@@ -242,7 +242,8 @@ class ContentOrchestrator:
         post_number: int,
         batch_id: str,
         trend=None,
-        use_video: bool = False
+        use_video: bool = False,
+        angle_seed: str = None,
     ) -> tuple:
         """
         Process a single post and store results in memory.
@@ -254,7 +255,8 @@ class ContentOrchestrator:
             post_number=post_number,
             batch_id=batch_id,
             trend=trend,
-            use_video=use_video
+            use_video=use_video,
+            angle_seed=angle_seed,
         )
 
         was_approved = post is not None
@@ -323,7 +325,8 @@ class ContentOrchestrator:
         post_number: int,
         batch_id: str,
         trend=None,
-        use_video: bool = False
+        use_video: bool = False,
+        angle_seed: str = None,
     ) -> Optional[LinkedInPost]:
         """Process a single post with its assigned trend."""
         
@@ -385,12 +388,17 @@ class ContentOrchestrator:
 
             trend_body = "\n".join(parts)
 
+            # Add angle seed from editorial calendar if available
+            angle_instruction = ""
+            if angle_seed:
+                angle_instruction = f"\n\nEDITORIAL GUIDANCE (from weekly strategy): {angle_seed}\nUse this angle as a starting point but make it your own."
+
             trend_context = f"""
 TODAY'S TRENDING NEWS ({trend.category.upper()}) — React to this:
 
 {trend_body}
 
-IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, details, or cultural moment. Don't create generic content.
+IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, details, or cultural moment. Don't create generic content.{angle_instruction}
 """
         
         # Generate content
@@ -490,15 +498,37 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
             if self.memory:
                 self.memory.start_session(f"live_{uuid.uuid4().hex[:8]}")
 
-            # Step 1: Reset trend tracking for fresh selection
+            # Step 1: Check editorial calendar for today's guidance
+            calendar_entry = None
+            preferred_theme = None
+            angle_seed = None
+            if self.memory:
+                try:
+                    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+                    calendar_entry = self.memory.get_calendar_entry(today_str)
+                    if calendar_entry and calendar_entry.get("status") == "planned":
+                        preferred_theme = calendar_entry.get("theme")
+                        angle_seed = calendar_entry.get("angle_seed")
+                        logger.info(f"📅 Calendar entry found: theme={preferred_theme}, angle={angle_seed}")
+                        self.memory.update_calendar_status(calendar_entry["id"], "generating")
+                    elif calendar_entry:
+                        logger.info(f"📅 Calendar entry exists but status={calendar_entry.get('status')} — skipping")
+                        calendar_entry = None
+                except Exception as e:
+                    logger.warning(f"Calendar check failed: {e}")
+
+            # Step 2: Reset trend tracking for fresh selection
             if self.trend_service:
                 self.trend_service.reset_for_new_batch()
 
-            # Step 2: Get curated trending topic
+            # Step 3: Get curated trending topic (guided by calendar if available)
             post_id = f"live_{uuid.uuid4().hex[:8]}"
             trend = None
             if self.news_curator:
-                trend = await self.news_curator.execute(post_id=post_id)
+                curator_kwargs = {"post_id": post_id}
+                if preferred_theme:
+                    curator_kwargs["preferred_theme"] = preferred_theme
+                trend = await self.news_curator.execute(**curator_kwargs)
                 if trend:
                     logger.info(f"📰 Curated trend ({trend.category}): {trend.headline[:70]}...")
                 else:
@@ -510,13 +540,14 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
                 else:
                     logger.warning("⚠️ No fresh trend available, generating without trend")
 
-            # Step 3: Generate content (with memory)
+            # Step 4: Generate content (with memory + calendar guidance)
             logger.info("✍️ Generating content...")
             post, validation_scores, was_approved = await self._process_single_post_with_memory(
                 post_number=1,
                 batch_id=post_id,
                 trend=trend,
-                use_video=use_video
+                use_video=use_video,
+                angle_seed=angle_seed,
             )
 
             if not was_approved or not post:
@@ -557,6 +588,9 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
                         f"{post_id[:8]}_1",
                         linkedin_result.get('post_id', '')
                     )
+                    # Update editorial calendar entry to 'posted'
+                    if calendar_entry:
+                        self.memory.update_calendar_status(calendar_entry["id"], "posted")
                     self.memory.end_session()
 
                 return {

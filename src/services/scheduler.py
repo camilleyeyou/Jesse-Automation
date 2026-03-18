@@ -212,6 +212,57 @@ class SchedulerService:
             logger.error(f"Failed to schedule daily post: {e}")
             return False
     
+    def schedule_weekly_job(
+        self,
+        job_func: Callable,
+        day_of_week: str = "sun",
+        hour: int = 6,
+        minute: int = 0,
+        timezone: str = "America/New_York",
+        job_id: str = "weekly_job",
+        job_name: str = "Weekly Job",
+    ) -> bool:
+        """Schedule a job to run once per week on a specific day/time."""
+
+        if not APSCHEDULER_AVAILABLE:
+            return False
+
+        try:
+            existing = self.scheduler.get_job(job_id)
+            if existing:
+                self.scheduler.remove_job(job_id)
+
+            if ZoneInfo:
+                try:
+                    trigger = CronTrigger(
+                        day_of_week=day_of_week,
+                        hour=hour,
+                        minute=minute,
+                        timezone=ZoneInfo(timezone),
+                    )
+                except Exception:
+                    trigger = CronTrigger(day_of_week=day_of_week, hour=hour, minute=minute)
+            else:
+                trigger = CronTrigger(day_of_week=day_of_week, hour=hour, minute=minute)
+
+            self.scheduler.add_job(
+                job_func,
+                trigger=trigger,
+                id=job_id,
+                name=job_name,
+                replace_existing=True,
+                misfire_grace_time=3600,
+                coalesce=True,
+                max_instances=1,
+            )
+
+            logger.info(f"Scheduled {job_name} at {day_of_week} {hour:02d}:{minute:02d} {timezone}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to schedule {job_name}: {e}")
+            return False
+
     def schedule_one_time(
         self,
         job_func: Callable,

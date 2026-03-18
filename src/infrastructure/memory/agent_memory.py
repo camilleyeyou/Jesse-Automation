@@ -192,11 +192,60 @@ class AgentMemory:
                 )
             """)
 
+            # Editorial calendar — weekly plan from ContentStrategistAgent
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS editorial_calendar (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    scheduled_for DATE,
+                    theme TEXT,
+                    format TEXT,
+                    angle_seed TEXT,
+                    status TEXT DEFAULT 'planned',
+                    post_id INTEGER,
+                    created_by TEXT DEFAULT 'manual',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Strategy insights — accumulated editorial learnings
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS strategy_insights (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    insight_type TEXT,
+                    observation TEXT,
+                    confidence REAL DEFAULT 0.0,
+                    evidence_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_validated TIMESTAMP
+                )
+            """)
+
+            # Add missing columns to content_memory (safe ALTER TABLE)
+            engagement_columns = [
+                ("theme", "TEXT"),
+                ("sub_theme", "TEXT"),
+                ("trend_tier", "INTEGER"),
+                ("engagement_score", "REAL"),
+                ("reactions", "INTEGER DEFAULT 0"),
+                ("comments", "INTEGER DEFAULT 0"),
+                ("shares", "INTEGER DEFAULT 0"),
+                ("impressions", "INTEGER DEFAULT 0"),
+                ("performance_fetched_at", "TIMESTAMP"),
+            ]
+            for col_name, col_type in engagement_columns:
+                try:
+                    cursor.execute(f"ALTER TABLE content_memory ADD COLUMN {col_name} {col_type}")
+                except sqlite3.OperationalError:
+                    pass  # Column already exists
+
             # Create indexes for common queries
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_content_created ON content_memory(created_at)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_content_approved ON content_memory(was_approved)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_content_pillar ON content_memory(pillar)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_validator_name ON validator_memory(validator_name)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_editorial_scheduled ON editorial_calendar(scheduled_for)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_editorial_status ON editorial_calendar(status)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_strategy_type ON strategy_insights(insight_type)")
 
             conn.commit()
 
@@ -836,6 +885,290 @@ class AgentMemory:
                "MEMORY CONTEXT (learned from past generations)\n" + \
                "═══════════════════════════════════════════════════════════════════════════════\n\n" + \
                "\n".join(lines)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # ENGAGEMENT DATA
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def update_post_engagement(
+        self,
+        linkedin_post_id: str,
+        reactions: int = 0,
+        comments: int = 0,
+        shares: int = 0,
+        impressions: int = 0,
+        engagement_score: float = None,
+    ):
+        """Update engagement metrics for a published post."""
+        if engagement_score is None:
+            engagement_score = reactions + (comments * 2) + (shares * 3)
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE content_memory
+                SET reactions = ?, comments = ?, shares = ?, impressions = ?,
+                    engagement_score = ?, performance_fetched_at = datetime('now')
+                WHERE linkedin_post_id = ?
+            """, (reactions, comments, shares, impressions, engagement_score, linkedin_post_id))
+            conn.commit()
+            updated = cursor.rowcount
+        if updated:
+            logger.info(f"Updated engagement for {linkedin_post_id}: r={reactions} c={comments} s={shares} i={impressions}")
+        else:
+            logger.warning(f"No content_memory row found for linkedin_post_id={linkedin_post_id}")
+
+    def get_posts_needing_engagement(self, min_age_hours: int = 24) -> List[Dict]:
+        """Get published posts that haven't had engagement fetched yet (or not recently)."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT post_id, linkedin_post_id, content, created_at,
+                       engagement_score, performance_fetched_at
+                FROM content_memory
+                WHERE posted_to_linkedin = TRUE
+                AND linkedin_post_id IS NOT NULL
+                AND linkedin_post_id != ''
+                AND (
+                    performance_fetched_at IS NULL
+                    OR performance_fetched_at < datetime('now', '-7 days')
+                )
+                AND created_at <= datetime('now', ?)
+                ORDER BY created_at DESC
+            """, (f'-{min_age_hours} hours',))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_recent_performance(self, days: int = 14) -> List[Dict]:
+        """Get engagement data for recently published posts."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT post_id, linkedin_post_id, content, pillar, theme, sub_theme,
+                       format, created_at, engagement_score, reactions, comments,
+                       shares, impressions, average_score
+                FROM content_memory
+                WHERE posted_to_linkedin = TRUE
+                AND engagement_score IS NOT NULL
+                AND created_at >= datetime('now', ?)
+                ORDER BY created_at DESC
+            """, (f'-{days} days',))
+            return [dict(row) for row in cursor.fetchall()]
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # EDITORIAL CALENDAR
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def add_calendar_entry(
+        self,
+        scheduled_for: str,
+        theme: str,
+        format: str = None,
+        angle_seed: str = None,
+        created_by: str = "manual",
+    ) -> int:
+        """Add an entry to the editorial calendar. Returns the row id."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO editorial_calendar (scheduled_for, theme, format, angle_seed, created_by)
+                VALUES (?, ?, ?, ?, ?)
+            """, (scheduled_for, theme, format, angle_seed, created_by))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_calendar_entry(self, scheduled_for: str) -> Optional[Dict]:
+        """Get the editorial calendar entry for a given date (YYYY-MM-DD)."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM editorial_calendar
+                WHERE scheduled_for = ?
+                ORDER BY id DESC LIMIT 1
+            """, (scheduled_for,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_calendar_week(self, start_date: str, end_date: str) -> List[Dict]:
+        """Get editorial calendar entries for a date range."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM editorial_calendar
+                WHERE scheduled_for BETWEEN ? AND ?
+                ORDER BY scheduled_for ASC
+            """, (start_date, end_date))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def update_calendar_status(self, entry_id: int, status: str, post_id: int = None):
+        """Update editorial calendar entry status."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            if post_id is not None:
+                cursor.execute("""
+                    UPDATE editorial_calendar SET status = ?, post_id = ? WHERE id = ?
+                """, (status, post_id, entry_id))
+            else:
+                cursor.execute("""
+                    UPDATE editorial_calendar SET status = ? WHERE id = ?
+                """, (status, entry_id))
+            conn.commit()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # STRATEGY INSIGHTS
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def add_strategy_insight(
+        self,
+        insight_type: str,
+        observation: str,
+        confidence: float = 0.0,
+        evidence_count: int = 1,
+    ) -> int:
+        """Add a strategy insight. Returns the row id."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO strategy_insights
+                (insight_type, observation, confidence, evidence_count, last_validated)
+                VALUES (?, ?, ?, ?, datetime('now'))
+            """, (insight_type, observation, confidence, evidence_count))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_strategy_insights(self, top: int = 10, insight_type: str = None) -> List[Dict]:
+        """Get top strategy insights by confidence."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            if insight_type:
+                cursor.execute("""
+                    SELECT * FROM strategy_insights
+                    WHERE insight_type = ?
+                    ORDER BY confidence DESC, evidence_count DESC
+                    LIMIT ?
+                """, (insight_type, top))
+            else:
+                cursor.execute("""
+                    SELECT * FROM strategy_insights
+                    ORDER BY confidence DESC, evidence_count DESC
+                    LIMIT ?
+                """, (top,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def update_strategy_insight(self, insight_id: int, confidence: float, evidence_count: int):
+        """Update an existing strategy insight with new evidence."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE strategy_insights
+                SET confidence = ?, evidence_count = ?, last_validated = datetime('now')
+                WHERE id = ?
+            """, (confidence, evidence_count, insight_id))
+            conn.commit()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # ADAPTIVE THEME WEIGHTS (Phase 4.2)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def get_theme_performance(self, days: int = 30) -> Dict[str, Dict]:
+        """
+        Get average engagement per theme over the last N days.
+        Returns {theme: {count, avg_engagement, avg_reactions, avg_comments}}.
+        Used by adaptive weighting to shift towards high-performing themes.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT theme,
+                       COUNT(*) as count,
+                       AVG(COALESCE(engagement_score, 0)) as avg_engagement,
+                       AVG(COALESCE(reactions, 0)) as avg_reactions,
+                       AVG(COALESCE(comments, 0)) as avg_comments,
+                       AVG(COALESCE(shares, 0)) as avg_shares
+                FROM content_memory
+                WHERE posted_to_linkedin = TRUE
+                AND theme IS NOT NULL
+                AND created_at >= datetime('now', ?)
+                GROUP BY theme
+            """, (f'-{days} days',))
+            return {row['theme']: dict(row) for row in cursor.fetchall()}
+
+    def compute_adaptive_weights(self, days: int = 30) -> Dict[str, float]:
+        """
+        Compute adaptive theme weights based on rolling engagement averages.
+
+        Themes with higher engagement get proportionally more weight.
+        Guarantees a minimum floor (0.10) so no theme is fully starved.
+        """
+        perf = self.get_theme_performance(days=days)
+        if not perf:
+            return {}
+
+        # Compute raw scores (engagement-based)
+        raw = {}
+        for theme, data in perf.items():
+            raw[theme] = max(data.get("avg_engagement", 0), 0.1)
+
+        total = sum(raw.values())
+        if total == 0:
+            return {t: 1.0 / len(raw) for t in raw}
+
+        # Proportional weights with minimum floor
+        floor = 0.10
+        remaining = 1.0 - floor * len(raw)
+        if remaining < 0:
+            # Too many themes for the floor — equal weights
+            return {t: 1.0 / len(raw) for t in raw}
+
+        weights = {}
+        for theme, score in raw.items():
+            weights[theme] = floor + remaining * (score / total)
+
+        return weights
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # A/B FORMAT TESTING (Phase 4.3)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def get_format_performance(self, days: int = 30) -> Dict[str, Dict]:
+        """
+        Get average engagement per post format over the last N days.
+        Returns {format: {count, avg_engagement, avg_reactions, avg_comments}}.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT format,
+                       COUNT(*) as count,
+                       AVG(COALESCE(engagement_score, 0)) as avg_engagement,
+                       AVG(COALESCE(reactions, 0)) as avg_reactions,
+                       AVG(COALESCE(comments, 0)) as avg_comments,
+                       AVG(COALESCE(shares, 0)) as avg_shares
+                FROM content_memory
+                WHERE posted_to_linkedin = TRUE
+                AND format IS NOT NULL
+                AND created_at >= datetime('now', ?)
+                GROUP BY format
+            """, (f'-{days} days',))
+            return {row['format']: dict(row) for row in cursor.fetchall()}
+
+    def get_underexplored_formats(self, days: int = 30, min_count: int = 3) -> List[str]:
+        """
+        Identify formats with fewer than min_count posts in the period.
+        These are candidates for A/B testing.
+        """
+        known_formats = [
+            "observation", "hot_take", "narrative", "question",
+            "confession", "breaking", "list"
+        ]
+        perf = self.get_format_performance(days=days)
+        return [f for f in known_formats if perf.get(f, {}).get("count", 0) < min_count]
 
     def get_stats(self) -> Dict[str, Any]:
         """Get memory statistics"""

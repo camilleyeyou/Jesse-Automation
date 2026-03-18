@@ -4,8 +4,9 @@ import {
   History, RefreshCw, AlertCircle, CheckCircle,
   Linkedin, Image, FileText, Zap, BarChart3, X, ZoomIn, Video,
   MessageCircle, ExternalLink, ThumbsUp, MessageSquare, Copy, Check,
-  Menu, ChevronRight
+  Menu, ChevronRight, Brain
 } from 'lucide-react';
+import StrategyTab from './StrategyTab';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
 
@@ -1406,6 +1407,7 @@ export default function App() {
     { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'schedule', label: 'Schedule', icon: Calendar },
     { id: 'queue', label: 'Queue', icon: FileText },
+    { id: 'strategy', label: 'Strategy', icon: Brain },
     { id: 'comments', label: 'Comments', icon: MessageCircle },
     { id: 'history', label: 'History', icon: History },
   ];
@@ -1555,6 +1557,9 @@ export default function App() {
             onPostNow={handlePostNow}
             loading={loading}
           />
+        )}
+        {activeTab === 'strategy' && (
+          <StrategyTab />
         )}
         {activeTab === 'comments' && (
           <CommentsTab />

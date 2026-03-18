@@ -35,10 +35,14 @@ from src.agents.image_generator import ImageGeneratorAgent
 from src.agents.comment_generator import CommentGeneratorAgent
 from src.services.comment_queue_manager import get_comment_queue_manager
 from src.services.linkedin_comment_service import (
-    LinkedInCommentService, 
+    LinkedInCommentService,
     LinkedInCommentConfig,
     MockLinkedInCommentService
 )
+from src.services.performance_ingestion import PerformanceIngestionService
+from src.agents.weekly_strategist import WeeklyStrategistAgent
+from src.agents.strategy_refinement import StrategyRefinementAgent
+from src.agents.portfolio_qc import PortfolioQCAgent
 from src.models.comment import (
     CommentGenerationRequest,
     CommentApprovalRequest,
@@ -65,6 +69,10 @@ image_generator = None  # NEW: Add image generator global
 comment_generator: CommentGeneratorAgent = None
 comment_queue_manager = None
 linkedin_comment_service = None
+performance_ingestion: PerformanceIngestionService = None
+weekly_strategist: WeeklyStrategistAgent = None
+strategy_refinement: StrategyRefinementAgent = None
+portfolio_qc: PortfolioQCAgent = None
 
 
 # ============== Pydantic Models ==============
@@ -171,6 +179,51 @@ async def lifespan(app: FastAPI):
 
     # ═══════════════════════════════════════════════════════════════════════════
     
+    # ═══════════════════════════════════════════════════════════════════════════
+    # PERFORMANCE INGESTION (Phase 1 — Data Foundation)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    from src.infrastructure.memory import get_memory as _get_memory
+    try:
+        _memory = _get_memory("data/automation/queue.db")
+        performance_ingestion = PerformanceIngestionService(memory=_memory)
+        if performance_ingestion.is_configured():
+            logger.info("✅ PerformanceIngestionService initialized — LinkedIn analytics ingestion ready")
+        else:
+            logger.warning("⚠️ PerformanceIngestionService initialized but LinkedIn token not set — will skip ingestion")
+    except Exception as e:
+        logger.warning(f"⚠️ PerformanceIngestionService init failed: {e}")
+
+    # Initialize Weekly Strategist Agent (Phase 2 — Strategic Brain)
+    try:
+        weekly_strategist = WeeklyStrategistAgent(
+            ai_client=ai_client,
+            config=config,
+            trend_service=orchestrator.trend_service if orchestrator else None,
+            db_path="data/automation/queue.db",
+        )
+        logger.info("✅ WeeklyStrategistAgent initialized — editorial planning ready")
+    except Exception as e:
+        logger.warning(f"⚠️ WeeklyStrategistAgent init failed: {e}")
+
+    # Initialize Strategy Refinement Agent (Phase 3 — Learning System)
+    try:
+        strategy_refinement = StrategyRefinementAgent(
+            ai_client=ai_client, config=config, db_path="data/automation/queue.db"
+        )
+        logger.info("✅ StrategyRefinementAgent initialized — performance pattern analysis ready")
+    except Exception as e:
+        logger.warning(f"⚠️ StrategyRefinementAgent init failed: {e}")
+
+    # Initialize Portfolio QC Agent (Phase 3 — Learning System)
+    try:
+        portfolio_qc = PortfolioQCAgent(
+            ai_client=ai_client, config=config, db_path="data/automation/queue.db"
+        )
+        logger.info("✅ PortfolioQCAgent initialized — brand consistency monitoring ready")
+    except Exception as e:
+        logger.warning(f"⚠️ PortfolioQCAgent init failed: {e}")
+
     # Auto-start scheduler if configured
     if os.getenv("AUTO_START_SCHEDULER", "false").lower() == "true":
         scheduler.start()
@@ -184,6 +237,58 @@ async def lifespan(app: FastAPI):
             timezone=timezone
         )
         logger.info(f"Auto-started scheduler at {hour:02d}:{minute:02d} {timezone}")
+
+        # Schedule weekly performance ingestion (Sunday 6:00 AM)
+        if performance_ingestion:
+            scheduler.schedule_weekly_job(
+                job_func=weekly_ingestion_job,
+                day_of_week="sun",
+                hour=6,
+                minute=0,
+                timezone=timezone,
+                job_id="weekly_ingestion",
+                job_name="Weekly Performance Ingestion",
+            )
+            logger.info("📊 Scheduled weekly performance ingestion: Sunday 6:00 AM")
+
+        # Schedule weekly strategy refinement (Sunday 6:30 AM)
+        if strategy_refinement:
+            scheduler.schedule_weekly_job(
+                job_func=weekly_refinement_job,
+                day_of_week="sun",
+                hour=6,
+                minute=30,
+                timezone=timezone,
+                job_id="weekly_refinement",
+                job_name="Weekly Strategy Refinement",
+            )
+            logger.info("📈 Scheduled weekly strategy refinement: Sunday 6:30 AM")
+
+        # Schedule weekly strategy planning (Sunday 7:00 AM)
+        if weekly_strategist:
+            scheduler.schedule_weekly_job(
+                job_func=weekly_strategy_job,
+                day_of_week="sun",
+                hour=7,
+                minute=0,
+                timezone=timezone,
+                job_id="weekly_strategy",
+                job_name="Weekly Strategy Planning",
+            )
+            logger.info("🧠 Scheduled weekly strategy planning: Sunday 7:00 AM")
+
+        # Schedule portfolio QC (Friday 6:00 PM)
+        if portfolio_qc:
+            scheduler.schedule_weekly_job(
+                job_func=friday_qc_job,
+                day_of_week="fri",
+                hour=18,
+                minute=0,
+                timezone=timezone,
+                job_id="friday_portfolio_qc",
+                job_name="Friday Portfolio QC",
+            )
+            logger.info("🔍 Scheduled portfolio QC: Friday 6:00 PM")
     
     logger.info("API startup complete")
     
@@ -285,6 +390,94 @@ async def daily_post_job():
             
     except Exception as e:
         logger.error(f"❌ Daily post job exception: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+async def weekly_ingestion_job():
+    """
+    Weekly job: fetch LinkedIn engagement data for all published posts.
+    Runs Sunday 6:00 AM before the strategy agents.
+    """
+    logger.info("=" * 60)
+    logger.info("📊 WEEKLY PERFORMANCE INGESTION JOB TRIGGERED")
+    logger.info("=" * 60)
+
+    if not performance_ingestion:
+        logger.warning("Performance ingestion service not initialized — skipping")
+        return
+
+    try:
+        result = await performance_ingestion.run()
+        logger.info(f"📊 Ingestion result: {result}")
+    except Exception as e:
+        logger.error(f"❌ Weekly ingestion job exception: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+async def weekly_refinement_job():
+    """
+    Weekly job: analyse performance patterns and generate strategy insights.
+    Runs Sunday 6:30 AM (after ingestion, before strategist).
+    """
+    logger.info("=" * 60)
+    logger.info("📈 WEEKLY STRATEGY REFINEMENT JOB TRIGGERED")
+    logger.info("=" * 60)
+
+    if not strategy_refinement:
+        logger.warning("Strategy refinement agent not initialized — skipping")
+        return
+
+    try:
+        result = await strategy_refinement.execute()
+        logger.info(f"📈 Refinement result: {result}")
+    except Exception as e:
+        logger.error(f"❌ Weekly refinement job exception: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+async def friday_qc_job():
+    """
+    Weekly job: evaluate brand consistency across recent posts.
+    Runs Friday 6:00 PM.
+    """
+    logger.info("=" * 60)
+    logger.info("🔍 FRIDAY PORTFOLIO QC JOB TRIGGERED")
+    logger.info("=" * 60)
+
+    if not portfolio_qc:
+        logger.warning("Portfolio QC agent not initialized — skipping")
+        return
+
+    try:
+        result = await portfolio_qc.execute()
+        logger.info(f"🔍 QC result: {result}")
+    except Exception as e:
+        logger.error(f"❌ Friday QC job exception: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+async def weekly_strategy_job():
+    """
+    Weekly job: plan the Mon-Fri editorial calendar.
+    Runs Sunday 7:00 AM after performance ingestion completes.
+    """
+    logger.info("=" * 60)
+    logger.info("🧠 WEEKLY STRATEGY PLANNING JOB TRIGGERED")
+    logger.info("=" * 60)
+
+    if not weekly_strategist:
+        logger.warning("Weekly strategist not initialized — skipping")
+        return
+
+    try:
+        result = await weekly_strategist.execute()
+        logger.info(f"🧠 Strategy result: {result}")
+    except Exception as e:
+        logger.error(f"❌ Weekly strategy job exception: {e}")
         import traceback
         traceback.print_exc()
 
@@ -628,6 +821,128 @@ async def test_linkedin():
     
     result = linkedin_poster.test_connection()
     return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PERFORMANCE INGESTION ENDPOINTS (Phase 1 — Data Foundation)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/automation/ingest-performance")
+async def trigger_ingestion(background_tasks: BackgroundTasks):
+    """Manually trigger LinkedIn performance ingestion."""
+    if not performance_ingestion:
+        raise HTTPException(503, "Performance ingestion service not initialized")
+
+    async def _run():
+        result = await performance_ingestion.run()
+        logger.info(f"Manual ingestion result: {result}")
+
+    background_tasks.add_task(_run)
+    return {"status": "started", "message": "Performance ingestion running in background"}
+
+
+@app.post("/api/automation/run-refinement")
+async def trigger_refinement(background_tasks: BackgroundTasks):
+    """Manually trigger the strategy refinement agent."""
+    if not strategy_refinement:
+        raise HTTPException(503, "Strategy refinement agent not initialized")
+
+    async def _run():
+        result = await strategy_refinement.execute()
+        logger.info(f"Manual refinement result: {result}")
+
+    background_tasks.add_task(_run)
+    return {"status": "started", "message": "Strategy refinement running in background"}
+
+
+@app.post("/api/automation/run-portfolio-qc")
+async def trigger_portfolio_qc(background_tasks: BackgroundTasks):
+    """Manually trigger the portfolio QC agent."""
+    if not portfolio_qc:
+        raise HTTPException(503, "Portfolio QC agent not initialized")
+
+    async def _run():
+        result = await portfolio_qc.execute()
+        logger.info(f"Manual portfolio QC result: {result}")
+
+    background_tasks.add_task(_run)
+    return {"status": "started", "message": "Portfolio QC running in background"}
+
+
+@app.post("/api/automation/run-strategist")
+async def trigger_strategist(background_tasks: BackgroundTasks):
+    """Manually trigger the weekly strategy planning agent."""
+    if not weekly_strategist:
+        raise HTTPException(503, "Weekly strategist not initialized")
+
+    async def _run():
+        result = await weekly_strategist.execute()
+        logger.info(f"Manual strategist result: {result}")
+
+    background_tasks.add_task(_run)
+    return {"status": "started", "message": "Weekly strategist running in background"}
+
+
+@app.get("/api/automation/performance")
+async def get_performance(days: int = 14):
+    """Get engagement performance data for recent posts."""
+    from src.infrastructure.memory import get_memory as _get_mem
+    try:
+        mem = _get_mem("data/automation/queue.db")
+        data = mem.get_recent_performance(days=days)
+        return {"success": True, "posts": data, "count": len(data)}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to fetch performance data: {e}")
+
+
+@app.get("/api/automation/calendar")
+async def get_calendar(start_date: str = None, end_date: str = None):
+    """Get editorial calendar entries for a date range."""
+    from src.infrastructure.memory import get_memory as _get_mem
+    from datetime import date, timedelta
+    try:
+        mem = _get_mem("data/automation/queue.db")
+        if not start_date:
+            start_date = date.today().isoformat()
+        if not end_date:
+            end_date = (date.today() + timedelta(days=7)).isoformat()
+        entries = mem.get_calendar_week(start_date, end_date)
+        return {"success": True, "entries": entries, "count": len(entries)}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to fetch calendar: {e}")
+
+
+@app.get("/api/automation/adaptive-weights")
+async def get_adaptive_weights(days: int = 30):
+    """Get adaptive theme weights and format performance."""
+    from src.infrastructure.memory import get_memory as _get_mem
+    try:
+        mem = _get_mem("data/automation/queue.db")
+        weights = mem.compute_adaptive_weights(days=days)
+        theme_perf = mem.get_theme_performance(days=days)
+        format_perf = mem.get_format_performance(days=days)
+        underexplored = mem.get_underexplored_formats(days=days)
+        return {
+            "success": True,
+            "adaptive_weights": {k: round(v, 3) for k, v in weights.items()},
+            "theme_performance": theme_perf,
+            "format_performance": format_perf,
+            "underexplored_formats": underexplored,
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Failed to compute weights: {e}")
+
+
+@app.get("/api/automation/strategy-insights")
+async def get_insights(top: int = 10, insight_type: str = None):
+    """Get top strategy insights."""
+    from src.infrastructure.memory import get_memory as _get_mem
+    try:
+        mem = _get_mem("data/automation/queue.db")
+        insights = mem.get_strategy_insights(top=top, insight_type=insight_type)
+        return {"success": True, "insights": insights, "count": len(insights)}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to fetch insights: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

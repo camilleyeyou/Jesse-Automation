@@ -172,7 +172,78 @@ class OpenAIClient:
         except Exception as e:
             logger.error(f"OpenAI API error: {str(e)}")
             raise
-    
+
+    async def generate_with_tools(
+        self,
+        messages: list,
+        tools: list,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Chat completion with tool/function calling support.
+
+        Args:
+            messages: Full conversation history (system + user + assistant + tool messages)
+            tools: OpenAI-format tool definitions
+            model: Model override (e.g. "gpt-4o")
+            temperature: Temperature override
+
+        Returns:
+            Dict with 'message' key containing the assistant response
+            (which may include tool_calls).
+        """
+        model = model or self.config.openai.model
+        temperature = temperature if temperature is not None else self.config.openai.temperature
+        max_tokens = max_tokens or self.config.openai.max_tokens
+
+        try:
+            response = await self.openai_client.chat.completions.create(
+                model=model,
+                messages=messages,
+                tools=tools,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+
+            choice = response.choices[0]
+            msg = choice.message
+
+            # Build a serialisable assistant message dict
+            assistant_msg = {
+                "role": "assistant",
+                "content": msg.content or "",
+            }
+
+            if msg.tool_calls:
+                assistant_msg["tool_calls"] = [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        },
+                    }
+                    for tc in msg.tool_calls
+                ]
+
+            return {
+                "message": assistant_msg,
+                "usage": {
+                    "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
+                    "completion_tokens": response.usage.completion_tokens if response.usage else 0,
+                    "total_tokens": response.usage.total_tokens if response.usage else 0,
+                },
+                "model": response.model,
+                "finish_reason": choice.finish_reason,
+            }
+
+        except Exception as e:
+            logger.error(f"OpenAI tool-calling API error: {e}")
+            raise
+
     async def generate_image(self,
                            prompt: str,
                            base_image_path: Optional[str] = None) -> Dict[str, Any]:
