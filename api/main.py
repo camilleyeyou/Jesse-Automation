@@ -102,6 +102,7 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     global config, ai_client, orchestrator, queue_manager, scheduler, linkedin_poster, image_generator
     global comment_generator, comment_queue_manager, linkedin_comment_service
+    global performance_ingestion, weekly_strategist, strategy_refinement, portfolio_qc
     
     logger.info("Starting Jesse A. Eisenbalm Automation API...")
     
