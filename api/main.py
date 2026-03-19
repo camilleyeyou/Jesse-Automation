@@ -15,9 +15,11 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional, List
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 
 # Add src to path
@@ -323,6 +325,49 @@ origins.append("https://jesse-automation.vercel.app")
 # Add common Vercel patterns (preview deployments)
 if os.getenv("VERCEL_URL"):
     origins.append(f"https://{os.getenv('VERCEL_URL')}")
+
+# --- API Key Authentication Middleware ---
+class APIKeyMiddleware(BaseHTTPMiddleware):
+    """Simple shared-secret authentication middleware.
+
+    If API_SECRET_KEY is set, all /api/ requests must include a valid key
+    via 'Authorization: Bearer <key>' or 'X-API-Key: <key>' header.
+    Health check (/) and static file routes (/images/, /videos/) are always public.
+    """
+    async def dispatch(self, request: Request, call_next):
+        api_key = os.getenv("API_SECRET_KEY")
+
+        # If no key configured, allow all requests (backward compatible)
+        if not api_key:
+            return await call_next(request)
+
+        path = request.url.path
+
+        # Always allow public routes
+        if path == "/" or path.startswith("/images/") or path.startswith("/videos/"):
+            return await call_next(request)
+
+        # Only protect /api/ routes
+        if path.startswith("/api/"):
+            # Check Authorization: Bearer <key>
+            auth_header = request.headers.get("authorization", "")
+            if auth_header.startswith("Bearer ") and auth_header[7:] == api_key:
+                return await call_next(request)
+
+            # Check X-API-Key header
+            x_api_key = request.headers.get("x-api-key", "")
+            if x_api_key == api_key:
+                return await call_next(request)
+
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid or missing API key"},
+            )
+
+        # Non-/api/ routes pass through
+        return await call_next(request)
+
+app.add_middleware(APIKeyMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -730,7 +775,7 @@ async def post_from_queue(post_id: Optional[str] = None):
     if not linkedin_poster:
         raise HTTPException(500, "LinkedIn poster not initialized")
 
-    result = queue_manager.post_from_queue(linkedin_poster, post_id)
+    result = await asyncio.to_thread(queue_manager.post_from_queue, linkedin_poster, post_id)
 
     if result.get("success"):
         return result
@@ -744,7 +789,7 @@ async def post_specific_from_queue(post_id: str):
     if not linkedin_poster:
         raise HTTPException(500, "LinkedIn poster not initialized")
 
-    result = queue_manager.post_from_queue(linkedin_poster, post_id)
+    result = await asyncio.to_thread(queue_manager.post_from_queue, linkedin_poster, post_id)
 
     if result.get("success"):
         return result

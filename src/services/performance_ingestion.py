@@ -12,6 +12,7 @@ LinkedIn API endpoints used:
 - GET /v2/socialActions/{shareUrn} — comment/reaction counts
 """
 
+import asyncio
 import logging
 import os
 from datetime import datetime
@@ -85,7 +86,7 @@ class PerformanceIngestionService:
                 continue
 
             try:
-                engagement = self._fetch_post_engagement(linkedin_post_id)
+                engagement = await asyncio.to_thread(self._fetch_post_engagement, linkedin_post_id)
                 if engagement:
                     self.memory.update_post_engagement(
                         linkedin_post_id=linkedin_post_id,

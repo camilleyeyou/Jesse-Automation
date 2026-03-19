@@ -2,48 +2,43 @@
 # Core dependencies
 
 # FastAPI Backend
-fastapi>=0.109.0
-uvicorn[standard]>=0.27.0
-python-multipart>=0.0.6
-pydantic>=2.0.0
+fastapi~=0.109.0
+uvicorn[standard]~=0.27.0
+python-multipart~=0.0.6
+pydantic~=2.6.0
 
 # AI & ML
-openai>=1.12.0
-google-genai>=0.3.0
-tiktoken>=0.5.0
+openai~=1.12.0
+google-genai~=0.3.0
 
 # Scheduling
-APScheduler>=3.10.0
+APScheduler~=3.10.0
 
 # Database
 # (Using SQLite - no additional packages needed)
 
 # HTTP & API
-requests>=2.31.0
-httpx>=0.26.0
-aiohttp>=3.9.0
+requests~=2.31.0
+httpx~=0.26.0
 
 # Image Processing
-Pillow>=10.0.0
+Pillow~=10.2.0
 
 # Data Processing
-pyyaml>=6.0.0
-python-dotenv>=1.0.0
+pyyaml~=6.0.0
+python-dotenv~=1.0.0
 
 # Google Trends
-pytrends>=4.9.0
-
-# Logging
-structlog>=24.1.0
+pytrends~=4.9.0
 
 # Utilities
-python-dateutil>=2.8.0
+python-dateutil~=2.8.0
 
 # Content Source Integrations
-feedparser>=6.0.11  # RSS parsing (HuggingFace, arXiv, blogs)
-praw>=7.8.0  # Reddit API
-beautifulsoup4>=4.12.3  # Web scraping (Techmeme, arXiv)
-lxml>=5.2.1  # XML/HTML parsing
+feedparser~=6.0.11  # RSS parsing (HuggingFace, arXiv, blogs)
+praw~=7.8.0  # Reddit API (planned integration)
+beautifulsoup4~=4.12.3  # Web scraping (Techmeme, arXiv)
+lxml~=5.2.1  # XML/HTML parsing
 
 # Optional: Development
 # pytest>=7.4.0

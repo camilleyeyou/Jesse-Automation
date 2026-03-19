@@ -14,6 +14,7 @@ import sqlite3
 import logging
 import random
 import hashlib
+import asyncio
 from typing import Optional, Set, List, Dict, Any
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timedelta
@@ -338,6 +339,8 @@ class TrendService:
             # Enrich bare topics with Brave context
             if self.brave_api_key and HTTPX_AVAILABLE:
                 for i, trend in enumerate(google_candidates):
+                    if i > 0:
+                        await asyncio.sleep(0.4)
                     google_candidates[i] = await self._enrich_with_brave(trend)
             candidates.extend(google_candidates)
 
@@ -356,9 +359,14 @@ class TrendService:
         categories = list(self.CATEGORY_QUERIES.items())
         random.shuffle(categories)
 
+        is_first_call = True
         for category_name, query in categories:
             if len(candidates) >= count:
                 break
+            # Delay between consecutive Brave API calls to avoid 429 rate limits
+            if not is_first_call:
+                await asyncio.sleep(0.4)
+            is_first_call = False
             try:
                 async with httpx.AsyncClient() as client:
                     response = await client.get(
@@ -605,7 +613,12 @@ class TrendService:
         categories = list(self.CATEGORY_QUERIES.items())
         random.shuffle(categories)
 
+        is_first_call = True
         for category_name, query in categories:
+            # Delay between consecutive Brave API calls to avoid 429 rate limits
+            if not is_first_call:
+                await asyncio.sleep(0.4)
+            is_first_call = False
             try:
                 async with httpx.AsyncClient() as client:
                     response = await client.get(

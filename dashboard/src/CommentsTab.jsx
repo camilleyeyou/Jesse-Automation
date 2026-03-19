@@ -89,18 +89,17 @@ function Button({ children, onClick, variant = 'primary', disabled = false, load
 
 function StatusBadge({ status }) {
   const statusConfig = {
-    pending: { color: 'amber', label: 'Pending' },
-    approved: { color: 'blue', label: 'Approved' },
-    posted: { color: 'green', label: 'Posted' },
-    rejected: { color: 'red', label: 'Rejected' },
-    failed: { color: 'red', label: 'Failed' }
+    pending: { classes: 'bg-amber-500/20 text-amber-400 border-amber-500/30', label: 'Pending' },
+    approved: { classes: 'bg-blue-500/20 text-blue-400 border-blue-500/30', label: 'Approved' },
+    posted: { classes: 'bg-green-500/20 text-green-400 border-green-500/30', label: 'Posted' },
+    rejected: { classes: 'bg-red-500/20 text-red-400 border-red-500/30', label: 'Rejected' },
+    failed: { classes: 'bg-red-500/20 text-red-400 border-red-500/30', label: 'Failed' }
   };
 
-  const config = statusConfig[status] || { color: 'gray', label: status };
+  const config = statusConfig[status] || { classes: 'bg-gray-500/20 text-gray-400 border-gray-500/30', label: status };
 
   return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium 
-      bg-${config.color}-500/20 text-${config.color}-400 border border-${config.color}-500/30`}>
+    <span className={`px-2 py-1 rounded-full text-xs font-medium border ${config.classes}`}>
       {config.label}
     </span>
   );
@@ -108,20 +107,19 @@ function StatusBadge({ status }) {
 
 // Style badge
 function StyleBadge({ style }) {
-  const styleColors = {
-    knowing_nod: 'blue',
-    absurdist_tangent: 'purple',
-    human_moment: 'green',
-    witty_insight: 'amber',
-    warm_encouragement: 'pink'
+  const styleClasses = {
+    knowing_nod: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    absurdist_tangent: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+    human_moment: 'bg-green-500/20 text-green-300 border-green-500/30',
+    witty_insight: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+    warm_encouragement: 'bg-pink-500/20 text-pink-300 border-pink-500/30'
   };
 
-  const color = styleColors[style] || 'gray';
+  const classes = styleClasses[style] || 'bg-gray-500/20 text-gray-300 border-gray-500/30';
   const label = style?.replace(/_/g, ' ');
 
   return (
-    <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize
-      bg-${color}-500/20 text-${color}-300 border border-${color}-500/30`}>
+    <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize border ${classes}`}>
       {label}
     </span>
   );
