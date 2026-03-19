@@ -90,9 +90,9 @@ class OpenAIClient:
         """Generate completion from OpenAI API with JSON support"""
         
         model = model or self.config.openai.model
-        temperature = temperature or self.config.openai.temperature
-        max_tokens = max_tokens or self.config.openai.max_tokens
-        
+        temperature = temperature if temperature is not None else self.config.openai.temperature
+        max_tokens = max_tokens if max_tokens is not None else self.config.openai.max_tokens
+
         messages = []
         
         # Add JSON instruction to system prompt

@@ -276,10 +276,16 @@ Return JSON:
     def _parse_validation(self, content: Dict[str, Any]) -> ValidationScore:
         """Parse Marcus Williams's validation response with Liquid Death criteria"""
 
-        score = max(0, min(10, float(content.get("score", 0))))
+        try:
+            score = max(0, min(10, float(content.get("score", 0))))
+        except (ValueError, TypeError):
+            score = 0.0
         portfolio_worthy = bool(content.get("portfolio_worthy", False))
         commitment_level = str(content.get("commitment_level", "safe_and_boring"))
-        word_count = int(content.get("word_count", 0))
+        try:
+            word_count = int(content.get("word_count", 0))
+        except (ValueError, TypeError):
+            word_count = 0
         length_verdict = str(content.get("length_verdict", "too_long"))
 
         criteria_breakdown = {

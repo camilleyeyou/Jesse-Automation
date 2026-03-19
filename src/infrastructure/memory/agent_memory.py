@@ -133,6 +133,8 @@ class AgentMemory:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
+            cursor.execute("PRAGMA journal_mode=WAL")
+
             # Content memory - all generated posts
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS content_memory (

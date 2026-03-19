@@ -939,7 +939,7 @@ class MultiTierTrendService(TrendService):
             db_path: Database path
             brave_api_key: Brave Search API key (optional)
         """
-        super().__init__(db_path=db_path, brave_api_key=brave_api_key)
+        super().__init__(db_path=db_path)
 
         self.config = config
         self.theme_classifier = theme_classifier

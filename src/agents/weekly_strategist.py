@@ -250,7 +250,11 @@ class WeeklyStrategistAgent(BaseAgent):
 
                 logger.info(f"  🔧 Tool: {fn_name}({fn_args})")
 
-                result = await self._execute_tool(fn_name, fn_args, week_dates)
+                try:
+                    result = await self._execute_tool(fn_name, fn_args, week_dates)
+                except Exception as e:
+                    logger.error(f"  ❌ Tool {fn_name} failed: {e}")
+                    result = {"error": f"Tool execution failed: {e}"}
 
                 if fn_name == "write_weekly_brief":
                     brief_result = result
