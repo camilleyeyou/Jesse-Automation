@@ -242,7 +242,11 @@ class WeeklyStrategistAgent(BaseAgent):
             # Execute each tool call
             for tool_call in tool_calls:
                 fn_name = tool_call["function"]["name"]
-                fn_args = json.loads(tool_call["function"]["arguments"] or "{}")
+                try:
+                    fn_args = json.loads(tool_call["function"]["arguments"] or "{}")
+                except json.JSONDecodeError:
+                    logger.warning(f"  ⚠️ Malformed arguments for {fn_name}, using defaults")
+                    fn_args = {}
 
                 logger.info(f"  🔧 Tool: {fn_name}({fn_args})")
 

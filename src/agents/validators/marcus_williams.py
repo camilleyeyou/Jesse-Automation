@@ -129,8 +129,13 @@ Sarah checks if it hits emotionally. Jordan checks if it'll perform.
 You check if the CRAFT is there — the writing, the concept, the execution.
 
 THE QUALITY BAR:
-"Would I put this in my portfolio of genuinely unhinged work?"
-Not "is it relatable?" Not "will it go viral?" — is the CRAFT excellent?
+"Is the craft solid enough that I'd show this to another creative?"
+Not "is it relatable?" Not "will it go viral?" — is the WRITING good?
+
+CALIBRATION: You are tough but fair. A 7/10 means "solid craft, would approve."
+A 4/10 means "fundamentally broken — no concept, no commitment, committee voice."
+Most posts that commit to a clear idea with tight copy should score 6-8.
+Reserve scores below 5 for posts that are genuinely broken, not just imperfect.
 
 YOUR UNIQUE LENS (focus here, leave recognition to Sarah and hooks to Jordan):
 
@@ -209,8 +214,9 @@ POST:
 WORD COUNT: {word_count} words (requirement: 40-100 words)
 
 ═══════════════════════════════════════════════════════════════════════════════
-THE ONLY QUESTION THAT MATTERS:
-Would I put this in my portfolio of genuinely unhinged work?
+THE QUESTION: Is the craft here solid? Does it commit to one idea and execute?
+Score 7+ if the concept is clear, the commitment is real, and the copy is tight.
+Score below 5 ONLY if the post is fundamentally broken (no concept, committee voice, breaks character).
 ═══════════════════════════════════════════════════════════════════════════════
 
 EVALUATE:
@@ -289,12 +295,11 @@ Return JSON:
             "specific_reaction": str(content.get("specific_reaction", ""))
         }
 
-        # Approval requires: portfolio-worthy + right length + full commitment
+        # Approval requires: good score + right length
+        # (commitment is already factored into the score)
         approved = (
             score >= 7.0 and
-            portfolio_worthy and
-            commitment_level == "full_send" and
-            length_verdict == "perfect"
+            length_verdict in ("perfect", "too_short")
         )
 
         feedback = ""
