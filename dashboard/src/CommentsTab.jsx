@@ -17,39 +17,7 @@ import {
   CheckCircle, XCircle, Clock, Trash2
 } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
-
-// API helper
-const api = {
-  async get(endpoint) {
-    const res = await fetch(`${API_BASE}${endpoint}`);
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
-    return res.json();
-  },
-  async post(endpoint, data = {}) {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
-    return res.json();
-  },
-  async patch(endpoint, data = {}) {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
-    return res.json();
-  },
-  async delete(endpoint) {
-    const res = await fetch(`${API_BASE}${endpoint}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
-    return res.json();
-  }
-};
+import { api } from './api';
 
 // UI Components
 function Card({ children, className = '' }) {

@@ -5,24 +5,7 @@ import {
   Clock, Target
 } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
-
-const api = {
-  async get(endpoint) {
-    const res = await fetch(`${API_BASE}${endpoint}`);
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
-    return res.json();
-  },
-  async post(endpoint, data = {}) {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
-    return res.json();
-  }
-};
+import { api } from './api';
 
 // ============== Sub-components ==============
 
