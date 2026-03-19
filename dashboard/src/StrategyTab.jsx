@@ -46,8 +46,8 @@ function SectionTitle({ icon: Icon, title, action }) {
   );
 }
 
-function ThemeBar({ theme, count, maxCount, engagement }) {
-  const pct = maxCount > 0 ? (count / maxCount) * 100 : 0;
+function ThemeBar({ theme, count = 0, maxCount = 1, engagement }) {
+  const pct = maxCount > 0 ? ((count || 0) / maxCount) * 100 : 0;
   const themeColors = {
     ai_slop: 'bg-purple-500',
     ai_safety: 'bg-red-500',
@@ -70,8 +70,8 @@ function ThemeBar({ theme, count, maxCount, engagement }) {
           <span className="text-[10px] text-white font-medium">{count}</span>
         </div>
       </div>
-      {engagement !== undefined && (
-        <span className="text-xs text-gray-500 w-12 text-right">{engagement.toFixed(0)} eng</span>
+      {engagement != null && !isNaN(engagement) && (
+        <span className="text-xs text-gray-500 w-12 text-right">{Number(engagement).toFixed(0)} eng</span>
       )}
     </div>
   );
@@ -104,8 +104,8 @@ function InsightCard({ insight }) {
     } catch { /* keep as string */ }
   }
 
-  const confidence = insight.confidence || 0;
-  const evidenceCount = insight.evidence_count || 0;
+  const confidence = Number(insight.confidence) || 0;
+  const evidenceCount = Number(insight.evidence_count) || 0;
 
   return (
     <div
@@ -177,9 +177,9 @@ function CalendarDay({ entry }) {
 }
 
 function PerformanceRow({ post }) {
-  const eng = post.engagement_score || 0;
+  const eng = Number(post.engagement_score) || 0;
   const maxEng = 50; // reasonable max for bar width
-  const pct = Math.min((eng / maxEng) * 100, 100);
+  const pct = Math.min((eng / maxEng) * 100, 100) || 0;
   const themeLabel = (post.theme || '?').replace(/_/g, ' ');
   const date = (post.created_at || '').slice(0, 10);
 
@@ -266,7 +266,8 @@ export default function StrategyTab() {
     }
   };
 
-  const maxThemeCount = Math.max(...Object.values(themeDistribution.counts || {}), 1);
+  const themeCounts = Object.values(themeDistribution.counts || {});
+  const maxThemeCount = themeCounts.length > 0 ? Math.max(...themeCounts, 1) : 1;
 
   return (
     <div className="space-y-6">
@@ -387,7 +388,7 @@ export default function StrategyTab() {
                   .sort((a, b) => b[1] - a[1])
                   .map(([theme, weight]) => {
                     const label = theme.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                    const pct = (weight * 100).toFixed(0);
+                    const pct = ((Number(weight) || 0) * 100).toFixed(0);
                     return (
                       <div key={theme} className="flex items-center gap-3">
                         <span className="text-xs text-gray-400 w-28 truncate">{label}</span>
@@ -420,11 +421,11 @@ export default function StrategyTab() {
                       <div className="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
                         <div
                           className="bg-blue-500 h-full rounded-full"
-                          style={{ width: `${Math.min(((data.avg_engagement || 0) / 50) * 100, 100)}%` }}
+                          style={{ width: `${Math.min(((Number(data.avg_engagement) || 0) / 50) * 100, 100) || 0}%` }}
                         />
                       </div>
                       <span className="text-[10px] text-gray-500 w-16 text-right">{data.count} posts</span>
-                      <span className="text-[10px] text-gray-400 w-14 text-right">{(data.avg_engagement || 0).toFixed(0)} eng</span>
+                      <span className="text-[10px] text-gray-400 w-14 text-right">{(Number(data.avg_engagement) || 0).toFixed(0)} eng</span>
                     </div>
                   ))}
                 {(adaptiveWeights.underexplored_formats || []).length > 0 && (
