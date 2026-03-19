@@ -78,9 +78,9 @@ portfolio_qc: PortfolioQCAgent = None
 # ============== Pydantic Models ==============
 
 class ScheduleConfig(BaseModel):
-    hour: int = 9
-    minute: int = 0
-    timezone: str = "America/New_York"
+    hour: int = 6
+    minute: int = 30
+    timezone: str = "America/Los_Angeles"
     enabled: bool = True
 
 class QueuePostRequest(BaseModel):
@@ -228,9 +228,9 @@ async def lifespan(app: FastAPI):
     # Auto-start scheduler if configured
     if os.getenv("AUTO_START_SCHEDULER", "false").lower() == "true":
         scheduler.start()
-        hour = int(os.getenv("DEFAULT_POST_HOUR", "9"))
-        minute = int(os.getenv("DEFAULT_POST_MINUTE", "0"))
-        timezone = os.getenv("DEFAULT_TIMEZONE", "America/New_York")
+        hour = int(os.getenv("DEFAULT_POST_HOUR", "6"))
+        minute = int(os.getenv("DEFAULT_POST_MINUTE", "30"))
+        timezone = os.getenv("DEFAULT_TIMEZONE", "America/Los_Angeles")
         scheduler.schedule_daily_post(
             job_func=daily_post_job,
             hour=hour,
@@ -557,7 +557,7 @@ async def get_schedule():
     return {
         "hour": scheduler.settings.get("post_hour", 9),
         "minute": scheduler.settings.get("post_minute", 0),
-        "timezone": scheduler.settings.get("timezone", "America/New_York"),
+        "timezone": scheduler.settings.get("timezone", "America/Los_Angeles"),
         "enabled": scheduler.settings.get("enabled", False),
         "next_run": scheduler.get_next_run_time().isoformat() if scheduler.get_next_run_time() else None
     }

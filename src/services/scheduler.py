@@ -86,9 +86,9 @@ class SchedulerService:
         
         self.settings = {
             "enabled": False,
-            "post_hour": 9,
-            "post_minute": 0,
-            "timezone": "America/New_York",
+            "post_hour": 6,
+            "post_minute": 30,
+            "timezone": "America/Los_Angeles",
             "auto_generate": True,
             "last_updated": None
         }
