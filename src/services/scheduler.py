@@ -97,6 +97,11 @@ class SchedulerService:
             try:
                 with open(self.config_file) as f:
                     saved = json.load(f)
+                # Migrate: if saved config has old timezone, reset to new defaults
+                if saved.get("timezone") == "America/New_York" and saved.get("post_hour") == 9:
+                    logger.info("Migrating scheduler config from 9:00 ET to 6:30 PT")
+                    self.config_file.unlink()
+                else:
                     self.settings.update(saved)
             except Exception as e:
                 logger.warning(f"Failed to load scheduler config: {e}")
