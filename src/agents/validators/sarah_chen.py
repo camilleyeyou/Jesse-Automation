@@ -273,6 +273,12 @@ Return JSON:
             word_count = 0
         length_verdict = str(content.get("length_verdict", "too_long"))
 
+        # Override AI's length verdict with actual count
+        if word_count > 100:
+            length_verdict = "too_long"
+        elif word_count < 40:
+            length_verdict = "too_short"
+
         criteria_breakdown = {
             "screenshot_worthy": screenshot_worthy,
             "would_send_to_friend": would_send,

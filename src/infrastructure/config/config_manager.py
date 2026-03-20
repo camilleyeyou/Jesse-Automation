@@ -64,9 +64,10 @@ class CulturalReferencesConfig(BaseModel):
         "The Office", "Mad Men", "Silicon Valley", "Succession", "Ted Lasso"
     ])
     workplace_themes: List[str] = Field(default_factory=lambda: [
-        "Zoom fatigue", "LinkedIn culture", "email disasters", 
-        "open office debates", "meeting overload", "Monday blues",
-        "Friday energy", "coffee addiction"
+        "LinkedIn culture", "email disasters",
+        "Friday energy", "coffee addiction",
+        "AI tool adoption chaos", "Slack notification overload",
+        "performance theater", "calendar Tetris"
     ])
     seasonal_themes: List[str] = Field(default_factory=lambda: [
         "New Year productivity", "performance reviews", 
@@ -222,8 +223,9 @@ class AppConfig:
             },
             'cultural_references': {
                 'tv_shows': ['The Office', 'Mad Men', 'Silicon Valley', 'Succession', 'Ted Lasso'],
-                'workplace_themes': ['Zoom fatigue', 'LinkedIn culture', 'email disasters', 
-                                    'open office debates', 'meeting overload'],
+                'workplace_themes': ['LinkedIn culture', 'email disasters',
+                                    'AI tool adoption chaos', 'Slack notification overload',
+                                    'performance theater'],
                 'seasonal_themes': ['New Year productivity', 'performance reviews', 
                                    'networking events', 'holiday parties']
             },

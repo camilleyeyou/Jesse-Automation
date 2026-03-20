@@ -133,20 +133,20 @@ class TrendSearcher:
             ],
             "ai_news": [
                 {
-                    "title": "AI tools now write most first drafts",
-                    "snippet": "Survey shows majority of knowledge workers use AI for initial content",
-                    "category": "ai_news", 
+                    "title": "Tech companies report record AI infrastructure spending",
+                    "snippet": "Quarterly capex on AI compute surpasses previous records as hyperscalers double down",
+                    "category": "ai_news",
                     "freshness": "evergreen",
                     "source": "curated",
-                    "jesse_angle": "AI wrote this. AI didn't apply your lip balm. Small victories."
+                    "jesse_angle": "Billions on GPUs. Zero on lip balm. Priorities."
                 },
                 {
-                    "title": "Companies mandate AI adoption",
-                    "snippet": "More employers requiring AI tool proficiency from employees",
+                    "title": "New AI capability benchmarks raise alignment questions",
+                    "snippet": "Latest evaluations show rapid capability gains outpacing safety research timelines",
                     "category": "ai_news",
-                    "freshness": "evergreen", 
+                    "freshness": "evergreen",
                     "source": "curated",
-                    "jesse_angle": "Learn AI or else. But they can't automate moisturizing your lips. Yet."
+                    "jesse_angle": "The benchmarks go up. The existential dread goes up. Lip hydration stays flat. We can fix one of those."
                 }
             ],
             "workplace_viral": [
@@ -159,12 +159,12 @@ class TrendSearcher:
                     "jesse_angle": "Hustle culture is a scam. Hydrated lips are not."
                 },
                 {
-                    "title": "Meeting overload hits record levels",
-                    "snippet": "Average worker now spends 23 hours per week in meetings",
+                    "title": "Neuroscience research shows handwriting activates different brain regions than typing",
+                    "snippet": "Studies confirm analog practices engage neural pathways digital tools cannot replicate",
                     "category": "workplace_viral",
                     "freshness": "evergreen",
                     "source": "curated",
-                    "jesse_angle": "You've been on mute for 47 minutes. Apply lip balm. No one will notice."
+                    "jesse_angle": "Your brain knows the difference between typing and writing. Your lips know the difference between neglect and $8.99."
                 }
             ],
             "tech_culture": [
@@ -189,12 +189,12 @@ class TrendSearcher:
             ],
             "remote_work": [
                 {
-                    "title": "Zoom fatigue still affecting workers",
-                    "snippet": "Video call exhaustion persists years after remote work boom",
+                    "title": "Companies rewrite remote work policies for the third time this year",
+                    "snippet": "Hybrid mandates shift again as employers struggle with enforcement and attrition",
                     "category": "remote_work",
                     "freshness": "evergreen",
                     "source": "curated",
-                    "jesse_angle": "Camera on. Mic muted. Lips chapped from nervous licking. We see you."
+                    "jesse_angle": "The policy changed again. Your commute didn't. Your lips are still chapped either way."
                 }
             ]
         }

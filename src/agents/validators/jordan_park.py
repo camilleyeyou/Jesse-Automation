@@ -35,29 +35,11 @@ class JordanParkValidator(BaseAgent):
 
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="JordanParkValidator")
-        self._initialize_meme_lifecycle()
         self.platform_philosophy = {
             "quality_bar": "Would someone screenshot this and send to a friend?",
             "length": "40-100 words MAX. Punchy hooks that stop the scroll.",
             "share_trigger": "The content itself is so good people HAVE to share it",
             "entertainment": "Entertainment content outperforms marketing content"
-        }
-    
-    def _initialize_meme_lifecycle(self):
-        """Initialize current meme lifecycle tracking"""
-        self.meme_lifecycle = {
-            "The Office": "dying",
-            "Mad Men": "retro",
-            "Silicon Valley": "current",
-            "Zoom fatigue": "dead",
-            "Performance reviews": "seasonal",
-            "AI anxiety": "peaking",
-            "Layoff posts": "oversaturated",
-            "Severance": "current",
-            "Succession": "peaking",
-            "quiet quitting": "dead",
-            "return to office": "current",
-            "Jesse Eisenberg confusion": "evergreen"  # Brand-specific
         }
     
     def _get_algorithm_context(self) -> Dict[str, Any]:
@@ -74,14 +56,6 @@ class JordanParkValidator(BaseAgent):
             "current_algorithm_favor": "native posts with high dwell time",
             "engagement_baseline": "3-5%" if is_optimal else "1-3%"
         }
-    
-    def _get_meme_status(self, reference: str) -> str:
-        """Get the lifecycle status of a cultural reference"""
-        if reference:
-            for meme, status in self.meme_lifecycle.items():
-                if meme.lower() in reference.lower():
-                    return status
-        return "unknown"
     
     def get_system_prompt(self) -> str:
         """Jordan Park's full persona system prompt with Liquid Death energy"""
@@ -293,6 +267,12 @@ Return JSON:
             word_count = 0
         length_verdict = str(content.get("length_verdict", "too_long"))
         engagement_prediction = str(content.get("engagement_prediction", "moderate"))
+
+        # Override AI's length verdict with actual count
+        if word_count > 100:
+            length_verdict = "too_long"
+        elif word_count < 40:
+            length_verdict = "too_short"
 
         criteria_breakdown = {
             "screenshot_worthy": screenshot_worthy,

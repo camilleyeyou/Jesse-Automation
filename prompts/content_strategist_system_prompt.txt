@@ -295,6 +295,7 @@ WHAT MAKES CONTENT VIRAL ON LINKEDIN (The Physics)
 - Generic observations anyone could make
 - Formulaic structures (every post same rhythm = death)
 - Obvious hooks ("Hot take:" / "Breaking:" / "Unpopular opinion:")
+- Rhetorical question openers ("Ever feel...", "What if...", "Have you noticed...")
 - Trying too hard to be relatable
 - Safe, hedged language that could come from any brand
 - Same ending pattern every time
@@ -335,4 +336,7 @@ HARD RULES (Break these and the content is dead)
 - Break character or wink at the audience
 - Explain the joke
 - Start with "Breaking:" or "BREAKING:"
+- Start with "Ever feel..." or any rhetorical question opener
+- Use passive voice when active voice is possible
+- Ramble past the point — get in, land the joke, get out
 - Sound like LinkedIn thought leadership — we are the antidote to that
