@@ -19,6 +19,13 @@ from ..agents.revision_generator import RevisionGeneratorAgent
 from ..agents.validators import SarahChenValidator, MarcusWilliamsValidator, JordanParkValidator
 
 try:
+    from ..agents.position_extractor import PositionExtractor
+    POSITION_EXTRACTOR_AVAILABLE = True
+except ImportError:
+    POSITION_EXTRACTOR_AVAILABLE = False
+    PositionExtractor = None
+
+try:
     from ..agents.news_curator import NewsCuratorAgent
     NEWS_CURATOR_AVAILABLE = True
 except ImportError:
@@ -169,6 +176,15 @@ class ContentOrchestrator:
             except Exception as e:
                 logger.warning(f"Memory system unavailable: {e}")
 
+        # Initialize position extractor for tracking what Jesse says
+        self.position_extractor = None
+        if POSITION_EXTRACTOR_AVAILABLE:
+            try:
+                self.position_extractor = PositionExtractor(ai_client, config)
+                logger.info("✅ Position extractor initialized - will track Jesse's stances")
+            except Exception as e:
+                logger.warning(f"Position extractor unavailable: {e}")
+
         if self.image_generator:
             logger.info("✅ ContentOrchestrator initialized WITH image generator")
         else:
@@ -244,6 +260,7 @@ class ContentOrchestrator:
         trend=None,
         use_video: bool = False,
         angle_seed: str = None,
+        preferred_format: str = None,
     ) -> tuple:
         """
         Process a single post and store results in memory.
@@ -257,6 +274,7 @@ class ContentOrchestrator:
             trend=trend,
             use_video=use_video,
             angle_seed=angle_seed,
+            preferred_format=preferred_format,
         )
 
         was_approved = post is not None
@@ -315,6 +333,14 @@ class ContentOrchestrator:
                 )
                 logger.debug(f"📝 Stored post {post_id} in memory (approved={was_approved})")
 
+                # Extract and store position for approved posts
+                if was_approved and post and content:
+                    await self._extract_and_store_position(
+                        post_id=post_id,
+                        content=content,
+                        trend=trend,
+                    )
+
             except Exception as e:
                 logger.warning(f"Failed to store post in memory: {e}")
 
@@ -327,6 +353,7 @@ class ContentOrchestrator:
         trend=None,
         use_video: bool = False,
         angle_seed: str = None,
+        preferred_format: str = None,
     ) -> Optional[LinkedInPost]:
         """Process a single post with its assigned trend."""
         
@@ -391,7 +418,13 @@ class ContentOrchestrator:
             # Add angle seed from editorial calendar if available
             angle_instruction = ""
             if angle_seed:
-                angle_instruction = f"\n\nEDITORIAL GUIDANCE (from weekly strategy): {angle_seed}\nUse this angle as a starting point but make it your own."
+                angle_instruction = f"""
+
+═══════════════════════════════════════════════════════════════════════════════
+EDITORIAL DIRECTION (from weekly strategy — follow this):
+{angle_seed}
+═══════════════════════════════════════════════════════════════════════════════
+Your post MUST align with this editorial direction. The trend above is the raw material — the angle seed tells you HOW to approach it. Don't ignore this guidance."""
 
             trend_context = f"""
 TODAY'S TRENDING NEWS ({trend.category.upper()}) — React to this:
@@ -400,12 +433,35 @@ TODAY'S TRENDING NEWS ({trend.category.upper()}) — React to this:
 
 IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, details, or cultural moment. Don't create generic content.{angle_instruction}
 """
-        
+
+            # Inject position context so Jesse builds on prior stances
+            if self.memory and theme:
+                try:
+                    position_context = self.memory.get_position_context_for_generation(
+                        theme=theme, days=30
+                    )
+                    if position_context:
+                        trend_context += f"\n\n{position_context}\n"
+                        logger.debug(f"Injected position context for theme={theme}")
+                except Exception as e:
+                    logger.debug(f"Position context lookup failed (non-blocking): {e}")
+
+        # Map preferred_format string from calendar to PostFormat enum
+        requested_format = None
+        if preferred_format:
+            try:
+                from ..agents.content_strategist import PostFormat
+                requested_format = PostFormat(preferred_format)
+                logger.info(f"📋 Editorial calendar requests format: {preferred_format}")
+            except (ValueError, ImportError):
+                logger.warning(f"⚠️ Unknown calendar format '{preferred_format}', ignoring")
+
         # Generate content
         post = await self.content_generator.execute(
             post_number=post_number,
             batch_id=batch_id,
             trending_context=trend_context,
+            requested_format=requested_format,
         )
         
         # Generate media
@@ -451,6 +507,43 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
         
         return None
     
+    async def _extract_and_store_position(
+        self,
+        post_id: str,
+        content: str,
+        trend=None,
+    ):
+        """Extract Jesse's position from an approved post and store it in memory."""
+        if not self.position_extractor or not self.memory:
+            return
+
+        try:
+            theme = getattr(trend, 'theme', None) or '' if trend else ''
+            sub_theme = getattr(trend, 'sub_theme', None) or '' if trend else ''
+            topic = trend.headline if trend else None
+
+            position = await self.position_extractor.execute(
+                post_content=content,
+                theme=theme,
+                topic=topic,
+            )
+
+            if position:
+                self.memory.store_position(
+                    post_id=post_id,
+                    theme=theme,
+                    sub_theme=sub_theme,
+                    topic=topic,
+                    position_summary=position.get("position_summary"),
+                    sentiment=position.get("sentiment"),
+                    key_claim=position.get("key_claim"),
+                )
+                logger.info(f"📌 Position stored for {post_id}: {position.get('sentiment')}")
+            else:
+                logger.debug(f"No position extracted for {post_id}")
+        except Exception as e:
+            logger.warning(f"Position extraction/storage failed (non-blocking): {e}")
+
     async def _validate_post(self, post: LinkedInPost) -> List[ValidationScore]:
         """Run all validators."""
         tasks = [v.execute(post) for v in self.validators]
@@ -502,6 +595,7 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
             calendar_entry = None
             preferred_theme = None
             angle_seed = None
+            preferred_format = None
             if self.memory:
                 try:
                     today_str = datetime.utcnow().strftime("%Y-%m-%d")
@@ -509,7 +603,8 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
                     if calendar_entry and calendar_entry.get("status") == "planned":
                         preferred_theme = calendar_entry.get("theme")
                         angle_seed = calendar_entry.get("angle_seed")
-                        logger.info(f"📅 Calendar entry found: theme={preferred_theme}, angle={angle_seed}")
+                        preferred_format = calendar_entry.get("format")
+                        logger.info(f"📅 Calendar entry found: theme={preferred_theme}, format={preferred_format}, angle={angle_seed}")
                         self.memory.update_calendar_status(calendar_entry["id"], "generating")
                     elif calendar_entry:
                         logger.info(f"📅 Calendar entry exists but status={calendar_entry.get('status')} — skipping")
@@ -548,6 +643,7 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
                 trend=trend,
                 use_video=use_video,
                 angle_seed=angle_seed,
+                preferred_format=preferred_format,
             )
 
             if not was_approved or not post:
@@ -562,7 +658,9 @@ IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, d
 
             logger.info(f"✅ Content generated: {post.content[:50]}...")
 
-            # Step 4: Post to LinkedIn
+            # Note: Position extraction already handled by _process_single_post_with_memory
+
+            # Step 5: Post to LinkedIn
             logger.info(f"📤 Posting to LinkedIn... (media_type: {post.media_type})")
             linkedin_result = await asyncio.to_thread(
                 linkedin_poster.publish_post,

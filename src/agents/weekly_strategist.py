@@ -528,6 +528,12 @@ Use these as guidance — favour high-weight themes but don't ignore the rest.
 A/B FORMAT TESTING: If underexplored formats are flagged, schedule at least one this week
 to gather data. Vary formats across the week (don't repeat the same format two days in a row).
 
+ACCOUNTABILITY FEEDBACK: If weekly_review insights exist in strategy insights, pay special
+attention to adherence issues and adjust your plan to be more realistic. Look for:
+- Low adherence scores → simplify the plan, use broader angle seeds
+- Recurring missed days → avoid scheduling ambitious content on those days
+- planning_alert insights → the previous week's plan was too ambitious or misaligned
+
 DO NOT skip the data-gathering steps. Read the data first, then decide."""
 
     def _build_user_prompt(self, week_dates: list) -> str:

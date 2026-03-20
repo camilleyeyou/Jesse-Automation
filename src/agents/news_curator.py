@@ -143,17 +143,28 @@ Return JSON with:
             TrendingNews object with jesse_angle populated, or None if no trends available.
         """
         # Step 1: Get candidate trends from TrendService
-        # If TrendService supports theme filtering, use it
+        candidates = []
+        theme_filtered = False
+
         if hasattr(self.trend_service, 'get_candidate_trends') and preferred_theme:
             try:
-                # Try to pass preferred_theme if MultiTierTrendService
+                # Try to get theme-filtered candidates first
                 candidates = await self.trend_service.get_candidate_trends(
                     count=8,
                     preferred_theme=preferred_theme
                 )
+                if candidates and len(candidates) >= 2:
+                    theme_filtered = True
+                    self.logger.info(f"Got {len(candidates)} theme-filtered candidates for '{preferred_theme}'")
             except TypeError:
-                # Fall back to regular call if TrendService doesn't support preferred_theme
+                candidates = []
+
+            # If theme filtering failed or returned too few, get general candidates
+            if not candidates or len(candidates) < 2:
+                self.logger.info(f"Theme filter for '{preferred_theme}' returned {len(candidates)} results, fetching general candidates")
                 candidates = await self.trend_service.get_candidate_trends(count=8)
+        elif hasattr(self.trend_service, 'get_candidate_trends'):
+            candidates = await self.trend_service.get_candidate_trends(count=8)
         else:
             candidates = await self.trend_service.get_candidate_trends(count=8)
 
@@ -170,14 +181,30 @@ Return JSON with:
 
         self.logger.info(f"Evaluating {len(candidates)} candidate trends...")
 
-        # Step 2: Build evaluation prompt
-        prompt = self._build_evaluation_prompt(candidates)
+        # Step 2: Build evaluation prompt (with theme priority if calendar specified one)
+        prompt = self._build_evaluation_prompt(
+            candidates,
+            preferred_theme=preferred_theme if (preferred_theme and not theme_filtered) else None
+        )
+
+        # Augment system prompt with preferred theme when unfiltered candidates need guidance
+        active_system_prompt = self.system_prompt
+        if preferred_theme and not theme_filtered:
+            active_system_prompt += f"""
+
+═══════════════════════════════════════════════════════════════════════════════
+EDITORIAL CALENDAR DIRECTIVE
+═══════════════════════════════════════════════════════════════════════════════
+
+Today's editorial calendar specifies the theme: **{preferred_theme.replace('_', ' ').title()}**
+Strongly prefer trends that match this theme. Only choose a different theme if
+NO viable {preferred_theme.replace('_', ' ')} trends exist among the candidates."""
 
         try:
             # Step 3: AI evaluation
             result = await self.generate(
                 prompt=prompt,
-                system_prompt=self.system_prompt,
+                system_prompt=active_system_prompt,
                 response_format="json"
             )
 
@@ -226,7 +253,7 @@ Return JSON with:
             self.logger.error(f"AI curation failed: {e}, falling back to viral scoring")
             return self._fallback_selection(candidates, post_id)
 
-    def _build_evaluation_prompt(self, candidates: list) -> str:
+    def _build_evaluation_prompt(self, candidates: list, preferred_theme: str = None) -> str:
         """Build the prompt that asks AI to evaluate and rank candidates."""
         trend_list = []
         for i, trend in enumerate(candidates):
@@ -247,8 +274,21 @@ Return JSON with:
 
         trends_text = "\n\n".join(trend_list)
 
-        return f"""Here are {len(candidates)} trending topics right now. Pick the ONE that would make the best LinkedIn post for Jesse A. Eisenbalm's audience of working professionals.
+        # Add theme priority instruction if editorial calendar specified a theme
+        theme_priority = ""
+        if preferred_theme:
+            theme_display = preferred_theme.replace('_', ' ').title()
+            theme_priority = f"""
+═══════════════════════════════════════════════════════════════════════════════
+PRIORITY: The editorial calendar specifies {theme_display} for today. Strongly
+prefer trends matching this theme. Only choose a different theme if NO viable
+{preferred_theme.replace('_', ' ')} trends exist.
+═══════════════════════════════════════════════════════════════════════════════
 
+"""
+
+        return f"""Here are {len(candidates)} trending topics right now. Pick the ONE that would make the best LinkedIn post for Jesse A. Eisenbalm's audience of working professionals.
+{theme_priority}
 ═══════════════════════════════════════════════════════════════════════════════
 CANDIDATE TRENDS
 ═══════════════════════════════════════════════════════════════════════════════

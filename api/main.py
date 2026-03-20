@@ -45,6 +45,7 @@ from src.services.performance_ingestion import PerformanceIngestionService
 from src.agents.weekly_strategist import WeeklyStrategistAgent
 from src.agents.strategy_refinement import StrategyRefinementAgent
 from src.agents.portfolio_qc import PortfolioQCAgent
+from src.agents.weekly_review import WeeklyReviewAgent
 from src.models.comment import (
     CommentGenerationRequest,
     CommentApprovalRequest,
@@ -75,6 +76,7 @@ performance_ingestion: PerformanceIngestionService = None
 weekly_strategist: WeeklyStrategistAgent = None
 strategy_refinement: StrategyRefinementAgent = None
 portfolio_qc: PortfolioQCAgent = None
+weekly_review: WeeklyReviewAgent = None
 
 
 # ============== Pydantic Models ==============
@@ -104,7 +106,7 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     global config, ai_client, orchestrator, queue_manager, scheduler, linkedin_poster, image_generator
     global comment_generator, comment_queue_manager, linkedin_comment_service
-    global performance_ingestion, weekly_strategist, strategy_refinement, portfolio_qc
+    global performance_ingestion, weekly_strategist, strategy_refinement, portfolio_qc, weekly_review
     
     logger.info("Starting Jesse A. Eisenbalm Automation API...")
     
@@ -227,6 +229,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ PortfolioQCAgent init failed: {e}")
 
+    # Initialize Weekly Review Agent (Phase 3.3 — Accountability Loop)
+    try:
+        weekly_review = WeeklyReviewAgent(
+            ai_client=ai_client, config=config, db_path="data/automation/queue.db"
+        )
+        logger.info("✅ WeeklyReviewAgent initialized — accountability loop ready")
+    except Exception as e:
+        logger.warning(f"⚠️ WeeklyReviewAgent init failed: {e}")
+
     # Auto-start scheduler if configured
     if os.getenv("AUTO_START_SCHEDULER", "false").lower() == "true":
         scheduler.start()
@@ -292,7 +303,20 @@ async def lifespan(app: FastAPI):
                 job_name="Friday Portfolio QC",
             )
             logger.info("🔍 Scheduled portfolio QC: Friday 6:00 PM")
-    
+
+        # Schedule weekly review (Friday 6:30 PM, after Portfolio QC)
+        if weekly_review:
+            scheduler.schedule_weekly_job(
+                job_func=friday_review_job,
+                day_of_week="fri",
+                hour=18,
+                minute=30,
+                timezone=timezone,
+                job_id="friday_weekly_review",
+                job_name="Friday Weekly Review",
+            )
+            logger.info("📋 Scheduled weekly review: Friday 6:30 PM")
+
     logger.info("API startup complete")
     
     yield
@@ -502,6 +526,28 @@ async def friday_qc_job():
         logger.info(f"🔍 QC result: {result}")
     except Exception as e:
         logger.error(f"❌ Friday QC job exception: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+async def friday_review_job():
+    """
+    Weekly job: compare editorial plan vs actual posts and score adherence.
+    Runs Friday 6:30 PM (after Portfolio QC at 6:00 PM).
+    """
+    logger.info("=" * 60)
+    logger.info("📋 FRIDAY WEEKLY REVIEW JOB TRIGGERED")
+    logger.info("=" * 60)
+
+    if not weekly_review:
+        logger.warning("Weekly review agent not initialized — skipping")
+        return
+
+    try:
+        result = await weekly_review.execute()
+        logger.info(f"📋 Review result: {result}")
+    except Exception as e:
+        logger.error(f"❌ Friday review job exception: {e}")
         import traceback
         traceback.print_exc()
 
@@ -913,6 +959,20 @@ async def trigger_portfolio_qc(background_tasks: BackgroundTasks):
 
     background_tasks.add_task(_run)
     return {"status": "started", "message": "Portfolio QC running in background"}
+
+
+@app.post("/api/automation/run-weekly-review")
+async def trigger_weekly_review(background_tasks: BackgroundTasks):
+    """Manually trigger the weekly review agent (plan vs reality accountability)."""
+    if not weekly_review:
+        raise HTTPException(503, "Weekly review agent not initialized")
+
+    async def _run():
+        result = await weekly_review.execute()
+        logger.info(f"Manual weekly review result: {result}")
+
+    background_tasks.add_task(_run)
+    return {"status": "started", "message": "Weekly review running in background"}
 
 
 @app.post("/api/automation/run-strategist")

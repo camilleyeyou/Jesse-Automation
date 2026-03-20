@@ -20,6 +20,12 @@ Provides three types of memory for AI agents:
    - Current batch context
    - What's been generated this session
    - Prevents within-session repetition
+
+4. POSITION MEMORY
+   - What Jesse SAID about each topic
+   - Sentiment and key claims tracked
+   - Enables building on prior positions
+   - Prevents accidental self-contradiction
 """
 
 import json
@@ -222,6 +228,21 @@ class AgentMemory:
                 )
             """)
 
+            # Position memory — what Jesse SAID about topics
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS position_memory (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    post_id TEXT,
+                    theme TEXT,
+                    sub_theme TEXT,
+                    topic TEXT,
+                    position_summary TEXT,
+                    sentiment TEXT,
+                    key_claim TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # Add missing columns to content_memory (safe ALTER TABLE)
             engagement_columns = [
                 ("theme", "TEXT"),
@@ -248,6 +269,8 @@ class AgentMemory:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_editorial_scheduled ON editorial_calendar(scheduled_for)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_editorial_status ON editorial_calendar(status)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_strategy_type ON strategy_insights(insight_type)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_position_theme ON position_memory(theme)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_position_created ON position_memory(created_at)")
 
             conn.commit()
 
@@ -1172,6 +1195,139 @@ class AgentMemory:
         perf = self.get_format_performance(days=days)
         return [f for f in known_formats if perf.get(f, {}).get("count", 0) < min_count]
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # POSITION MEMORY — What Jesse SAID about topics
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def store_position(
+        self,
+        post_id: str,
+        theme: str,
+        sub_theme: str = None,
+        topic: str = None,
+        position_summary: str = None,
+        sentiment: str = None,
+        key_claim: str = None,
+    ):
+        """Store a position Jesse took on a topic."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO position_memory
+                (post_id, theme, sub_theme, topic, position_summary, sentiment, key_claim)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (post_id, theme, sub_theme, topic, position_summary, sentiment, key_claim))
+            conn.commit()
+        logger.debug(f"Stored position for post {post_id}: {sentiment} on {theme}/{topic}")
+
+    def get_positions_on_topic(self, topic: str, days: int = 60) -> List[Dict]:
+        """Return past positions on a topic."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM position_memory
+                WHERE topic = ?
+                AND created_at >= datetime('now', ?)
+                ORDER BY created_at DESC
+            """, (topic, f'-{days} days'))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_positions_by_theme(self, theme: str, days: int = 30, limit: int = 10) -> List[Dict]:
+        """Return recent positions for a theme."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM position_memory
+                WHERE theme = ?
+                AND created_at >= datetime('now', ?)
+                ORDER BY created_at DESC
+                LIMIT ?
+            """, (theme, f'-{days} days', limit))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_position_context_for_generation(self, theme: str = None, days: int = 30) -> str:
+        """
+        Return a formatted string for prompts showing what Jesse has said recently.
+        If theme is provided, filters to that theme; otherwise returns all recent positions.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            if theme:
+                cursor.execute("""
+                    SELECT theme, sub_theme, topic, position_summary, sentiment, key_claim, created_at
+                    FROM position_memory
+                    WHERE theme = ?
+                    AND created_at >= datetime('now', ?)
+                    ORDER BY created_at DESC
+                    LIMIT 10
+                """, (theme, f'-{days} days'))
+            else:
+                cursor.execute("""
+                    SELECT theme, sub_theme, topic, position_summary, sentiment, key_claim, created_at
+                    FROM position_memory
+                    WHERE created_at >= datetime('now', ?)
+                    ORDER BY created_at DESC
+                    LIMIT 15
+                """, (f'-{days} days',))
+
+            rows = [dict(row) for row in cursor.fetchall()]
+
+        if not rows:
+            return ""
+
+        lines = []
+        theme_label = theme.replace('_', ' ').title() if theme else "ALL THEMES"
+        lines.append(f"JESSE'S PRIOR POSITIONS ON {theme_label}:")
+
+        for row in rows:
+            created = row.get("created_at", "")
+            # Calculate rough age
+            age_str = self._format_age(created)
+            sentiment = row.get("sentiment", "")
+            summary = row.get("position_summary", "")
+            claim = row.get("key_claim", "")
+            topic_label = row.get("topic") or row.get("sub_theme") or ""
+
+            if summary:
+                entry = f"- {age_str}: \"{summary}\""
+                if topic_label:
+                    entry += f" [topic: {topic_label}]"
+                if sentiment:
+                    entry += f" ({sentiment})"
+                lines.append(entry)
+
+        lines.append("BUILD ON these positions. Don't contradict without acknowledging the shift.")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _format_age(created_at_str: str) -> str:
+        """Convert a timestamp string to a human-friendly age like '2 weeks ago'."""
+        try:
+            created = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+            now = datetime.utcnow()
+            delta = now - created.replace(tzinfo=None)
+            days = delta.days
+            if days == 0:
+                return "today"
+            elif days == 1:
+                return "yesterday"
+            elif days < 7:
+                return f"{days} days ago"
+            elif days < 14:
+                return "1 week ago"
+            elif days < 30:
+                weeks = days // 7
+                return f"{weeks} weeks ago"
+            else:
+                months = days // 30
+                return f"{months} month{'s' if months > 1 else ''} ago"
+        except Exception:
+            return "recently"
+
     def get_stats(self) -> Dict[str, Any]:
         """Get memory statistics"""
 
@@ -1190,12 +1346,16 @@ class AgentMemory:
             cursor.execute("SELECT COUNT(*) FROM learning_insights")
             total_insights = cursor.fetchone()[0]
 
+            cursor.execute("SELECT COUNT(*) FROM position_memory")
+            total_positions = cursor.fetchone()[0]
+
         return {
             "total_posts_remembered": total_posts,
             "approved_posts": approved_posts,
             "approval_rate": approved_posts / total_posts if total_posts > 0 else 0,
             "total_validator_feedback": total_feedback,
             "total_insights": total_insights,
+            "total_positions": total_positions,
             "session_active": self._session is not None,
             "session_posts": self._session.posts_generated if self._session else 0
         }
