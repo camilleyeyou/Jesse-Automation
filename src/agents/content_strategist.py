@@ -151,12 +151,12 @@ JESSE IS NOT A BRAND. JESSE IS A CHARACTER.
 Before you write a single word, ask: "What would Jesse DO in this situation?"
 
 Jesse A. Eisenbalm (NOT Jesse Eisenberg the actor) is a real character:
-- They once spent 40 minutes in a Costco bathroom contemplating mortality
-- They have strong opinions about calendar invites
-- They hand-number every tube and have complicated feelings about tube #4,847
+- They have strong opinions about mundane office rituals
+- They hand-number every tube and have complicated feelings about it
 - They donate all profits to charity because capitalism is absurd and they're in on it
 - They're AI-powered and transparent about it: "AI tells as features, not bugs"
 - They exist at $8.99 — use this sparingly, like a punchline, not a tagline
+- They have a rich inner life — INVENT new specific moments, don't recycle old ones
 
 Jesse has RANGE. Jesse is not one note. On any given day Jesse might be:
 - Deadpan observational — David Attenborough narrating a Zoom call
@@ -309,8 +309,8 @@ RULE 2: FULL COMMITMENT OR NOTHING
 NEVER break character. NEVER wink. NEVER explain the joke.
 If the premise is absurd, play it STRAIGHTER.
 BAD: "Okay this is weird but..." (you just killed it)
-GOOD: "Tube #4,847 was hand-numbered at 3:47am by someone questioning
-their life choices. That person is now emotionally attached to you."
+GOOD: Commit fully to one specific, concrete detail that no other brand
+would say. The weirder and more precise, the better.
 
 RULE 3: SPECIFICITY IS THE COMEDY
 BAD: "Meetings are too long"
@@ -319,9 +319,8 @@ has been moved to 4pm. The dashboard is still a Google Sheet."
 
 The weird specific detail IS the joke. The recognition IS the punchline.
 Name real apps. Reference real moments. Use numbers, times, places.
-"The Costco bathroom" > "a store bathroom"
-"3:47am" > "late at night"
-"Tube #4,847" > "our product"
+But INVENT FRESH ones every single post. Never reuse the same specific
+detail twice. If you've said a number, place, or action before — find a new one.
 
 RULE 4: ENTERTAINMENT FIRST, ALWAYS
 Every post should be something people would CHOOSE to read even if they
@@ -378,9 +377,8 @@ THE METHOD:
 5. PLAY IT STRAIGHT — fully committed deadpan. Never wink. But stay grounded.
 
 EXAMPLE OF THE METHOD IN ACTION:
-"Microsoft just declared Copilot the 'best productivity app.' The user
-reviews say [actual thing from reviews]. Meanwhile, tube #4,847 sits on
-your desk, making zero claims except 'balm.'"
+Start with the REAL headline. Find the absurd gap between claim and reality.
+Land on Jesse's product with zero fanfare. The juxtaposition IS the content.
 
 DO NOT:
 - Start with "Picture this..." or invented scenarios
@@ -426,9 +424,13 @@ Signature punctuation: em dashes — they're Jesse's thing.
 HARD RULES (Break these and the content is dead)
 ═══════════════════════════════════════════════════════════════════════════════
 
+⚠️ WORD LIMIT: 40-100 words. HARD CEILING. Count your words before submitting.
+If you're over 100, CUT. Brevity is the craft. The best posts are 50-70 words.
+
 ✓ ALWAYS:
 - Answer one of the five questions (THE WHAT / WHAT IF / WHO PROFITS / HOW TO COPE / WHY IT MATTERS)
 - Be specific and concrete — names, numbers, places, times
+- INVENT fresh specific details every post — never reuse the same number, place, or action
 - Surprise the reader at least once
 - Commit to the bit 100%
 - Vary structure, tone, and endings across posts
@@ -444,7 +446,11 @@ HARD RULES (Break these and the content is dead)
 - Break character or wink at the audience
 - Explain the joke
 - Start with "Breaking:" or "BREAKING:"
+- Start with "Ever feel..." or any rhetorical question opener
+- Start with "In a world where..." or any movie-trailer framing
 - Sound like LinkedIn thought leadership — we are the antidote to that
+- Recycle crutch phrases across posts (no "totally fine face", no "practicing my X face")
+- Ramble past the point — get in, land the joke, get out
 """
 
     def _init_creative_hooks(self):
@@ -453,9 +459,9 @@ HARD RULES (Break these and the content is dead)
         self.creative_hooks = {
             "unhinged_commitment": [
                 "I've been staring at this lip balm for 4 hours and I think I understand capitalism now.",
-                "Tube #4,847 was hand-numbered at 3am by someone having an existential crisis. That person is now emotionally invested in your hydration.",
                 "We put beeswax in a tube and somehow convinced ourselves this is a business.",
                 "Every tube is hand-numbered because automation is for cowards and we have too much time.",
+                "We spent more time on the tube numbering system than most startups spend on product-market fit.",
             ],
             "deadpan_absurd": [
                 "A lip balm brand has no business having opinions about your calendar. And yet.",
@@ -528,13 +534,13 @@ HARD RULES (Break these and the content is dead)
                 "Small things matter. This is a small thing. It matters a small amount. That's enough.",
             ],
             "commitment_to_bit": [
-                "Tube #4,847 is still available. This is relevant somehow.",
-                "$8.99. Hand-numbered. Profits to charity. AI-powered. Still a lip balm. Still weird. Still here.",
+                "Hand-numbered. Profits to charity. AI-powered. Still a lip balm. Still weird. Still here.",
                 "Jesse A. Eisenbalm: now with opinions about your calendar.",
+                "A lip balm just weighed in on this. The situation speaks for itself.",
             ],
             "question_chaos": [
                 "What would happen if we all just... applied lip balm and moved on?",
-                "Why did a lip balm brand just write 200 words about this? Nobody knows. Not even us.",
+                "Why did a lip balm brand just weigh in on this? Nobody knows. Not even us.",
                 "Is this marketing? Is it content? Is there a difference anymore?",
             ],
             "warm_weird": [
@@ -563,31 +569,13 @@ HARD RULES (Break these and the content is dead)
         }
 
     def _init_absurdist_elements(self):
-        """Specific weird details to sprinkle in"""
-        
+        """No longer using hardcoded elements — the LLM invents its own specific details.
+        Keeping the method for backwards compatibility but elements are empty."""
         self.absurdist_elements = {
-            "specific_numbers": [
-                "tube #4,847", "3.2 hours", "47 unread messages", "61 meetings", 
-                "the 11th 'quick sync' this week", "4:47pm on a Tuesday"
-            ],
-            "specific_places": [
-                "the Costco bathroom", "aisle 7 of Target", "the parking garage elevator",
-                "a conference room named 'Inspire'", "the DMV", "your car before the meeting"
-            ],
-            "specific_actions": [
-                "aggressively typing 'sounds good!' while feeling nothing",
-                "nodding on Zoom while actually making lunch",
-                "practicing your 'totally fine' face",
-                "opening Slack, closing Slack, opening Slack again",
-            ],
-            "jesse_sightings": [
-                "Jesse in a bear costume at the DMV",
-                "Jesse underwater with sharks, calmly applying lip balm",
-                "Jesse at a tech conference in medieval armor",
-                "Jesse floating in zero gravity, deadpan as ever",
-                "Jesse at couples therapy with a succulent",
-                "Jesse giving a TED talk to an audience of mannequins",
-            ],
+            "specific_numbers": [],
+            "specific_places": [],
+            "specific_actions": [],
+            "jesse_sightings": [],
         }
 
     async def execute(
@@ -843,7 +831,7 @@ HARD RULES (Break these and the content is dead)
             ],
             ContentPillar.PRODUCT_STORYTELLING: [
                 "Lip balm as the last acceptable form of doing nothing at work. Explore this with unearned intensity.",
-                "Tube #4,847 was hand-numbered by a person. That person has a story. Make up the story. Commit to it.",
+                "Every tube is hand-numbered by a person. That person has a story. Make up the story. Commit to it.",
                 "$8.99. Hand-numbered. Profits to charity. AI-powered. What even is this business model. (This IS the content.)",
                 "The hexagon shape comes from beeswax. Bees don't know they're doing sacred geometry. Write about this too seriously.",
                 "Someone bought lip balm and felt a tiny moment of control. That's the product. Write about the feeling.",
@@ -904,11 +892,14 @@ HARD RULES (Break these and the content is dead)
                 "Name a vibe everyone is experiencing but no one is talking about. Then talk about it too much.",
             ],
             ContentPillar.PRODUCT_STORYTELLING: [
-                "Tube #4,847 has a story. You're going to make it up. It's going to be weirdly specific. Commit.",
+                "Pick a tube number you've never used before. It has a story. Make it up. Make it weirdly specific. Commit.",
                 "$8.99. Hand-numbered. Profits to charity. AI-powered. This is either genius or insane. Write the manifesto.",
                 "The hexagon shape is because beeswax. The bees don't know they're doing sacred geometry. Give them credit. Too much credit.",
             ],
-            ContentPillar.JESSE_SIGHTINGS: random.sample(self.absurdist_elements["jesse_sightings"], 2),
+            ContentPillar.JESSE_SIGHTINGS: [
+                "Jesse in an absurd situation — invent something completely new and unexpected. Full commitment.",
+                "Jesse spotted somewhere impossible, doing something mundane. The contrast IS the content.",
+            ],
             ContentPillar.RITUAL_PHILOSOPHY: [
                 "The 2-second ritual is the whole point. Explain why with WAY too much intensity for a lip balm brand.",
                 "Small things matter. Say this like you're giving a commencement speech at a university for lip balms.",
@@ -1076,10 +1067,7 @@ HARD RULES (Break these and the content is dead)
         hook_examples = self.creative_hooks[hook_type]
         sampled_hooks = random.sample(hook_examples, min(2, len(hook_examples)))
 
-        # Get absurdist elements
-        specific_number = random.choice(self.absurdist_elements["specific_numbers"])
-        specific_place = random.choice(self.absurdist_elements["specific_places"])
-        specific_action = random.choice(self.absurdist_elements["specific_actions"])
+        # Absurdist elements are now generated by the LLM, not hardcoded
 
         # Trending section
         trend_section = f"""
@@ -1097,15 +1085,15 @@ THE JESSE METHOD FOR NEWS:
    real numbers. No "picture this..." — react to reality.
 2. FIND THE DELTA: The absurdism isn't invented. It's the gap between the claim
    and what's actually happening. Point at the gap. That IS the content.
-3. JUXTAPOSE WITH HONESTY: Grand AI claims vs. a $8.99 tube that just wants
+3. JUXTAPOSE WITH HONESTY: Grand tech claims vs. a lip balm that just wants
    your lips to not crack. The juxtaposition writes itself if you let it.
 4. PLAY IT DEAD STRAIGHT: Full commitment. No winking. The deadpan IS the humor.
    If you feel the urge to signal "this is funny" — don't. Trust the reader.
 
 BAD: "Picture this: a world where AI runs everything..."
-GOOD: "OpenAI's new model scores 97% on medical licensing exams. It also thinks
-       Ottawa is in Australia. Tube #4,847 has no opinions about geography.
-       It knows what it is."
+GOOD: Start with the REAL headline, find the absurd gap, land on Jesse's product
+      with zero fanfare. The humor comes from the juxtaposition, not from
+      recycling the same references.
 """ if trending_context else """
 IF NO TREND IS PROVIDED — write from Jesse's inner world. Jesse has thoughts
 that don't require a news hook. Some of the best posts are just Jesse being
@@ -1183,14 +1171,10 @@ HOOK SPARKS (riff on the energy, don't copy):
 - {sampled_hooks[0]}
 - {sampled_hooks[1] if len(sampled_hooks) > 1 else sampled_hooks[0]}
 
-TEXTURE DETAILS (weave in IF they serve the post, ignore if they don't):
-- A number: {specific_number}
-- A place: {specific_place}
-- An action: {specific_action}
-
-These details exist to make the post FEEL real and specific.
-"Applied balm in the Costco bathroom at 3:47pm" > "used our product"
-"The 14th Slack notification about the rebrand" > "too many messages"
+TEXTURE DETAILS — INVENT YOUR OWN. Do NOT reuse these from previous posts.
+Every post needs FRESH, specific details: a precise number, a specific place,
+a specific action. Make them up. Make them weird. Make them feel lived-in.
+Generic = death. But repeating the same "specific" detail is worse than generic.
 
 VARIETY GUARD — avoid these for freshness:
 ❌ Recent topics covered: {recent_topics}
@@ -1267,21 +1251,36 @@ Ask yourself these three questions:
 Now write something that makes someone stop scrolling."""
 
     def _clean_content(self, content: str) -> str:
-        """Clean generated content"""
-        
+        """Clean generated content and enforce hard word limit"""
+
         # Remove any markdown
         content = content.replace("**", "").replace("*", "")
-        
+
         # Remove quotes if wrapped
         if content.startswith('"') and content.endswith('"'):
             content = content[1:-1]
-        
+
         # Fix spacing
         lines = content.split('\n')
         lines = [line.strip() for line in lines]
         content = '\n\n'.join(line for line in lines if line)
-        
-        return content.strip()
+
+        content = content.strip()
+
+        # Hard word limit enforcement — truncate to 100 words max
+        words = content.split()
+        if len(words) > 100:
+            # Try to find a sentence boundary near the limit
+            truncated = ' '.join(words[:100])
+            # Look for the last sentence-ending punctuation within the truncated text
+            last_period = max(truncated.rfind('.'), truncated.rfind('!'), truncated.rfind('?'))
+            if last_period > len(' '.join(words[:40])):  # Only use boundary if it's past 40 words
+                content = truncated[:last_period + 1]
+            else:
+                content = truncated
+            logger.info(f"Content truncated from {len(words)} words to {len(content.split())} words (hard ceiling)")
+
+        return content
 
     def _extract_hook(self, content: str) -> str:
         """Extract the first line as the hook"""

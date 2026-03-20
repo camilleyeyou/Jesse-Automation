@@ -93,7 +93,7 @@ class ContentOrchestrator:
     
     # CTA comments in Jesse's voice — one is chosen randomly per post
     CTA_COMMENTS = [
-        "Tube #4,847 is waiting. jesseaeisenbalm.com",
+        "Hand-numbered. Waiting. jesseaeisenbalm.com",
         "The balm doesn't judge. jesseaeisenbalm.com",
         "$8.99 and zero opinions about your calendar. jesseaeisenbalm.com",
         "One tube. No advice. jesseaeisenbalm.com",

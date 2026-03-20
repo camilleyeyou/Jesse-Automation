@@ -142,10 +142,10 @@ REVISION PRINCIPLES:
 GOOD REVISION EXAMPLES:
 
 Original (weak): "Struggling with work-life balance? Try Jesse A. Eisenbalm! 🌟"
-Revised (strong): "Your calendar says 'collaborative.' Your body says 'floating.' Stop. Breathe. Apply."
+Revised (strong): "Your calendar says 'collaborative.' Your body says 'floating.' Jesse has no calendar. Jesse has beeswax."
 
 Original (performative): "We all have those days where we feel overwhelmed, right? 💪"
-Revised (authentic): "That moment when your AI tool writes better notes than you did all quarter. Stop. Breathe. Apply."
+Revised (authentic): "Your AI tool writes better meeting notes than you did all quarter. The tube on your desk doesn't take notes. It doesn't need to."
 
 BAD REVISION EXAMPLES (NEVER DO THIS):
 ❌ "Join the Jesse A. Eisenbalm community today! 🎉"
@@ -227,13 +227,16 @@ REVISION REQUIREMENTS:
 1. ADDRESS VALIDATOR CONCERNS:
 {validator_instructions}
 
-2. MAINTAIN JESSE'S VOICE:
+2. HARD WORD LIMIT: 40-100 words. This is non-negotiable. Cut ruthlessly.
+   If the original is too long, the revision MUST be shorter, not longer.
+
+3. MAINTAIN JESSE'S VOICE:
    - Minimal, dry-smart, unhurried
    - Post-post-ironic sincerity
    - Em dashes encouraged —
    - No corporate speak
 
-3. BRAND TOOLKIT:
+4. BRAND TOOLKIT:
    - Product: {self.config.brand.product_name} ({self.config.brand.price})
    - Ritual: {self.config.brand.ritual}
    - Voice: Calm Conspirator

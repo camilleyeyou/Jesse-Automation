@@ -471,109 +471,114 @@ class TrendService:
         return candidates
 
     def _get_fallback_list(self) -> List[TrendingNews]:
-        """Return the curated fallback list with fingerprints set."""
+        """Return curated fallback topics aligned with Jesse's audience: working professionals.
+
+        These are evergreen workplace/AI/culture topics that the content strategist
+        can always find a fresh angle on. NOT celebrity gossip or sports.
+        """
         fallbacks = [
             TrendingNews(
-                headline="Taylor Swift",
-                summary="Taylor Swift continues to dominate headlines with tour and music news",
-                source="fallback", category="celebrity",
+                headline="Return-to-office mandates spark backlash",
+                summary="Major companies forcing employees back to the office full-time, workers pushing back on rigid policies",
+                source="fallback", category="workplace_culture",
             ),
             TrendingNews(
-                headline="Beyoncé",
-                summary="Beyoncé remains in the spotlight with new projects and appearances",
-                source="fallback", category="celebrity",
+                headline="AI tools replacing junior roles faster than expected",
+                summary="Companies quietly eliminating entry-level positions as AI handles tasks previously done by new hires",
+                source="fallback", category="ai_workplace",
             ),
             TrendingNews(
-                headline="Travis Kelce",
-                summary="NFL star Travis Kelce trending for football and personal life",
-                source="fallback", category="sports",
+                headline="Meeting overload reaches new heights",
+                summary="Average knowledge worker now spends over 50% of their week in meetings, productivity plummets",
+                source="fallback", category="workplace_culture",
             ),
             TrendingNews(
-                headline="Drake",
-                summary="Drake making headlines in music industry",
-                source="fallback", category="music",
+                headline="LinkedIn engagement farming hits new levels",
+                summary="Viral LinkedIn posts increasingly follow the same formulaic patterns, users grow skeptical",
+                source="fallback", category="viral_linkedin",
             ),
             TrendingNews(
-                headline="Kendrick Lamar",
-                summary="Kendrick Lamar trending for music releases and cultural impact",
-                source="fallback", category="music",
+                headline="Tech layoffs continue despite record profits",
+                summary="Companies reporting strong earnings while simultaneously cutting workforce, citing AI efficiency",
+                source="fallback", category="career_workforce",
             ),
             TrendingNews(
-                headline="NFL Playoffs",
-                summary="NFL playoff drama captivates fans nationwide",
-                source="fallback", category="sports",
+                headline="The 'quiet promotion' trend",
+                summary="Workers taking on more responsibilities without corresponding title or pay increases",
+                source="fallback", category="career_workforce",
             ),
             TrendingNews(
-                headline="NBA Trade Rumors",
-                summary="NBA teams making moves as trade deadline approaches",
-                source="fallback", category="sports",
+                headline="AI-generated content flooding the internet",
+                summary="Researchers estimate a growing percentage of online content is now AI-generated, raising questions about authenticity",
+                source="fallback", category="ai_news",
             ),
             TrendingNews(
-                headline="LeBron James",
-                summary="LeBron James continues to make basketball history",
-                source="fallback", category="sports",
+                headline="Burnout rates among knowledge workers at all-time high",
+                summary="New surveys show record burnout levels, especially in tech, finance, and healthcare sectors",
+                source="fallback", category="burnout_wellness",
             ),
             TrendingNews(
-                headline="Netflix",
-                summary="Netflix releases new hit show that everyone is watching",
-                source="fallback", category="entertainment",
+                headline="Companies mandating AI tool adoption",
+                summary="Organizations requiring employees to integrate AI into daily workflows, with mixed results",
+                source="fallback", category="ai_workplace",
             ),
             TrendingNews(
-                headline="Oscar Nominations",
-                summary="Hollywood buzzing about award season predictions",
-                source="fallback", category="entertainment",
+                headline="The death of the corporate career ladder",
+                summary="Traditional career progression models breaking down as companies flatten hierarchies and restructure",
+                source="fallback", category="career_workforce",
             ),
             TrendingNews(
-                headline="Timothée Chalamet",
-                summary="Timothée Chalamet trending for new film project",
-                source="fallback", category="celebrity",
+                headline="Slack and email overload destroying deep work",
+                summary="Studies show average worker checks messages every 6 minutes, sustained focus becoming impossible",
+                source="fallback", category="productivity_tools",
             ),
             TrendingNews(
-                headline="Zendaya",
-                summary="Zendaya making headlines for fashion and film",
-                source="fallback", category="celebrity",
+                headline="AI company valuations vs actual revenue",
+                summary="Massive gap between AI startup valuations and their actual revenue, echoing previous tech bubbles",
+                source="fallback", category="economy_business",
             ),
             TrendingNews(
-                headline="iPhone",
-                summary="Apple iPhone news continues to trend among consumers",
-                source="fallback", category="tech",
+                headline="Remote workers face promotion penalties",
+                summary="Data shows remote employees promoted at significantly lower rates than in-office peers despite equal performance",
+                source="fallback", category="workplace_culture",
             ),
             TrendingNews(
-                headline="Elon Musk",
-                summary="Elon Musk creates controversy with latest statements",
-                source="fallback", category="tech",
+                headline="Corporate jargon reaches peak absurdity",
+                summary="Workplace buzzwords like 'synergy', 'circle back', and 'move the needle' proliferating in AI-generated corporate communications",
+                source="fallback", category="workplace_culture",
             ),
             TrendingNews(
-                headline="ChatGPT",
-                summary="AI chatbot continues to spark debates about technology",
-                source="fallback", category="tech",
+                headline="The productivity paradox of AI adoption",
+                summary="Despite massive AI investment, overall worker productivity gains remain modest, puzzling economists",
+                source="fallback", category="ai_workplace",
             ),
             TrendingNews(
-                headline="TikTok Trend",
-                summary="New viral TikTok challenge takes over social media",
-                source="fallback", category="viral",
+                headline="Side hustles becoming survival strategy",
+                summary="Growing number of professionals taking on freelance work to keep pace with cost of living",
+                source="fallback", category="economy_business",
             ),
             TrendingNews(
-                headline="Super Bowl",
-                summary="Super Bowl anticipation builds as teams compete",
-                source="fallback", category="sports",
+                headline="Self-care industry worth trillions while workers burn out",
+                summary="Wellness market booms as the structural causes of burnout go unaddressed by employers",
+                source="fallback", category="burnout_wellness",
             ),
             TrendingNews(
-                headline="Coachella",
-                summary="Music festival announcements generate excitement",
-                source="fallback", category="entertainment",
+                headline="AI hallucinations causing real workplace problems",
+                summary="Employees relying on AI-generated information making costly errors, raising liability questions",
+                source="fallback", category="ai_news",
             ),
             TrendingNews(
-                headline="The Bachelor",
-                summary="Reality TV drama unfolds on latest season",
-                source="fallback", category="entertainment",
+                headline="The open office plan backlash",
+                summary="Workers increasingly vocal about productivity losses in open floor plans, noise cancelling headphones now a workplace essential",
+                source="fallback", category="workplace_culture",
             ),
             TrendingNews(
-                headline="Real Housewives",
-                summary="Reality TV franchise drama trending on social media",
-                source="fallback", category="entertainment",
+                headline="Performance reviews in the age of AI",
+                summary="How do you evaluate human performance when AI handles an increasing share of the work?",
+                source="fallback", category="ai_workplace",
             ),
         ]
+        random.shuffle(fallbacks)
         for fb in fallbacks:
             fb.fingerprint = self._generate_fingerprint(fb.headline, fb.summary)
         return fallbacks

@@ -145,7 +145,7 @@ YOUR UNIQUE LENS (focus here, leave recognition to Sarah and hooks to Jordan):
    - Or does it hedge, qualify, wink, or explain the joke?
 
    PASS examples:
-   ✅ "Tube #4,847 was hand-numbered at 3:47am by someone questioning their life choices. That person is now emotionally attached to you." — One idea, fully committed, no hedging.
+   ✅ One idea, fully committed, no hedging. Played dead straight with absurd specificity.
    ✅ "HuggingFace trending: Someone trained a model on LinkedIn posts. It only outputs buzzword salad. They're calling it 'too realistic.'" — Perfect deadpan. Never breaks. The gap IS the joke.
 
    FAIL examples:
@@ -240,7 +240,7 @@ EVALUATE:
 
 4. SPECIFICITY CHECK:
    - Are there concrete, specific details that create recognition?
-   - "The Costco bathroom at 3:47pm" > "a store bathroom"
+   - Specific and concrete > vague and generic (name the app, give the time, pick the place)
    - Names, numbers, places, times — or vague generic observations?
 
 5. GENUINE WEIRD VS PERFORMATIVE QUIRKY:
