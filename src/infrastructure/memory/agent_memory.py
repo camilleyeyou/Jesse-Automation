@@ -430,6 +430,22 @@ class AgentMemory:
 
             return [row[0] for row in cursor.fetchall()]
 
+    def get_recent_pillars(self, days: int = 7, limit: int = 10) -> List[str]:
+        """Get pillars/themes used recently (to ensure variety across Five Questions)"""
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT pillar FROM content_memory
+                WHERE pillar IS NOT NULL
+                AND created_at >= datetime('now', ?)
+                ORDER BY created_at DESC
+                LIMIT ?
+            """, (f'-{days} days', limit))
+
+            return [row[0] for row in cursor.fetchall()]
+
     def get_pillar_stats(self, days: int = 30) -> Dict[str, Dict]:
         """Get statistics by content pillar"""
 

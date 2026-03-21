@@ -427,11 +427,11 @@ EDITORIAL DIRECTION (from weekly strategy — follow this):
 Your post MUST align with this editorial direction. The trend above is the raw material — the angle seed tells you HOW to approach it. Don't ignore this guidance."""
 
             trend_context = f"""
-TODAY'S TRENDING NEWS ({trend.category.upper()}) — React to this:
-
 {trend_body}
 
-IMPORTANT: Write about the SPECIFIC news above. Reference the actual headline, details, or cultural moment. Don't create generic content.{angle_instruction}
+IMPORTANT: React to the SPECIFIC news above. Reference the actual details, source, and cultural moment.
+Do NOT start your post with "Today's trending headline:" or any preamble about the news — just react AS Jesse.
+Don't create generic content. Don't summarize the headline. Find YOUR angle and write the post.{angle_instruction}
 """
 
             # Inject position context so Jesse builds on prior stances

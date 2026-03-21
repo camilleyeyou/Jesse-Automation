@@ -327,7 +327,8 @@ If you're over 100, CUT. Brevity is the craft. The best posts are 50-70 words.
 - End every post the same way
 - Break character or wink at the audience
 - Explain the joke
-- Start with "Breaking:" or "BREAKING:"
+- Start with "Breaking:", "BREAKING:", or "Today's trending headline:"
+- Parrot or summarize a headline — react to it, don't repeat it
 - Start with "Ever feel..." or any rhetorical question opener
 - Start with "In a world where..." or any movie-trailer framing
 - Use passive voice when active voice is possible

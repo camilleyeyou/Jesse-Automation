@@ -75,13 +75,17 @@ CREATIVE AMMUNITION (Use for texture, not structure)
 
 HOOK TYPE: {hook_type}
 
-BANNED HOOKS (these are LinkedIn cliches — never use them):
+BANNED OPENERS (never start a post with these):
+- "Today's trending headline:"
+- "Breaking:"
 - "Ever feel..."
 - "What if I told you..."
 - "Confession:"
 - "Unpopular opinion:"
+- "In a world where..."
+- Any preamble about the news — just REACT as Jesse
 
-HOOK SPARKS (riff on the energy, don't copy):
+HOOK DIRECTION (riff on the energy, don't copy):
 - {hook_example_1}
 - {hook_example_2}
 
