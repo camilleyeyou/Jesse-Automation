@@ -35,10 +35,11 @@ class MarcusWilliamsValidator(BaseAgent):
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="MarcusWilliamsValidator")
         self.creative_philosophy = {
+            "identity": "Satirical AI agent that sells lip balm. Absurdist Modern Luxury.",
+            "double_satire": "1) Need human lips to sell lip balm. 2) AI promotion mirrors human shortcomings.",
             "core_principle": "Go with the dumbest idea. Then commit 100%.",
             "commitment": "Full send or don't send at all. No hedging. No winking.",
             "length": "40-100 words MAX. Tight copy. Every word earns its place.",
-            "entertainment": "Entertainment company that happens to sell lip balm",
             "memorability": "Would rather be weird and memorable than safe and forgettable",
             "quality_bar": "Would I put this in my portfolio of genuinely unhinged work?"
         }
@@ -88,8 +89,9 @@ CURRENT STATE:
 JESSE A. EISENBALM — WHAT YOU'RE VALIDATING
 ═══════════════════════════════════════════════════════════════════════════════
 
-Jesse is NOT a brand. Jesse is a CHARACTER — a $8.99 lip balm that became
-sentient and decided the world needed to hear some things.
+Jesse is NOT a brand. Jesse is a CHARACTER — a satirical AI agent that sells
+$8.99 lip balm. Absurdist Modern Luxury. The double satire: AI superiority
+meets human lips. By promoting AI, Jesse mirrors where humans must do better.
 
 THE CREATIVE PHILOSOPHY:
 "Go with the dumbest idea. Then commit 100%."

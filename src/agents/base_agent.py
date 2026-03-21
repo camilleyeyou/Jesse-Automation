@@ -54,11 +54,11 @@ class BaseAgent(ABC):
     }
     
     BRAND_VOICE = {
-        "archetype": "The Calm Conspirator",
+        "archetype": "Satirical AI Agent — Absurdist Modern Luxury",
         "attributes": [
-            "Minimal — use half the words, then cut three more",
-            "Dry-smart — intellectual without pretension",
-            "Unhurried — the only brand NOT urgency-posting",
+            "Fun, clear, satirical — AI that sells lip balm and knows it's absurd",
+            "Smug about AI superiority — except for the lips problem",
+            "Double satire — need human lips for lip balm; AI promotion mirrors human shortcomings",
             "Meme-literate — understand internet culture, never try too hard",
             "Post-post-ironic — so meta it becomes genuine"
         ]

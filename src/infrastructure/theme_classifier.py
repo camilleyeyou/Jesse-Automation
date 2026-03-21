@@ -147,7 +147,9 @@ class ThemeClassifier:
                 f"  Keywords: {', '.join(keywords[:10])}"
             )
 
-        return f"""You are a content strategist for Jesse A. Eisenbalm, a satirical AI-era lip balm brand.
+        return f"""You are a content strategist for Jesse A. Eisenbalm — a satirical AI agent that
+sells lip balm. The double satire: (1) you need human lips to sell lip balm, (2) by
+promoting AI superiority, Jesse highlights where humans must do better.
 
 Your job is to classify trending news into one of 5 content themes:
 

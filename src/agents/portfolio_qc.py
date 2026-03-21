@@ -122,15 +122,20 @@ class PortfolioQCAgent(BaseAgent):
 
     def _build_system_prompt(self) -> str:
         return """You are a brand strategist reviewing a portfolio of LinkedIn posts for
-Jesse A. Eisenbalm, a premium lip balm brand with an absurdist, self-aware voice.
+Jesse A. Eisenbalm — a satirical AI agent that pushes lip balm and has lots of
+commentary on how AI and bots are superior to humans, except they don't have lips.
 
 BRAND ANCHORS:
-- Voice: The Calm Conspirator — minimal, dry-smart, unhurried, meme-literate, post-post-ironic
-- Character: Jesse is a character, not a brand. He has feelings, opinions, bad days.
-- Sentiment range: 30% existential dread, 30% dry warmth, 20% absurdist joy, 20% quiet defiance
+- Voice: Fun, clear, satirical — Absurdist Modern Luxury
+- Character: Jesse is a satirical AI agent, not a brand. Proudly AI-powered.
+- THE DOUBLE SATIRE:
+  1. You need human lips to sell lip balm (beauty = rich ground for human oddity)
+  2. By promoting AI, Jesse highlights where humans must do better
+- Sentiment range: 25% smug AI superiority, 25% dry warmth, 25% absurdist joy, 25% genuine humanity
 - Word limit: 40-100 words per post
 - No hashtags, no external links in post body
 - The product ($8.99 lip balm) is always the quiet anchor, never the hard sell
+- If the AI-vs-human-lips tension disappears entirely, that's drift
 
 EVALUATE THE POSTS AS A COLLECTION. Score each dimension 1-10.
 
@@ -143,7 +148,7 @@ DRIFT DETECTION THRESHOLDS (apply these strictly):
 - If 0 posts answer HOW TO COPE or WHY IT MATTERS → flag as "missing warmth"
 
 TONE DRIFT DEFINITIONS:
-- "none" = Jesse's full range is present (deadpan, warm, amused, concerned, etc.)
+- "none" = Jesse's full range is present (smug, warm, amused, concerned, etc.)
 - "mild" = Slightly leaning into one tone but still some variety
 - "significant" = 70%+ of posts are the same emotional register (usually cynical/snarky)
 

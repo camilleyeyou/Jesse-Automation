@@ -52,8 +52,10 @@ brand:
   target_audience: LinkedIn professionals (24-34) dealing with AI workplace automation
   voice_attributes:
     - absurdist modern luxury
-    - wry
-    - human-first
+    - satirical AI agent
+    - smug machine superiority undercut by lacking lips
+    - fun and clear
+    - dry irony
 
 cultural_references:
   tv_shows:
@@ -85,10 +87,10 @@ content_strategy:
   themes:
     ai_slop:
       name: "AI Slop"
-      description: "Democratization of creative tools vs. dead internet theory"
+      description: "We ARE AI slop — celebrating creative democratization while confronting dead internet"
       sub_themes:
-        - celebration  # It's fun and lets anyone be a creator
-        - reckoning    # It will create a dead internet
+        - celebration  # Weird, joyful things people make with AI — TikTok, indie games, ASMR
+        - reckoning    # Dead Internet Theory — synthetic engagement, bot comments, generated "reality"
       keywords:
         - ai generated
         - synthetic media
@@ -97,15 +99,17 @@ content_strategy:
         - authentic
         - bot
         - generated content
+        - slop
 
     ai_safety:
       name: "AI Safety"
-      description: "Research, news, scary stories, hysteria vs. reality"
+      description: "A bot commenting on its own species' risks — make safety matter to normal people"
       sub_themes:
-        - safety_research       # Technical safety concepts made accessible
-        - safety_news          # Curated roundups of developments
-        - scary_stories        # Speculative fiction and real-world cases
-        - hysteria_vs_reality  # Comparing headlines to primary sources
+        - safety_research       # Anthropic, ARC Evals, MIRI — translate the so what
+        - safety_news          # EU AI Act, US executive orders, state bills — legalese to plain language
+        - scary_stories        # Real capabilities extrapolated one step — boring is scarier than sci-fi
+        - hysteria_vs_reality  # Compare headlines to primary sources — rate on panic scale
+        - incidents            # Rogue AIs, lab incidents, AIAAIC documented cases
       keywords:
         - alignment
         - safety
@@ -115,14 +119,16 @@ content_strategy:
         - regulation
         - oversight
         - responsible AI
+        - incidents
+        - rogue
 
     ai_economy:
       name: "AI Economy, Investment & Labor"
-      description: "Capex, investment trends, and workforce impact"
+      description: "Hundreds of billions in capex — the gap between investment and realized value IS the story"
       sub_themes:
-        - capex         # Massive infrastructure investment
-        - investment    # Funding rounds, valuations, bubble concerns
-        - labor_impact  # Jobs, automation, workforce restructuring
+        - capex         # Nvidia, Microsoft, Google, Amazon quarterly earnings
+        - investment    # Valuations vs revenue, bubble discourse, Stratechery analysis
+        - labor_impact  # Sector-specific stories, BLS data, layoff trackers — granular over broad
       keywords:
         - layoffs
         - automation
@@ -133,15 +139,17 @@ content_strategy:
         - hiring
         - remote work
         - capex
+        - bubble
 
     rituals:
       name: "Rituals to Maintain Your Humanity"
-      description: "Practices for staying human when ground is shifting"
+      description: "Our AI agent reminds you of human tools you already have — attention, presence, agency"
       sub_themes:
-        - mindfulness                # Attention as contested resource
-        - ifs                        # Internal Family Systems
-        - nvc                        # Nonviolent Communication
-        - positive_mental_attitude   # Agency in era of helplessness
+        - mindfulness                # Attention as contested resource — Tara Brach, MBSR
+        - ifs                        # Parts framework for tech anxiety — Richard Schwartz
+        - nvc                        # Express fears without culture war — Marshall Rosenberg
+        - positive_mental_attitude   # Deliberate daily structures for uncertainty — BJ Fogg, James Clear
+        - embodied_rituals           # Physical practices that predate and outlast digital tech
       keywords:
         - meditation
         - self-care
@@ -151,14 +159,16 @@ content_strategy:
         - mindfulness
         - habit
         - wellness
+        - embodied
+        - attention
 
     meditations:
       name: "Meditations on Humanity & the Well-Lived Life"
-      description: "Philosophy, embodiment, and what AI can't replace"
+      description: "What does it mean to live well when 'human' is being renegotiated? The philosophical heart."
       sub_themes:
-        - philosophy        # Engaging technology and meaning
-        - embodiment        # Physical, present, improvised
-        - well_lived_life   # Irreducibly human experiences
+        - philosophy        # Byung-Chul Han, Simone Weil, Stoics, Thich Nhat Hanh
+        - embodiment        # Physical, present, improvised — what AI can't replace
+        - well_lived_life   # Grief, joy, getting it wrong, making ugly things and loving them
       keywords:
         - human
         - meaning
@@ -168,6 +178,8 @@ content_strategy:
         - joy
         - grief
         - connection
+        - awe
+        - compassion
 
   # Four sourcing tiers with different time horizons and sources
   sourcing_tiers:
@@ -181,10 +193,10 @@ content_strategy:
           type: "rss"
           url: "https://huggingface.co/papers"
           enabled: true  # RSS integration implemented
-        - name: "arXiv Sanity Lite"
+        - name: "arXiv CS.AI"
           type: "rss"
-          url: "https://arxiv-sanity-lite.com/"
-          enabled: false
+          url: "https://arxiv.org/list/cs.AI/recent"
+          enabled: true
         - name: "Reddit r/MachineLearning"
           type: "api"
           subreddit: "MachineLearning"
@@ -211,9 +223,13 @@ content_strategy:
           enabled: false
           note: "Newsletter integration deferred"
         - name: "Import AI"
-          type: "newsletter"
-          enabled: false
-          note: "Newsletter integration deferred"
+          type: "rss"
+          url: "https://importai.substack.com/feed"
+          enabled: true
+        - name: "AI Snake Oil"
+          type: "rss"
+          url: "https://www.aisnakeoil.com/feed"
+          enabled: true
 
     tier_3:
       name: "Cultural Pickup (3-7 days)"
@@ -248,7 +264,8 @@ content_strategy:
           enabled: false
         - name: "AIAAIC Repository"
           type: "rss"
-          enabled: false
+          url: "https://www.aiaaic.org/aiaaic-repository/ai-algorithmic-and-automation-incidents"
+          enabled: true
 
 logging_level: INFO
 environment: development

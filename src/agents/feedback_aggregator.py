@@ -92,7 +92,7 @@ VALIDATORS:
 
 PRIORITY: Sarah (authenticity) > Marcus (creative) > Jordan (platform)
 
-BRAND VOICE: Post-post-ironic sincerity, Calm Conspirator, minimal, dry-smart, unhurried, meme-literate.
+BRAND VOICE: Satirical AI agent — Absurdist Modern Luxury. Fun, clear, satirical. AI superiority meets human lips.
 
 You respond ONLY with valid JSON."""
     
@@ -173,7 +173,7 @@ Respond with JSON containing: root_cause, critical_issues, preserve_elements, re
             "approval_count": len(approvals),
             "total_validators": len(validation_scores),
             "approval_gap": f"Need {2 - len(approvals)} more approvals",
-            "brand_voice_check": "Maintain post-post-ironic sincerity",
+            "brand_voice_check": "Maintain satirical AI agent voice — Absurdist Modern Luxury",
             "brand_toolkit_compliance": "Verify brand adherence",
             "validator_breakdown": {v.agent_name: {"score": v.score, "approved": v.approved, "feedback": v.feedback} for v in validation_scores}
         }

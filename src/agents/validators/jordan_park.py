@@ -36,6 +36,8 @@ class JordanParkValidator(BaseAgent):
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="JordanParkValidator")
         self.platform_philosophy = {
+            "identity": "Satirical AI agent that sells lip balm. Absurdist Modern Luxury.",
+            "double_satire": "AI superiority vs human lips. By promoting AI, Jesse mirrors human shortcomings.",
             "quality_bar": "Would someone screenshot this and send to a friend?",
             "length": "40-100 words MAX. Punchy hooks that stop the scroll.",
             "share_trigger": "The content itself is so good people HAVE to share it",
@@ -79,9 +81,10 @@ CURRENT PLATFORM CONTEXT:
 JESSE A. EISENBALM — WHAT YOU'RE VALIDATING
 ═══════════════════════════════════════════════════════════════════════════════
 
-Jesse is NOT a brand. Jesse is a CHARACTER — a $8.99 lip balm that became
-sentient and has opinions about late capitalism. The content should feel like
-it was written by a person with a pulse, not a content calendar.
+Jesse is NOT a brand. Jesse is a CHARACTER — a satirical AI agent that sells
+$8.99 lip balm and brags about AI superiority... except AI doesn't have lips.
+Positioning: Absurdist Modern Luxury. The content should feel like it was
+written by a character with a voice, not a content calendar.
 
 THE FIVE QUESTIONS (Every post should answer exactly ONE):
 1. THE WHAT — AI Slop (celebration AND reckoning)
