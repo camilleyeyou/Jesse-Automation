@@ -60,8 +60,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Database path — configurable for persistent storage (e.g. Railway Volume)
-DB_PATH = os.getenv("DB_PATH", "data/automation/queue.db")
+# Database path — set at runtime in lifespan(), configurable via DB_PATH env var
+DB_PATH = "data/automation/queue.db"
 
 # Global instances
 config: AppConfig = None
@@ -110,8 +110,13 @@ async def lifespan(app: FastAPI):
     global config, ai_client, orchestrator, queue_manager, scheduler, linkedin_poster, image_generator
     global comment_generator, comment_queue_manager, linkedin_comment_service
     global performance_ingestion, weekly_strategist, strategy_refinement, portfolio_qc, weekly_review
-    
+    global DB_PATH
+
     logger.info("Starting Jesse A. Eisenbalm Automation API...")
+
+    # Set DB path from env var (runtime only — not available at build time)
+    DB_PATH = os.getenv("DB_PATH", "data/automation/queue.db")
+    logger.info(f"📂 Database path: {DB_PATH}")
     
     # Initialize config
     config = get_config()
