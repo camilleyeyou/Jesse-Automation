@@ -108,7 +108,7 @@ class ContentOrchestrator:
         self.image_generator = image_generator
         self.queue_manager = queue_manager
         self.comment_service = comment_service
-        self.db_path = db_path or os.getenv("DB_PATH", "data/automation/queue.db")
+        self.db_path = db_path or ("/data/queue.db" if os.path.isdir("/data") else "data/automation/queue.db")
 
         self.content_generator = ContentGeneratorAgent(ai_client, config)
         self.feedback_aggregator = FeedbackAggregatorAgent(ai_client, config)

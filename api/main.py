@@ -60,7 +60,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Database path — set at runtime in lifespan(), configurable via DB_PATH env var
+# Database path — auto-detects Railway volume at /data, falls back to local
 DB_PATH = "data/automation/queue.db"
 
 # Global instances
@@ -114,9 +114,13 @@ async def lifespan(app: FastAPI):
 
     logger.info("Starting Jesse A. Eisenbalm Automation API...")
 
-    # Set DB path from env var (runtime only — not available at build time)
-    DB_PATH = os.getenv("DB_PATH", "data/automation/queue.db")
-    logger.info(f"📂 Database path: {DB_PATH}")
+    # Auto-detect persistent storage (Railway volume mounted at /data)
+    if os.path.isdir("/data"):
+        DB_PATH = "/data/queue.db"
+        logger.info(f"📂 Railway volume detected — using persistent DB: {DB_PATH}")
+    else:
+        DB_PATH = "data/automation/queue.db"
+        logger.info(f"📂 Local mode — using DB: {DB_PATH}")
     
     # Initialize config
     config = get_config()
