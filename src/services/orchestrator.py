@@ -482,30 +482,49 @@ Don't create generic content. Don't summarize the headline. Find YOUR angle and 
             except Exception as e:
                 logger.warning(f"Media generation failed: {e}")
         
-        # Validate
+        # Validate with revision loop — keep revising until approved or max attempts
+        MAX_REVISION_ATTEMPTS = 3
+        best_post = None
+        best_score = 0
+
         validation_scores = await self._validate_post(post)
         approvals = sum(1 for v in validation_scores if v.approved)
         avg_score = sum(v.score for v in validation_scores) / len(validation_scores) if validation_scores else 0
-        
+
         logger.info(f"Validation: {approvals}/3 approvals, avg: {avg_score:.1f}")
-        
-        approved = approvals >= 2
-        
-        # Revise if needed
-        if not approved and approvals >= 1:
-            logger.info("Attempting revision...")
+
+        # Track best version in case we never reach 2/3 approval
+        if avg_score > best_score:
+            best_score = avg_score
+            best_post = post
+            best_post.validation_scores = validation_scores
+
+        attempt = 0
+        while approvals < 2 and attempt < MAX_REVISION_ATTEMPTS:
+            attempt += 1
+            logger.info(f"Revision attempt {attempt}/{MAX_REVISION_ATTEMPTS} (had {approvals}/3 approvals)...")
+
             aggregated = await self.feedback_aggregator.execute(post, validation_scores)
             post = await self.revision_generator.execute(post, aggregated)
-            
+
             validation_scores = await self._validate_post(post)
             approvals = sum(1 for v in validation_scores if v.approved)
-            approved = approvals >= 2
-        
-        if approved:
+            avg_score = sum(v.score for v in validation_scores) / len(validation_scores) if validation_scores else 0
+
+            logger.info(f"Revision {attempt} result: {approvals}/3 approvals, avg: {avg_score:.1f}")
+
+            if avg_score > best_score:
+                best_score = avg_score
+                best_post = post
+                best_post.validation_scores = validation_scores
+
+        if approvals >= 2:
             post.validation_scores = validation_scores
             return post
-        
-        return None
+
+        # All revision attempts exhausted — return best version as fallback
+        logger.warning(f"Max revisions reached. Using best version (avg score: {best_score:.1f})")
+        return best_post
     
     async def _extract_and_store_position(
         self,

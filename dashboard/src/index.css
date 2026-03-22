@@ -32,10 +32,9 @@ html, body {
   background: rgba(255, 255, 255, 0.3);
 }
 
-/* Glassmorphism card effect */
+/* Card effect */
 .glass {
   background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -116,11 +115,9 @@ html, body {
   }
 }
 
-/* Smooth transitions for all interactive elements */
-button, a, input, select, .transition-all {
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
+/* Hover transitions only — no global transition on every element */
+button, a {
+  transition: color 150ms, background-color 150ms;
 }
 
 /* Focus states for accessibility */
@@ -131,7 +128,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* Hover effects for cards */
 .hover\:shadow-glow:hover {
-  box-shadow: 0 0 30px rgba(245, 158, 11, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 /* Safe area padding for notched devices */

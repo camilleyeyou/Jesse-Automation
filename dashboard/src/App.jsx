@@ -46,9 +46,9 @@ const getVideoUrl = (videoPath) => {
 
 function StatusBadge({ active, label }) {
   return (
-    <span className={`px-2.5 py-1 sm:px-3 rounded-full text-xs sm:text-sm font-medium inline-flex items-center gap-1.5 transition-all duration-200 ${
+    <span className={`px-2.5 py-1 sm:px-3 rounded-full text-xs sm:text-sm font-medium inline-flex items-center gap-1.5 ${
       active
-        ? 'bg-green-500/20 text-green-400 border border-green-500/30 shadow-green-500/10 shadow-lg'
+        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
         : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
     }`}>
       <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
@@ -60,10 +60,9 @@ function StatusBadge({ active, label }) {
 function Card({ children, className = '', hover = false }) {
   return (
     <div className={`
-      bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl
+      bg-gray-800/50 border border-white/10 rounded-xl
       p-4 sm:p-6
-      transition-all duration-300
-      ${hover ? 'hover:bg-white/8 hover:border-white/20 hover:shadow-xl hover:shadow-black/20 hover:-translate-y-0.5' : ''}
+      ${hover ? 'hover:bg-gray-800/70 hover:border-white/15' : ''}
       ${className}
     `}>
       {children}
@@ -92,9 +91,7 @@ function Button({ children, onClick, variant = 'primary', disabled = false, load
       disabled={disabled || loading}
       className={`
         ${sizes[size]} rounded-lg font-medium
-        transition-all duration-200
         flex items-center justify-center gap-2
-        active:scale-[0.98]
         ${variants[variant]}
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         ${fullWidth ? 'w-full' : ''}
@@ -559,7 +556,7 @@ function QueueTab({ queue, onGenerate, onRemove, onPostNow, loading }) {
                           </div>
                           {/* Play icon overlay */}
                           <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-black/60 rounded-full flex items-center justify-center backdrop-blur-sm">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-black/80 rounded-full flex items-center justify-center">
                               <Play className="w-5 h-5 sm:w-6 sm:h-6 text-white ml-0.5" />
                             </div>
                           </div>
@@ -746,7 +743,7 @@ function HistoryTab({ history }) {
                             onError={(e) => { e.target.style.display = 'none'; }}
                           />
                           <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                            <div className="w-10 h-10 sm:w-8 sm:h-8 bg-black/60 rounded-full flex items-center justify-center backdrop-blur-sm">
+                            <div className="w-10 h-10 sm:w-8 sm:h-8 bg-black/80 rounded-full flex items-center justify-center">
                               <Play className="w-5 h-5 sm:w-4 sm:h-4 text-white ml-0.5" />
                             </div>
                           </div>
@@ -1446,9 +1443,9 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col" style={{ background: 'linear-gradient(to bottom right, #111827, #1f2937, #111827)', backgroundAttachment: 'fixed' }}>
+    <div className="min-h-screen bg-gray-900 flex flex-col">
       {/* Header */}
-      <header className="border-b border-white/10 bg-black/40 backdrop-blur-md sticky top-0 z-20">
+      <header className="border-b border-white/10 bg-gray-900 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-3">
