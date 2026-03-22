@@ -1297,7 +1297,7 @@ Now write something that makes someone stop scrolling."""
         for prefix in parrot_prefixes:
             if content.lower().startswith(prefix.lower()):
                 content = content[len(prefix):].strip()
-                logger.info(f"Stripped parrot prefix: '{prefix}'")
+                self.logger.info(f"Stripped parrot prefix: '{prefix}'")
 
         # Fix spacing
         lines = content.split('\n')
@@ -1317,7 +1317,7 @@ Now write something that makes someone stop scrolling."""
                 content = truncated[:last_period + 1]
             else:
                 content = truncated
-            logger.info(f"Content truncated from {len(words)} words to {len(content.split())} words (hard ceiling)")
+            self.logger.info(f"Content truncated from {len(words)} words to {len(content.split())} words (hard ceiling)")
 
         return content
 

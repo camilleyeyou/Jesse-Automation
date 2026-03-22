@@ -1036,7 +1036,7 @@ class MultiTierTrendService(TrendService):
 
         # Fetch from each tier based on weights
         for tier_num, weight in sorted(tier_weights.items()):
-            tier_count = max(1, int(count * weight))
+            tier_count = max(2, int(count * weight))  # At least 2 per tier to avoid single-result fragility
 
             try:
                 tier_candidates = await self.get_candidate_trends_by_tier(
@@ -1044,8 +1044,14 @@ class MultiTierTrendService(TrendService):
                     count=tier_count
                 )
                 candidates.extend(tier_candidates)
+                self.logger.info(f"Tier {tier_num}: got {len(tier_candidates)} candidates")
             except Exception as e:
                 self.logger.warning(f"Failed to fetch from tier {tier_num}: {e}")
+
+        # If all tiers returned empty, fall back to parent's full Brave + Google + fallback pipeline
+        if not candidates:
+            self.logger.warning("All tiers returned empty — falling back to legacy candidate fetching")
+            candidates = await super().get_candidate_trends(count=count)
 
         # Classify themes for all candidates
         for candidate in candidates:
@@ -1098,7 +1104,8 @@ class MultiTierTrendService(TrendService):
             # Fallback to existing TrendService for tier 3
             if tier == 3:
                 self.logger.debug(f"No custom sources for tier {tier}, using legacy TrendService")
-                return await super().get_candidate_trends(count=count)
+                # Request more than the tier count — parent has Brave + Google + fallbacks
+                return await super().get_candidate_trends(count=max(count, 5))
             return []
 
         trends = []

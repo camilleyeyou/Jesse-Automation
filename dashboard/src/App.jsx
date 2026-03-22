@@ -1320,17 +1320,24 @@ export default function App() {
     }
   }, []);
 
+  // Full refresh (with loading indicator) — for user-initiated actions
   const refresh = useCallback(async () => {
     setLoading(true);
     await Promise.all([fetchStatus(), fetchQueue(), fetchHistory()]);
     setLoading(false);
   }, [fetchStatus, fetchQueue, fetchHistory]);
 
+  // Silent refresh — for background polling (no loading state = no re-render churn)
+  const silentRefresh = useCallback(async () => {
+    await Promise.all([fetchStatus(), fetchQueue(), fetchHistory()]);
+  }, [fetchStatus, fetchQueue, fetchHistory]);
+
   useEffect(() => {
-    refresh();
-    const interval = setInterval(refresh, 30000);
+    refresh(); // Initial load shows spinner
+    const interval = setInterval(silentRefresh, 30000); // Background polls don't
     return () => clearInterval(interval);
-  }, [refresh]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Actions
   const showMessage = (msg, duration = 3000) => {
