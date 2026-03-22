@@ -80,34 +80,43 @@ class OpenAIClient:
         self._current_batch_id = batch_id
         self._current_post_number = post_number
     
-    async def generate(self, 
+    async def generate(self,
                       prompt: str,
                       system_prompt: Optional[str] = None,
                       model: Optional[str] = None,
                       temperature: Optional[float] = None,
                       max_tokens: Optional[int] = None,
-                      response_format: str = "json") -> Dict[str, Any]:
-        """Generate completion from OpenAI API with JSON support"""
-        
+                      response_format = "json") -> Dict[str, Any]:
+        """Generate completion from OpenAI API with JSON support.
+
+        response_format can be:
+          - "json" (string) — basic JSON mode
+          - "text" (string) — plain text
+          - dict with "type": "json_schema" — structured output with strict schema
+        """
+
         model = model or self.config.openai.model
         temperature = temperature if temperature is not None else self.config.openai.temperature
         max_tokens = max_tokens if max_tokens is not None else self.config.openai.max_tokens
 
         messages = []
-        
+
+        # Determine if we're in JSON mode (string "json" or structured schema dict)
+        is_json_mode = response_format == "json" or (isinstance(response_format, dict) and response_format.get("type") in ("json_object", "json_schema"))
+
         # Add JSON instruction to system prompt
         if system_prompt:
-            if response_format == "json":
+            if is_json_mode:
                 system_prompt += "\n\nIMPORTANT: You MUST respond with valid JSON only. No additional text, no markdown formatting, no explanations - just pure, valid JSON."
             messages.append({"role": "system", "content": system_prompt})
-        elif response_format == "json":
+        elif is_json_mode:
             messages.append({"role": "system", "content": "You MUST respond with valid JSON only. No additional text, no markdown formatting, no explanations - just pure, valid JSON."})
-        
-        if response_format == "json":
+
+        if is_json_mode:
             prompt += "\n\nRemember: Respond ONLY with valid JSON. No other text."
-        
+
         messages.append({"role": "user", "content": prompt})
-        
+
         try:
             kwargs = {
                 "model": model,
@@ -115,8 +124,11 @@ class OpenAIClient:
                 "temperature": temperature,
                 "max_tokens": max_tokens
             }
-            
-            if response_format == "json" and ("gpt-4" in model or "gpt-3.5-turbo" in model):
+
+            # Support structured JSON schema (dict) or basic JSON mode (string)
+            if isinstance(response_format, dict):
+                kwargs["response_format"] = response_format
+            elif response_format == "json" and ("gpt-4" in model or "gpt-3.5-turbo" in model):
                 kwargs["response_format"] = {"type": "json_object"}
             
             response = await self.openai_client.chat.completions.create(**kwargs)
@@ -125,9 +137,9 @@ class OpenAIClient:
             
             if not content:
                 logger.error("Received empty content from OpenAI")
-                content = "{}" if response_format == "json" else ""
-            
-            if response_format == "json":
+                content = "{}" if is_json_mode else ""
+
+            if is_json_mode:
                 try:
                     content = content.strip()
                     

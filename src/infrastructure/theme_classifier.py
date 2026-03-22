@@ -47,6 +47,8 @@ class ThemeClassifier:
 
     def __init__(self, ai_client, config, db_path: str = "data/automation/queue.db"):
         self.ai_client = ai_client
+        # Access the raw AsyncOpenAI client for direct SDK calls
+        self.openai_client = getattr(ai_client, 'openai_client', ai_client)
         self.config = config
         self.db_path = Path(db_path)
         self.logger = logging.getLogger(f"classifier.theme")
@@ -54,7 +56,29 @@ class ThemeClassifier:
         # Theme definitions from config
         self.themes = config.content_strategy.themes
 
+        # Ensure trend_theme_mapping table exists
+        self._init_db()
+
         self.logger.info(f"ThemeClassifier initialized with {len(self.themes)} themes")
+
+    def _init_db(self):
+        """Create trend_theme_mapping table if it doesn't exist"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS trend_theme_mapping (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        trend_fingerprint TEXT UNIQUE,
+                        theme TEXT NOT NULL,
+                        sub_theme TEXT,
+                        confidence REAL,
+                        assigned_by TEXT DEFAULT 'ai',
+                        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                conn.commit()
+        except Exception as e:
+            self.logger.warning(f"Failed to init trend_theme_mapping table: {e}")
 
     async def classify_trend(
         self,
@@ -88,7 +112,7 @@ class ThemeClassifier:
 
         # Call LLM
         try:
-            response = await self.ai_client.chat.completions.create(
+            response = await self.openai_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": self._get_system_prompt()},

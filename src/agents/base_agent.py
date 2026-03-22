@@ -149,7 +149,7 @@ Identity Note: {self.BRAND_IDENTITY['name']} — {self.BRAND_IDENTITY['note']}
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-        response_format: str = "json",
+        response_format = "json",
         temperature: Optional[float] = None
     ) -> Dict[str, Any]:
         """Generate a response using the AI client"""

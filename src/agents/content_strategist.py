@@ -676,7 +676,7 @@ TONE TRAPS:
             result = await self.generate(
                 prompt=prompt,
                 system_prompt=self.system_prompt,
-                response_format="json"
+                response_format=self.response_format
             )
             
             # FIXED: Better handling of the response structure
