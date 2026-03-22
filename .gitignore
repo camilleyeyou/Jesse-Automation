@@ -32,6 +32,7 @@ build/
 data/images/*
 data/output/*
 data/automation/*.db
+api/data/automation/*.db
 !data/images/.gitkeep
 !data/output/.gitkeep
 !data/automation/.gitkeep

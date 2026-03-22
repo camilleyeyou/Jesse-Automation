@@ -60,6 +60,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Database path — configurable for persistent storage (e.g. Railway Volume)
+DB_PATH = os.getenv("DB_PATH", "data/automation/queue.db")
+
 # Global instances
 config: AppConfig = None
 ai_client: OpenAIClient = None
@@ -130,7 +133,7 @@ async def lifespan(app: FastAPI):
     logger.info("✅ ContentOrchestrator initialized with image generator")
     
     # Initialize queue manager
-    queue_manager = get_queue_manager()
+    queue_manager = get_queue_manager(DB_PATH)
     
     # Initialize scheduler
     scheduler = get_scheduler(config)
@@ -190,7 +193,7 @@ async def lifespan(app: FastAPI):
 
     from src.infrastructure.memory import get_memory as _get_memory
     try:
-        _memory = _get_memory("data/automation/queue.db")
+        _memory = _get_memory(DB_PATH)
         performance_ingestion = PerformanceIngestionService(memory=_memory)
         if performance_ingestion.is_configured():
             logger.info("✅ PerformanceIngestionService initialized — LinkedIn analytics ingestion ready")
@@ -205,7 +208,7 @@ async def lifespan(app: FastAPI):
             ai_client=ai_client,
             config=config,
             trend_service=orchestrator.trend_service if orchestrator else None,
-            db_path="data/automation/queue.db",
+            db_path=DB_PATH,
         )
         logger.info("✅ WeeklyStrategistAgent initialized — editorial planning ready")
     except Exception as e:
@@ -214,7 +217,7 @@ async def lifespan(app: FastAPI):
     # Initialize Strategy Refinement Agent (Phase 3 — Learning System)
     try:
         strategy_refinement = StrategyRefinementAgent(
-            ai_client=ai_client, config=config, db_path="data/automation/queue.db"
+            ai_client=ai_client, config=config, db_path=DB_PATH
         )
         logger.info("✅ StrategyRefinementAgent initialized — performance pattern analysis ready")
     except Exception as e:
@@ -223,7 +226,7 @@ async def lifespan(app: FastAPI):
     # Initialize Portfolio QC Agent (Phase 3 — Learning System)
     try:
         portfolio_qc = PortfolioQCAgent(
-            ai_client=ai_client, config=config, db_path="data/automation/queue.db"
+            ai_client=ai_client, config=config, db_path=DB_PATH
         )
         logger.info("✅ PortfolioQCAgent initialized — brand consistency monitoring ready")
     except Exception as e:
@@ -232,7 +235,7 @@ async def lifespan(app: FastAPI):
     # Initialize Weekly Review Agent (Phase 3.3 — Accountability Loop)
     try:
         weekly_review = WeeklyReviewAgent(
-            ai_client=ai_client, config=config, db_path="data/automation/queue.db"
+            ai_client=ai_client, config=config, db_path=DB_PATH
         )
         logger.info("✅ WeeklyReviewAgent initialized — accountability loop ready")
     except Exception as e:
@@ -982,7 +985,7 @@ async def get_performance(days: int = 14):
     """Get engagement performance data for recent posts."""
     from src.infrastructure.memory import get_memory as _get_mem
     try:
-        mem = _get_mem("data/automation/queue.db")
+        mem = _get_mem(DB_PATH)
         data = mem.get_recent_performance(days=days)
         return {"success": True, "posts": data, "count": len(data)}
     except Exception as e:
@@ -995,7 +998,7 @@ async def get_calendar(start_date: str = None, end_date: str = None):
     from src.infrastructure.memory import get_memory as _get_mem
     from datetime import date, timedelta
     try:
-        mem = _get_mem("data/automation/queue.db")
+        mem = _get_mem(DB_PATH)
         if not start_date:
             start_date = date.today().isoformat()
         if not end_date:
@@ -1011,7 +1014,7 @@ async def get_adaptive_weights(days: int = 30):
     """Get adaptive theme weights and format performance."""
     from src.infrastructure.memory import get_memory as _get_mem
     try:
-        mem = _get_mem("data/automation/queue.db")
+        mem = _get_mem(DB_PATH)
         weights = mem.compute_adaptive_weights(days=days)
         theme_perf = mem.get_theme_performance(days=days)
         format_perf = mem.get_format_performance(days=days)
@@ -1032,7 +1035,7 @@ async def get_insights(top: int = 10, insight_type: str = None):
     """Get top strategy insights."""
     from src.infrastructure.memory import get_memory as _get_mem
     try:
-        mem = _get_mem("data/automation/queue.db")
+        mem = _get_mem(DB_PATH)
         insights = mem.get_strategy_insights(top=top, insight_type=insight_type)
         return {"success": True, "insights": insights, "count": len(insights)}
     except Exception as e:

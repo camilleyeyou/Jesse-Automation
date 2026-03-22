@@ -8,6 +8,7 @@ Content Orchestrator - SIMPLIFIED
 
 import asyncio
 import logging
+import os
 import random
 import uuid
 from typing import Dict, Any, List, Optional
@@ -101,13 +102,14 @@ class ContentOrchestrator:
         "The void called. It wants balm. jesseaeisenbalm.com",
     ]
 
-    def __init__(self, ai_client, config, image_generator=None, queue_manager=None, comment_service=None):
+    def __init__(self, ai_client, config, image_generator=None, queue_manager=None, comment_service=None, db_path=None):
         self.ai_client = ai_client
         self.config = config
         self.image_generator = image_generator
         self.queue_manager = queue_manager
         self.comment_service = comment_service
-        
+        self.db_path = db_path or os.getenv("DB_PATH", "data/automation/queue.db")
+
         self.content_generator = ContentGeneratorAgent(ai_client, config)
         self.feedback_aggregator = FeedbackAggregatorAgent(ai_client, config)
         self.revision_generator = RevisionGeneratorAgent(ai_client, config)
@@ -126,15 +128,14 @@ class ContentOrchestrator:
             # Initialize theme classifier if content strategy is available
             if MULTI_TIER_AVAILABLE and hasattr(config, 'content_strategy'):
                 try:
-                    self.theme_classifier = ThemeClassifier(ai_client, config, db_path="data/automation/queue.db")
+                    self.theme_classifier = ThemeClassifier(ai_client, config, db_path=self.db_path)
                     logger.info("✅ Theme classifier initialized - AI-powered theme classification enabled")
 
                     # Initialize MultiTierTrendService with theme classification
-                    import os
                     self.trend_service = MultiTierTrendService(
                         config=config,
                         theme_classifier=self.theme_classifier,
-                        db_path="data/automation/queue.db",
+                        db_path=self.db_path,
                         brave_api_key=os.getenv('BRAVE_API_KEY')
                     )
                     logger.info("✅ Multi-tier trend service initialized - 5 themes, 4 sourcing tiers active")
@@ -146,10 +147,10 @@ class ContentOrchestrator:
 
                 except Exception as e:
                     logger.warning(f"⚠️ MultiTierTrendService initialization failed: {e}, falling back to legacy TrendService")
-                    self.trend_service = get_trend_service("data/automation/queue.db")
+                    self.trend_service = get_trend_service(self.db_path)
             else:
                 # Fall back to legacy TrendService
-                self.trend_service = get_trend_service("data/automation/queue.db")
+                self.trend_service = get_trend_service(self.db_path)
                 logger.info("✅ Trend service initialized - content will react to real news")
 
             # Initialize AI-powered news curator with theme classifier
@@ -171,7 +172,7 @@ class ContentOrchestrator:
         self.memory = None
         if MEMORY_AVAILABLE:
             try:
-                self.memory = get_memory("data/automation/queue.db")
+                self.memory = get_memory(self.db_path)
                 logger.info("✅ Memory system initialized - agents will learn from past content")
             except Exception as e:
                 logger.warning(f"Memory system unavailable: {e}")
