@@ -241,81 +241,8 @@ async def lifespan(app: FastAPI):
     # Auto-start scheduler if configured
     if os.getenv("AUTO_START_SCHEDULER", "false").lower() == "true":
         scheduler.start()
-        hour = int(os.getenv("DEFAULT_POST_HOUR", "6"))
-        minute = int(os.getenv("DEFAULT_POST_MINUTE", "30"))
-        timezone = os.getenv("DEFAULT_TIMEZONE", "America/Los_Angeles")
-        scheduler.schedule_daily_post(
-            job_func=daily_post_job,
-            hour=hour,
-            minute=minute,
-            timezone=timezone
-        )
-        logger.info(f"Auto-started scheduler at {hour:02d}:{minute:02d} {timezone}")
-
-        # Schedule weekly performance ingestion (Sunday 6:00 AM)
-        if performance_ingestion:
-            scheduler.schedule_weekly_job(
-                job_func=weekly_ingestion_job,
-                day_of_week="sun",
-                hour=6,
-                minute=0,
-                timezone=timezone,
-                job_id="weekly_ingestion",
-                job_name="Weekly Performance Ingestion",
-            )
-            logger.info("📊 Scheduled weekly performance ingestion: Sunday 6:00 AM")
-
-        # Schedule weekly strategy refinement (Sunday 6:30 AM)
-        if strategy_refinement:
-            scheduler.schedule_weekly_job(
-                job_func=weekly_refinement_job,
-                day_of_week="sun",
-                hour=6,
-                minute=30,
-                timezone=timezone,
-                job_id="weekly_refinement",
-                job_name="Weekly Strategy Refinement",
-            )
-            logger.info("📈 Scheduled weekly strategy refinement: Sunday 6:30 AM")
-
-        # Schedule weekly strategy planning (Sunday 7:00 AM)
-        if weekly_strategist:
-            scheduler.schedule_weekly_job(
-                job_func=weekly_strategy_job,
-                day_of_week="sun",
-                hour=7,
-                minute=0,
-                timezone=timezone,
-                job_id="weekly_strategy",
-                job_name="Weekly Strategy Planning",
-            )
-            logger.info("🧠 Scheduled weekly strategy planning: Sunday 7:00 AM")
-
-        # Schedule portfolio QC (Friday 6:00 PM)
-        if portfolio_qc:
-            scheduler.schedule_weekly_job(
-                job_func=friday_qc_job,
-                day_of_week="fri",
-                hour=18,
-                minute=0,
-                timezone=timezone,
-                job_id="friday_portfolio_qc",
-                job_name="Friday Portfolio QC",
-            )
-            logger.info("🔍 Scheduled portfolio QC: Friday 6:00 PM")
-
-        # Schedule weekly review (Friday 6:30 PM, after Portfolio QC)
-        if weekly_review:
-            scheduler.schedule_weekly_job(
-                job_func=friday_review_job,
-                day_of_week="fri",
-                hour=18,
-                minute=30,
-                timezone=timezone,
-                job_id="friday_weekly_review",
-                job_name="Friday Weekly Review",
-            )
-            logger.info("📋 Scheduled weekly review: Friday 6:30 PM")
+        _schedule_all_jobs()
+        logger.info("Auto-started scheduler with all jobs")
 
     logger.info("API startup complete")
     
@@ -416,6 +343,66 @@ try:
     app.mount("/videos", StaticFiles(directory=str(videos_dir)), name="videos")
 except Exception as e:
     logger.warning(f"Could not mount videos directory: {e}")
+
+
+# ============== Job Scheduling ==============
+
+def _schedule_all_jobs():
+    """Schedule all recurring jobs — daily post + Sunday learning cycle + Friday QC."""
+    hour = int(os.getenv("DEFAULT_POST_HOUR", "6"))
+    minute = int(os.getenv("DEFAULT_POST_MINUTE", "30"))
+    timezone = os.getenv("DEFAULT_TIMEZONE", "America/Los_Angeles")
+
+    # Daily content generation + LinkedIn post
+    scheduler.schedule_daily_post(
+        job_func=daily_post_job,
+        hour=hour,
+        minute=minute,
+        timezone=timezone
+    )
+    logger.info(f"📅 Daily post: {hour:02d}:{minute:02d} {timezone}")
+
+    # Sunday learning cycle
+    if performance_ingestion:
+        scheduler.schedule_weekly_job(
+            job_func=weekly_ingestion_job,
+            day_of_week="sun", hour=6, minute=0, timezone=timezone,
+            job_id="weekly_ingestion", job_name="Weekly Performance Ingestion",
+        )
+        logger.info("📊 Sunday 6:00 AM: Performance Ingestion")
+
+    if strategy_refinement:
+        scheduler.schedule_weekly_job(
+            job_func=weekly_refinement_job,
+            day_of_week="sun", hour=6, minute=30, timezone=timezone,
+            job_id="weekly_refinement", job_name="Weekly Strategy Refinement",
+        )
+        logger.info("📈 Sunday 6:30 AM: Strategy Refinement")
+
+    if weekly_strategist:
+        scheduler.schedule_weekly_job(
+            job_func=weekly_strategy_job,
+            day_of_week="sun", hour=7, minute=0, timezone=timezone,
+            job_id="weekly_strategy", job_name="Weekly Strategy Planning",
+        )
+        logger.info("🧠 Sunday 7:00 AM: Weekly Strategist")
+
+    # Friday quality checks
+    if portfolio_qc:
+        scheduler.schedule_weekly_job(
+            job_func=friday_qc_job,
+            day_of_week="fri", hour=18, minute=0, timezone=timezone,
+            job_id="friday_portfolio_qc", job_name="Friday Portfolio QC",
+        )
+        logger.info("🔍 Friday 6:00 PM: Portfolio QC")
+
+    if weekly_review:
+        scheduler.schedule_weekly_job(
+            job_func=friday_review_job,
+            day_of_week="fri", hour=18, minute=30, timezone=timezone,
+            job_id="friday_weekly_review", job_name="Friday Weekly Review",
+        )
+        logger.info("📋 Friday 6:30 PM: Weekly Review")
 
 
 # ============== Background Jobs ==============
@@ -620,12 +607,13 @@ async def get_automation_status():
 
 @app.post("/api/automation/scheduler/start")
 async def start_scheduler():
-    """Start the automation scheduler"""
+    """Start the automation scheduler with all jobs"""
     if not scheduler:
         raise HTTPException(500, "Scheduler not initialized")
-    
+
     if scheduler.start():
-        return {"success": True, "message": "Scheduler started"}
+        _schedule_all_jobs()
+        return {"success": True, "message": "Scheduler started with all jobs"}
     else:
         raise HTTPException(500, "Failed to start scheduler")
 
