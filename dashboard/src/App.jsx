@@ -396,6 +396,7 @@ function QueueTab({ queue, onGenerate, onRemove, onPostNow, loading }) {
   const [selectedMediaType, setSelectedMediaType] = useState('image');
   const [useVideo, setUseVideo] = useState(false);
   const [numPosts, setNumPosts] = useState(1);
+  const [expandedThinking, setExpandedThinking] = useState({});
 
   // Helper to safely render the cultural reference
   const renderCulturalReference = (ref) => {
@@ -622,6 +623,35 @@ function QueueTab({ queue, onGenerate, onRemove, onPostNow, loading }) {
                       </p>
                     )}
 
+                    {/* AI Thinking */}
+                    {(post.creative_reasoning || post.why_this_works) && (
+                      <div className="mt-2">
+                        <button
+                          onClick={() => setExpandedThinking(prev => ({ ...prev, [post.id || index]: !prev[post.id || index] }))}
+                          className="text-xs text-amber-400/70 hover:text-amber-400 flex items-center gap-1 transition-colors"
+                        >
+                          <Brain className="w-3 h-3" />
+                          {expandedThinking[post.id || index] ? 'Hide' : 'Show'} AI Thinking
+                        </button>
+                        {expandedThinking[post.id || index] && (
+                          <div className="mt-2 p-3 bg-amber-500/5 border border-amber-500/15 rounded-lg space-y-2 animate-fade-in">
+                            {post.creative_reasoning && (
+                              <div>
+                                <p className="text-amber-400/60 text-xs font-medium mb-1">Reasoning</p>
+                                <p className="text-gray-300 text-xs leading-relaxed">{post.creative_reasoning}</p>
+                              </div>
+                            )}
+                            {post.why_this_works && (
+                              <div>
+                                <p className="text-amber-400/60 text-xs font-medium mb-1">Why This Works</p>
+                                <p className="text-gray-300 text-xs leading-relaxed">{post.why_this_works}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Actions - moved to bottom on mobile */}
                     <div className="flex gap-2 mt-3 pt-3 border-t border-white/5 sm:border-0 sm:mt-auto sm:pt-0">
                       {post.status === 'pending' && (
@@ -651,6 +681,7 @@ function HistoryTab({ history }) {
   const posts = history?.posts || [];
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [selectedMediaType, setSelectedMediaType] = useState('image');
+  const [expandedThinking, setExpandedThinking] = useState({});
 
   const handleMediaClick = (post) => {
     const isVideo = post.media_type === 'video' || post.image_url?.includes('/videos/') || post.image_url?.endsWith('.mp4');
@@ -765,6 +796,34 @@ function HistoryTab({ history }) {
                         <p className="text-gray-300 text-sm sm:text-base line-clamp-2 sm:line-clamp-none">{post.content}</p>
                         {post.error_message && (
                           <p className="text-red-400 text-xs sm:text-sm mt-2 bg-red-500/10 p-2 rounded-lg">{post.error_message}</p>
+                        )}
+                        {/* AI Thinking */}
+                        {(post.creative_reasoning || post.why_this_works) && (
+                          <div className="mt-2">
+                            <button
+                              onClick={() => setExpandedThinking(prev => ({ ...prev, [post.id || index]: !prev[post.id || index] }))}
+                              className="text-xs text-amber-400/70 hover:text-amber-400 flex items-center gap-1 transition-colors"
+                            >
+                              <Brain className="w-3 h-3" />
+                              {expandedThinking[post.id || index] ? 'Hide' : 'Show'} AI Thinking
+                            </button>
+                            {expandedThinking[post.id || index] && (
+                              <div className="mt-2 p-3 bg-amber-500/5 border border-amber-500/15 rounded-lg space-y-2 animate-fade-in">
+                                {post.creative_reasoning && (
+                                  <div>
+                                    <p className="text-amber-400/60 text-xs font-medium mb-1">Reasoning</p>
+                                    <p className="text-gray-300 text-xs leading-relaxed">{post.creative_reasoning}</p>
+                                  </div>
+                                )}
+                                {post.why_this_works && (
+                                  <div>
+                                    <p className="text-amber-400/60 text-xs font-medium mb-1">Why This Works</p>
+                                    <p className="text-gray-300 text-xs leading-relaxed">{post.why_this_works}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1380,7 +1439,7 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
+    <div className="min-h-screen bg-gray-900 flex flex-col" style={{ background: 'linear-gradient(to bottom right, #111827, #1f2937, #111827)', backgroundAttachment: 'fixed' }}>
       {/* Header */}
       <header className="border-b border-white/10 bg-black/40 backdrop-blur-md sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">

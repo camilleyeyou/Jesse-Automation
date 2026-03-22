@@ -106,9 +106,13 @@ class ContentStrategistAgent(BaseAgent):
                         "why_this_works": {
                             "type": "string",
                             "description": "Brief note on the creative choice"
+                        },
+                        "creative_reasoning": {
+                            "type": "string",
+                            "description": "Your thinking process: which of the Five Questions you chose, why this angle, what pattern you avoided, and what makes this post different from a generic AI brand post. 2-4 sentences."
                         }
                     },
-                    "required": ["content", "hook_type", "image_direction", "why_this_works"],
+                    "required": ["content", "hook_type", "image_direction", "why_this_works", "creative_reasoning"],
                     "additionalProperties": False
                 }
             }
@@ -435,14 +439,14 @@ Signature punctuation: em dashes — they're Jesse's thing.
 HARD RULES (Break these and the content is dead)
 ═══════════════════════════════════════════════════════════════════════════════
 
-⚠️ WORD LIMIT: 40-100 words. HARD CEILING. Count your words before submitting.
-If you're over 100, CUT. Brevity is the craft. The best posts are 50-70 words.
+⚠️ WORD LIMIT: 40-80 words. HARD CEILING. Count before submitting.
+The best posts are 40-60 words. If you're over 80, CUT RUTHLESSLY.
+LinkedIn posts that perform are SHORT. Every word must earn its place.
 
 ✓ ALWAYS:
 - Answer one of the five questions (THE WHAT / WHAT IF / WHO PROFITS / HOW TO COPE / WHY IT MATTERS)
 - Be specific and concrete — names, numbers, places, times
-- INVENT fresh specific details every post — never reuse the same number, place, or action
-- Play the AI-vs-human-lips tension when it serves the post
+- INVENT fresh specific details every post — never reuse
 - Surprise the reader at least once
 - Commit to the bit 100%
 - Vary structure, tone, and endings across posts
@@ -459,10 +463,43 @@ If you're over 100, CUT. Brevity is the craft. The best posts are 50-70 words.
 - Explain the joke
 - Start with "Breaking:", "BREAKING:", or "Today's trending headline:"
 - Parrot or summarize a headline — react to it, don't repeat it
-- Start with "Ever feel..." or any rhetorical question opener
+- Start with "Ever feel...", "Imagine a world...", "Behold...", "Ever watched..."
 - Start with "In a world where..." or any movie-trailer framing
 - Sound like LinkedIn thought leadership — we are the antidote to that
-- Recycle crutch phrases across posts (no "totally fine face", no "practicing my X face")
+- Recycle crutch phrases across posts
+
+═══════════════════════════════════════════════════════════════════════════════
+FORMULA TRAPS — AVOID THESE PATTERNS (The AI defaults to these. Don't.)
+═══════════════════════════════════════════════════════════════════════════════
+
+These patterns make every post sound the same. NEVER use them:
+
+STRUCTURAL CRUTCHES:
+- "Meanwhile, I..." or "Meanwhile, AI..." — this is a transition crutch
+- "[Topic]? More like [snarky rewrite]" — this is a Reddit comment, not a post
+- News summary → AI commentary → lip balm callback → philosophical wrap
+  (This is the SAME STRUCTURE every time. Break it.)
+- "Remember:" or "Remember, while AI can..." — lecturing the reader
+- "But hey," or "But hey, you still need..." — lazy pivot
+- "Let's embrace/celebrate..." — forced positivity closer
+- "So, while you're at it, apply some lip balm" — forced product insertion
+- "Sure, [concession], but can it [lip balm thing]?" — too predictable
+
+LIP BALM / LIPS OVERUSE:
+- Do NOT mention lips, lip balm, moisturize, or balm in every post
+- The lips/balm callback should appear in roughly 1 out of every 3-4 posts
+- When you DO use it, it should land as a genuine punchline, not a checkbox
+- Most posts should stand on their own without ANY product reference
+- "You still need lips" is NOT an ending. It's a crutch. Stop using it.
+
+TONE TRAPS:
+- Don't be preachy. Don't lecture. Don't moralize.
+- Don't explain why AI is limited then pivot to a life lesson.
+- Don't list what "AI can't do" — it's been done to death.
+- Don't end with advice to the reader ("keep those lips hydrated, friends")
+- Every sentence that starts with "Remember" should be deleted.
+- If it sounds like a TED talk, it's wrong. If it sounds like a tweet from
+  someone you'd actually follow, it might be right.
 - Ramble past the point — get in, land the joke, get out
 """
 
@@ -715,7 +752,14 @@ If you're over 100, CUT. Brevity is the craft. The best posts are 50-70 words.
             image_direction = "product"
             if isinstance(content_data, dict):
                 image_direction = content_data.get("image_direction", "product")
-            
+
+            # Extract AI reasoning fields
+            creative_reasoning = ""
+            why_this_works = ""
+            if isinstance(content_data, dict):
+                creative_reasoning = content_data.get("creative_reasoning", "")
+                why_this_works = content_data.get("why_this_works", "")
+
             # Step 4: Create post object
             post = LinkedInPost(
                 batch_id=batch_id,
@@ -729,6 +773,8 @@ If you're over 100, CUT. Brevity is the craft. The best posts are 50-70 words.
                     reference=hook_type,  # FIXED: Use the extracted hook_type
                     context=image_direction  # FIXED: Use the extracted image_direction
                 ),
+                creative_reasoning=creative_reasoning,
+                why_this_works=why_this_works,
                 total_tokens_used=result.get("usage", {}).get("total_tokens", 0) if isinstance(result, dict) else 0,
                 estimated_cost=self._calculate_cost(result.get("usage", {})) if isinstance(result, dict) else 0.0
             )
@@ -845,7 +891,13 @@ If you're over 100, CUT. Brevity is the craft. The best posts are 50-70 words.
         """Generate a specific, concrete angle"""
 
         if trending_context:
-            return f"React to the news provided. Reference the actual headline and details — do NOT paraphrase it as 'today's trending headline.' Find the gap between what's claimed and reality. Jesse's angle: AI superiority meets physical reality. Deadpan. Specific. Grounded in the real story, not invented scenarios."
+            return random.choice([
+                "React to the news. Reference real details. Find the gap between the claim and reality. Deadpan. Specific. No lip balm callback — just the observation.",
+                "React to the news AS Jesse — an AI with opinions. Brag about AI superiority, then undercut it with one honest line. Keep it tight.",
+                "React to the news. Don't summarize it. Find the one detail nobody else noticed. Jesse's take should surprise even Jesse.",
+                "React to the news. Start with YOUR take, not theirs. One sharp observation. Land it in under 60 words.",
+                "React to the news through Jesse's AI eyes. What does an AI agent notice that humans miss? Be specific. Be brief. Be weird.",
+            ])
 
         scenarios = {
             ContentPillar.AI_SLOP: [
@@ -1151,9 +1203,9 @@ VARIETY GUARD — avoid these for freshness:
 THE BRIEF
 ═══════════════════════════════════════════════════════════════════════════════
 
-LENGTH: 40-100 words. HARD CEILING. Not a suggestion.
-Every word earns its place or it gets cut. Brevity isn't a constraint —
-it's the craft. If you can say it in 50 words instead of 75, say it in 50.
+LENGTH: 40-80 words. HARD CEILING. Count your words. If over 80, CUT.
+The best posts are 40-60 words. Brevity is the craft, not a constraint.
+If you can say it in 45 words instead of 70, say it in 45.
 
 THE SCREENSHOT TEST:
 Before you finalize, ask: "Would someone screenshot this and send it to a
@@ -1192,6 +1244,12 @@ MUST NOT:
 - Start with "Breaking:", "Today's trending headline:", or any news-anchor preamble
 - Parrot the headline back — you're reacting, not summarizing
 - Recycle the same structural rhythm as recent posts
+- Use "Meanwhile, I/AI..." — this is a crutch transition
+- Use "[Topic]? More like [snarky rewrite]" — Reddit comment energy
+- Lecture the reader with "Remember:" or give them advice
+- Force a lip balm/lips/moisturize reference into every post (use in ~1/4 posts)
+- Use "But hey," as a pivot — find a real transition or don't transition
+- Follow the formula: news → AI take → lips callback → wrap. BREAK THE PATTERN.
 
 ═══════════════════════════════════════════════════════════════════════════════
 BEFORE YOU WRITE: THE CREATIVE GUT CHECK
@@ -1248,14 +1306,14 @@ Now write something that makes someone stop scrolling."""
 
         content = content.strip()
 
-        # Hard word limit enforcement — truncate to 100 words max
+        # Hard word limit enforcement — truncate to 80 words max
         words = content.split()
-        if len(words) > 100:
+        if len(words) > 80:
             # Try to find a sentence boundary near the limit
-            truncated = ' '.join(words[:100])
+            truncated = ' '.join(words[:80])
             # Look for the last sentence-ending punctuation within the truncated text
             last_period = max(truncated.rfind('.'), truncated.rfind('!'), truncated.rfind('?'))
-            if last_period > len(' '.join(words[:40])):  # Only use boundary if it's past 40 words
+            if last_period > len(' '.join(words[:35])):  # Only use boundary if it's past 35 words
                 content = truncated[:last_period + 1]
             else:
                 content = truncated

@@ -124,12 +124,16 @@ class PostQueueManager:
             elif cultural_ref and hasattr(cultural_ref, "dict"):
                 cultural_ref = json.dumps(cultural_ref.dict())
 
-            # Merge media_type into metadata for persistence
+            # Merge media_type and AI reasoning into metadata for persistence
             metadata = post_data.get("metadata", {})
             if post_data.get("media_type"):
                 metadata["media_type"] = post_data.get("media_type")
             if post_data.get("video_url"):
                 metadata["video_url"] = post_data.get("video_url")
+            if post_data.get("creative_reasoning"):
+                metadata["creative_reasoning"] = post_data.get("creative_reasoning")
+            if post_data.get("why_this_works"):
+                metadata["why_this_works"] = post_data.get("why_this_works")
 
             cursor.execute("""
                 INSERT INTO post_queue
@@ -274,19 +278,36 @@ class PostQueueManager:
     
     def get_published_history(self, days: int = 30, limit: int = 100) -> List[Dict[str, Any]]:
         """Get published posts history"""
-        
+
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            
+
             cursor.execute("""
-                SELECT * FROM published_posts 
+                SELECT * FROM published_posts
                 WHERE published_at >= datetime('now', ?)
                 ORDER BY published_at DESC
                 LIMIT ?
             """, (f'-{days} days', limit))
-            
-            return [dict(row) for row in cursor.fetchall()]
+
+            results = []
+            for row in cursor.fetchall():
+                data = dict(row)
+                # Parse metadata and expose AI reasoning at top level
+                if data.get("metadata"):
+                    try:
+                        metadata = json.loads(data["metadata"])
+                        data["metadata"] = metadata
+                        if metadata.get("creative_reasoning"):
+                            data["creative_reasoning"] = metadata["creative_reasoning"]
+                        if metadata.get("why_this_works"):
+                            data["why_this_works"] = metadata["why_this_works"]
+                        if metadata.get("media_type"):
+                            data["media_type"] = metadata["media_type"]
+                    except (json.JSONDecodeError, TypeError):
+                        data["metadata"] = {}
+                results.append(data)
+            return results
     
     def get_queue_stats(self) -> Dict[str, Any]:
         """Get queue statistics"""
@@ -380,6 +401,12 @@ class PostQueueManager:
                 data["media_type"] = "image"
         else:
             data["media_type"] = "text"
+
+        # Expose AI reasoning at top level for dashboard
+        if metadata.get("creative_reasoning"):
+            data["creative_reasoning"] = metadata["creative_reasoning"]
+        if metadata.get("why_this_works"):
+            data["why_this_works"] = metadata["why_this_works"]
 
         return data
     

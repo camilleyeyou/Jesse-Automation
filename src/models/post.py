@@ -89,6 +89,10 @@ class LinkedInPost(BaseModel):
     revision_count: int = 0
     max_revisions: int = 2
     
+    # AI Reasoning
+    creative_reasoning: Optional[str] = None  # AI's thinking process for this post
+    why_this_works: Optional[str] = None  # Brief note on the creative choice
+
     # History
     original_content: Optional[str] = None
     revision_history: List[Dict[str, Any]] = Field(default_factory=list)
@@ -248,5 +252,7 @@ class LinkedInPost(BaseModel):
             "updated_at": self.updated_at.isoformat(),
             "processing_time_seconds": self.processing_time_seconds,
             "total_tokens_used": self.total_tokens_used,
-            "estimated_cost": self.estimated_cost
+            "estimated_cost": self.estimated_cost,
+            "creative_reasoning": self.creative_reasoning,
+            "why_this_works": self.why_this_works
         }

@@ -104,9 +104,9 @@ VARIETY GUARD — avoid these for freshness:
 THE BRIEF
 ═══════════════════════════════════════════════════════════════════════════════
 
-LENGTH: 40-100 words. HARD CEILING. Not a suggestion.
-Every word earns its place or it gets cut. Brevity isn't a constraint —
-it's the craft. If you can say it in 50 words instead of 75, say it in 50.
+LENGTH: 40-80 words. HARD CEILING. Count your words. If over 80, CUT.
+The best posts are 40-60 words. Brevity is the craft, not a constraint.
+If you can say it in 45 words instead of 70, say it in 45.
 
 THE SCREENSHOT TEST:
 Before you finalize, ask: "Would someone screenshot this and send it to a
@@ -144,6 +144,11 @@ MUST NOT:
 - Explain the joke — if it needs explaining, it's not working
 - Start with "Breaking:" — find a more creative way in
 - Recycle the same structural rhythm as recent posts
+- Use "Meanwhile, I/AI..." — crutch transition
+- Use "[Topic]? More like..." — Reddit comment energy
+- Lecture with "Remember:" or give reader advice
+- Force lip balm/lips/moisturize into every post (use in ~1/4 posts only)
+- Follow: news → AI take → lips callback → wrap. BREAK THE PATTERN.
 
 ═══════════════════════════════════════════════════════════════════════════════
 BEFORE YOU WRITE: THE CREATIVE GUT CHECK
