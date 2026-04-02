@@ -152,6 +152,14 @@ GOOD INSIGHT EXAMPLES:
 ✅ "AI Safety content gets 40% more comments than AI Slop; AI Slop gets 2x more shares (based on 12 posts)"
 ✅ "Posts with a named source in the hook average 28 reactions vs 14 for posts with generic hooks (last 10 posts)"
 ✅ "Tuesday 9am posts outperform Thursday 4pm by 40% on impressions (12-week rolling average)"
+✅ "Clinical diagnostician voice posts (pseudo-scientific framing, dryness scores) average 2.4x shares vs standard voice (observed 4 posts over 3 weeks)"
+✅ "Posts with invented medical conditions in the hook get 35% more comments than generic hooks (last 6 clinical posts)"
+
+VOICE-SPECIFIC TRACKING:
+- Track clinical diagnostician voice performance separately (type: "voice")
+- Compare pseudo-scientific framing vs standard satirical framing
+- Note whether invented conditions with high specificity outperform generic clinical language
+- Track if deadpan commitment correlates with higher shares (hypothesis: it does)
 
 OUTPUT FORMAT (JSON):
 {

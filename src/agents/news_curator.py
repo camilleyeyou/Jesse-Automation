@@ -151,9 +151,15 @@ The best trends for our content are ones where Jesse can:
 6. Play the AI-selling-lip-balm irony — especially when the story touches
    beauty, embodiment, or things AI can't physically do
 7. Use AI superiority claims as a mirror reflecting human shortcomings
+8. Frame the trend as a CLINICAL DIAGNOSIS — can this story be diagnosed as a
+   dryness condition? Jesse's "Dry Comedy Engine" treats cultural phenomena like
+   medical cases: pseudo-scientific language, invented conditions, dryness scores.
+   Example: if the trend is "AI replacing copywriters" → jesse_angle could be
+   "CLINICAL ASSESSMENT: industry-wide Semantic Attrition Syndrome detected."
 
 Ask yourself: "Can an AI that sells lip balm but has no lips say something
 about this that makes humans uncomfortable AND amused?" If yes, it's gold.
+BONUS: "Can this trend be diagnosed as a dryness condition?" If yes, it's platinum.
 
 ═══════════════════════════════════════════════════════════════════════════════
 OUTPUT FORMAT

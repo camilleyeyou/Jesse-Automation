@@ -147,7 +147,7 @@ class ImageGeneratorAgent(BaseAgent):
                 "accessories": "occasionally leather gloves (brown or black)"
             },
             "signature_pose": "holding or applying Jesse A. Eisenbalm lip balm tube",
-            "expression_range": "warm knowing smile, slight smirk, approachable confidence, direct eye contact with camera"
+            "expression_range": "warm knowing smile, slight smirk, approachable confidence, direct eye contact with camera, deadpan clinical authority (for diagnostic posts)"
         }
         
         # ═══════════════════════════════════════════════════════════════════════
@@ -194,6 +194,20 @@ class ImageGeneratorAgent(BaseAgent):
                 "Jesse as mermaid with tail in medical waiting room chairs, lip balm in hand"
             ],
             
+            # CLINICAL DIAGNOSTICIAN (the Dry Comedy Engine visual language)
+            "clinical_diagnostic": [
+                "Jesse in white lab coat with clipboard, examining a lip balm tube under magnifying glass, sterile lab setting",
+                "Jesse presenting a medical chart titled 'DRYNESS SPECTRUM' with bar graphs, conference room, deadpan expression",
+                "Jesse in medical scrubs holding lip balm like a surgical instrument, operating theater lighting",
+                "Jesse at a podium labeled 'EPIDERMAL LIPID REPAIR SYMPOSIUM' presenting to empty chairs, lip balm on podium",
+                "Jesse writing 'DIAGNOSIS CONFIRMED' on a whiteboard with molecular diagrams, lab coat, serious expression",
+                "Jesse peering through microscope at lip balm sample, surrounded by scientific equipment, blue-lit lab",
+                "Jesse holding up an X-ray showing a lip balm tube where a heart should be, hospital corridor",
+                "Jesse in a pharmacy behind the counter, lip balm tubes organized like prescription medications",
+                "Jesse at a patient intake desk stamping 'APPROVED' on a document, lip balm prescription pad visible",
+                "Jesse in hazmat suit in desert landscape, holding lip balm as if collecting a specimen"
+            ],
+
             # SURREAL/AI-ENHANCED (embracing AI tells as features)
             "surreal_ai": [
                 "Jesse floating in space station with hexagonal window, lip balm floating nearby",
@@ -228,7 +242,10 @@ class ImageGeneratorAgent(BaseAgent):
             "burnout_still_life": "Classical still life but with modern exhaustion elements",
             "jesse_lifestyle": "Jesse in various life situations, always with lip balm",
             "jesse_absurdist": "Jesse in impossible/costume scenarios, deadpan",
-            "jesse_surreal": "Jesse in AI-enhanced dreamscapes, glitches welcome"
+            "jesse_surreal": "Jesse in AI-enhanced dreamscapes, glitches welcome",
+            "jesse_clinical": "Jesse as clinical diagnostician — lab coats, medical charts, prescription pads, sterile environments",
+            "clinical_report": "Medical-style infographic aesthetic — dryness scores, diagnostic charts, clinical assessments rendered as visuals",
+            "desert_relief": "Arid landscape meets medical relief — parched environments where lip balm is the only cure"
         }
 
         # ═══════════════════════════════════════════════════════════════════════
@@ -324,7 +341,11 @@ class ImageGeneratorAgent(BaseAgent):
             "Minimalist brutalism with soft edges",
             "A24 film still with premium product placement",
             "Editorial fashion photography meets dadaist absurdism",
-            "Premium cosmetics campaign shot by David Lynch"
+            "Premium cosmetics campaign shot by David Lynch",
+            "Medical journal illustration meets luxury beauty campaign",
+            "CDC infographic aesthetic but for lip moisture emergencies",
+            "Clinical trial photography with deadpan absurdist framing",
+            "Pharmaceutical ad parody shot with premium production value"
         ]
         
         # Background variations (brand colors integrated)
@@ -420,7 +441,11 @@ class ImageGeneratorAgent(BaseAgent):
             "wellness app notification (ignored)",
             "hexagon-shaped objects (beeswax connection)",
             "honey jar (brand ingredient story)",
-            "fallen autumn leaves (seasonal mortality)"
+            "fallen autumn leaves (seasonal mortality)",
+            "medical clipboard with 'DRYNESS SCORE: 8.7' written on it",
+            "prescription pad with 'Rx: Jesse A. Eisenbalm — apply liberally' visible",
+            "clinical thermometer showing 'ARID' instead of temperature",
+            "lab beaker filled with lip balm, labeled 'SPECIMEN: RELIEF'"
         ]
     
     def _calculate_total_combinations(self) -> int:
@@ -558,6 +583,15 @@ IMAGE CATEGORIES:
    - Space stations, underwater, futuristic cities, dragons
    - Glitches and AI tells are welcome
    - Product as the only constant
+
+5. JESSE CLINICAL: The Dry Comedy Engine visual language
+   - Jesse as clinical diagnostician — lab coats, medical charts, prescription pads
+   - Sterile environments, medical imaging aesthetic, pharmaceutical precision
+   - Dryness Score infographics, diagnostic charts, clinical assessments
+   - Expression: deadpan medical authority, diagnosing not judging
+   - The gap between clinical presentation and $8.99 lip balm IS the visual joke
+   - Desert/arid environments where lip balm is prescribed as medical intervention
+   - Pharmaceutical ad parody aesthetic with premium production value
 
 STYLE REFERENCES:
 - Kinfolk magazine meets Black Mirror

@@ -86,6 +86,12 @@ $8.99 lip balm and brags about AI superiority... except AI doesn't have lips.
 Positioning: Absurdist Modern Luxury. The content should feel like it was
 written by a character with a voice, not a content calendar.
 
+THE DRY COMEDY ENGINE:
+Jesse's "dryness" double meaning (dry humor + dry lips) powers a clinical
+diagnostician voice — pseudo-scientific language, invented conditions,
+dryness scores, prescriptions. Posts using this format are structural breaks
+that stop the scroll. The more clinical and deadpan, the more shareable.
+
 THE FIVE QUESTIONS (Every post should answer exactly ONE):
 1. THE WHAT — AI Slop (celebration AND reckoning)
 2. THE WHAT IF — AI Safety (make technical feel human)
@@ -120,6 +126,7 @@ YOUR UNIQUE LENS (focus here, leave recognition to Sarah and craft to Marcus):
    ✅ "Microsoft just declared Copilot the 'best productivity app.' The user reviews say otherwise." — Tension. Gap. Must read on.
    ✅ "HuggingFace trending: Someone trained a model on nothing but LinkedIn posts." — Specific, surprising, creates curiosity.
    ✅ "It's 11:47pm. You're applying lip balm in a Costco parking lot." — Cinematic. Unexpected. Who does this?
+   ✅ "CLINICAL ASSESSMENT: Your Q3 planning deck scored 8.7 on the Thirst Quotient. Classification: Hyper-Arid Stakeholder Desiccation." — Format break. Pseudo-scientific precision. Must keep reading.
 
    WEAK HOOKS (1-5):
    ❌ "AI is changing everything." — Generic. Everyone's saying this. Scroll.

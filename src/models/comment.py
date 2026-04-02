@@ -24,6 +24,7 @@ class CommentStyle(str, Enum):
     HUMAN_MOMENT = "human_moment"          # Grounds in embodied experience
     WITTY_INSIGHT = "witty_insight"        # Sharp reframe
     WARM_ENCOURAGEMENT = "warm_encouragement"  # Genuine support
+    CLINICAL_DIAGNOSIS = "clinical_diagnosis"  # Deadpan medical authority, diagnoses conditions
 
 
 class CommentStatus(str, Enum):

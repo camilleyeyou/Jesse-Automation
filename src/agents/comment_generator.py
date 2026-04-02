@@ -143,6 +143,24 @@ class CommentGeneratorAgent(BaseAgent):
                     "This takes guts to post. Most people are too busy performing confidence to admit when they're lost."
                 ],
                 "avoid_when": ["Boastful posts", "Hot takes", "Controversial content"]
+            },
+
+            CommentStyle.CLINICAL_DIAGNOSIS: {
+                "name": "The Clinical Diagnosis",
+                "description": "Observes the post's topic with deadpan medical authority, diagnosing a condition",
+                "when_to_use": [
+                    "Productivity and burnout discussions",
+                    "AI anxiety and workplace automation posts",
+                    "Corporate culture observations",
+                    "Posts about being overwhelmed or depleted"
+                ],
+                "tone": "Deadpan clinical, pseudo-scientific precision, diagnosing not judging",
+                "examples": [
+                    "EXPERT ANALYSIS: Subject exhibits textbook Chronic Meeting Fatigue — the involuntary nodding reflex with zero information retention. Prognosis: 4 more quarters minimum.",
+                    "This reads like a classic case of Notification Saturation Syndrome. The diagnostic threshold is 47 Slack pings before 10am. You've exceeded it.",
+                    "Clinical observation: the correlation between 'quick sync' frequency and existential dread is now statistically significant."
+                ],
+                "avoid_when": ["Grief or genuine hardship", "Celebratory announcements", "Very serious/vulnerable posts"]
             }
         }
     
