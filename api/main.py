@@ -1052,6 +1052,61 @@ async def get_insights(top: int = 10, insight_type: str = None):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# CLIENT REVIEWS — Human feedback from client on content quality
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@app.post("/api/automation/client-reviews")
+async def add_client_review(request: Request):
+    """Submit a client review about content quality."""
+    from src.infrastructure.memory import get_memory as _get_mem
+    try:
+        body = await request.json()
+        review_text = body.get("review_text", "").strip()
+        if not review_text:
+            raise HTTPException(400, "review_text is required")
+        rating = body.get("rating")
+        category = body.get("category", "general")
+        post_id = body.get("post_id")
+        mem = _get_mem(DB_PATH)
+        review_id = mem.add_client_review(
+            review_text=review_text,
+            rating=int(rating) if rating is not None else None,
+            category=category,
+            post_id=post_id,
+        )
+        return {"success": True, "review_id": review_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Failed to add review: {e}")
+
+
+@app.get("/api/automation/client-reviews")
+async def get_client_reviews(limit: int = 50, unaddressed_only: bool = False):
+    """Get client reviews."""
+    from src.infrastructure.memory import get_memory as _get_mem
+    try:
+        mem = _get_mem(DB_PATH)
+        reviews = mem.get_client_reviews(limit=limit, unaddressed_only=unaddressed_only)
+        return {"success": True, "reviews": reviews, "count": len(reviews)}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to fetch reviews: {e}")
+
+
+@app.delete("/api/automation/client-reviews/{review_id}")
+async def delete_client_review(review_id: int):
+    """Delete a client review."""
+    from src.infrastructure.memory import get_memory as _get_mem
+    try:
+        mem = _get_mem(DB_PATH)
+        mem.delete_client_review(review_id)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to delete review: {e}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # COMMENT ENGAGEMENT ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════════════
 

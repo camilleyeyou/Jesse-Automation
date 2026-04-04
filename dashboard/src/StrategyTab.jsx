@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Brain, RefreshCw, Calendar, TrendingUp, AlertTriangle,
   ChevronDown, ChevronUp, Lightbulb, BarChart3, Play, CheckCircle,
-  Clock, Target
+  Clock, Target, MessageSquarePlus, Star, Trash2, Send
 } from 'lucide-react';
 
 import { api } from './api';
@@ -72,6 +72,7 @@ function InsightCard({ insight }) {
     drift_alert: 'text-red-400 bg-red-500/10',
     weekly_avoid: 'text-orange-400 bg-orange-500/10',
     weekly_double_down: 'text-emerald-400 bg-emerald-500/10',
+    client_feedback: 'text-yellow-400 bg-yellow-500/10',
   };
 
   const type = insight.insight_type || 'general';
@@ -186,6 +187,49 @@ function PerformanceRow({ post }) {
   );
 }
 
+function ReviewCard({ review, onDelete }) {
+  const addressed = review.addressed === 1;
+  const categoryColors = {
+    tone: 'text-amber-400 bg-amber-500/10',
+    content: 'text-blue-400 bg-blue-500/10',
+    strategy: 'text-purple-400 bg-purple-500/10',
+    general: 'text-gray-400 bg-gray-500/10',
+    brand: 'text-pink-400 bg-pink-500/10',
+  };
+  const colorClass = categoryColors[review.category] || categoryColors.general;
+  const date = (review.created_at || '').slice(0, 10);
+
+  return (
+    <div className={`rounded-lg p-3 ${addressed ? 'bg-white/3 opacity-60' : 'bg-white/5'}`}>
+      <div className="flex items-start gap-2">
+        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${colorClass}`}>
+          {review.category || 'general'}
+        </span>
+        <p className="text-gray-300 text-sm flex-1">{review.review_text}</p>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(review.id); }}
+          className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0"
+          title="Delete review"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div className="flex items-center gap-3 mt-2">
+        {review.rating && (
+          <div className="flex items-center gap-0.5">
+            {[1, 2, 3, 4, 5].map(s => (
+              <Star key={s} className={`w-3 h-3 ${s <= review.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-600'}`} />
+            ))}
+          </div>
+        )}
+        <span className="text-[10px] text-gray-500">{date}</span>
+        {addressed && <span className="text-[10px] text-green-500">addressed</span>}
+        {!addressed && <span className="text-[10px] text-amber-400">pending</span>}
+      </div>
+    </div>
+  );
+}
+
 // ============== Main Component ==============
 
 export default function StrategyTab() {
@@ -194,6 +238,11 @@ export default function StrategyTab() {
   const [performance, setPerformance] = useState([]);
   const [themeDistribution, setThemeDistribution] = useState({});
   const [adaptiveWeights, setAdaptiveWeights] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [reviewText, setReviewText] = useState('');
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewCategory, setReviewCategory] = useState('general');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [message, setMessage] = useState('');
@@ -201,14 +250,16 @@ export default function StrategyTab() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [calRes, insRes, perfRes, weightsRes] = await Promise.all([
+      const [calRes, insRes, perfRes, weightsRes, revRes] = await Promise.all([
         api.get('/api/automation/calendar'),
         api.get('/api/automation/strategy-insights?top=20'),
         api.get('/api/automation/performance?days=14'),
         api.get('/api/automation/adaptive-weights?days=30').catch(() => ({ success: false })),
+        api.get('/api/automation/client-reviews?limit=50').catch(() => ({ success: false, reviews: [] })),
       ]);
       setCalendar(calRes.entries || []);
       setInsights(insRes.insights || []);
+      setReviews(revRes.reviews || []);
       setPerformance(perfRes.posts || []);
 
       // Compute theme distribution from performance data
@@ -246,6 +297,36 @@ export default function StrategyTab() {
       setMessage(`Failed: ${e.message}`);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const submitReview = async () => {
+    if (!reviewText.trim()) return;
+    setReviewSubmitting(true);
+    try {
+      await api.post('/api/automation/client-reviews', {
+        review_text: reviewText.trim(),
+        rating: reviewRating > 0 ? reviewRating : null,
+        category: reviewCategory,
+      });
+      setReviewText('');
+      setReviewRating(0);
+      setReviewCategory('general');
+      setMessage('Review submitted — will be processed on next refinement run');
+      fetchAll();
+    } catch (e) {
+      setMessage(`Failed to submit review: ${e.message}`);
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const deleteReview = async (reviewId) => {
+    try {
+      await api.delete(`/api/automation/client-reviews/${reviewId}`);
+      setReviews(prev => prev.filter(r => r.id !== reviewId));
+    } catch (e) {
+      setMessage(`Failed to delete: ${e.message}`);
     }
   };
 
@@ -431,6 +512,73 @@ export default function StrategyTab() {
           </Card>
         </div>
       )}
+
+      {/* Client Reviews */}
+      <Card>
+        <SectionTitle icon={MessageSquarePlus} title={`Client Reviews (${reviews.filter(r => !r.addressed).length} pending)`} />
+
+        {/* Submit form */}
+        <div className="space-y-3 mb-4">
+          <textarea
+            value={reviewText}
+            onChange={e => setReviewText(e.target.value)}
+            placeholder="Share feedback about recent content — tone, topics, what's working, what's not..."
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 resize-none"
+            rows={3}
+          />
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Category selector */}
+            <select
+              value={reviewCategory}
+              onChange={e => setReviewCategory(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-amber-500/50"
+            >
+              <option value="general">General</option>
+              <option value="tone">Tone & Voice</option>
+              <option value="content">Content & Topics</option>
+              <option value="strategy">Strategy</option>
+              <option value="brand">Brand Alignment</option>
+            </select>
+
+            {/* Star rating */}
+            <div className="flex items-center gap-0.5">
+              {[1, 2, 3, 4, 5].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setReviewRating(reviewRating === s ? 0 : s)}
+                  className="p-0.5"
+                >
+                  <Star className={`w-4 h-4 transition-colors ${s <= reviewRating ? 'text-amber-400 fill-amber-400' : 'text-gray-600 hover:text-gray-400'}`} />
+                </button>
+              ))}
+              {reviewRating > 0 && (
+                <span className="text-[10px] text-gray-500 ml-1">{reviewRating}/5</span>
+              )}
+            </div>
+
+            {/* Submit button */}
+            <button
+              onClick={submitReview}
+              disabled={!reviewText.trim() || reviewSubmitting}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-xs text-amber-400 transition-colors disabled:opacity-50 ml-auto"
+            >
+              <Send className="w-3.5 h-3.5" />
+              {reviewSubmitting ? 'Submitting...' : 'Submit Review'}
+            </button>
+          </div>
+        </div>
+
+        {/* Review list */}
+        {reviews.length === 0 ? (
+          <p className="text-gray-500 text-sm">No reviews yet. Submit feedback above to improve the strategist.</p>
+        ) : (
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {reviews.map(r => (
+              <ReviewCard key={r.id} review={r} onDelete={deleteReview} />
+            ))}
+          </div>
+        )}
+      </Card>
 
       {/* Strategy Insights */}
       <Card>

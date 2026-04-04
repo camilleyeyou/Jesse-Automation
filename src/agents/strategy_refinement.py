@@ -52,13 +52,14 @@ class StrategyRefinementAgent(BaseAgent):
         recent = self.memory.get_recent_performance(days=7)
         historical = self.memory.get_recent_performance(days=60)
         existing_insights = self.memory.get_strategy_insights(top=20)
+        client_reviews = self.memory.get_client_reviews(limit=20, unaddressed_only=True)
 
-        if not recent and not historical:
-            logger.info("No performance data yet — skipping refinement")
+        if not recent and not historical and not client_reviews:
+            logger.info("No performance data or client reviews — skipping refinement")
             return {"success": True, "new_insights": 0, "updated_insights": 0, "reason": "no_data"}
 
         # Build the analysis prompt
-        prompt = self._build_prompt(recent, historical, existing_insights)
+        prompt = self._build_prompt(recent, historical, existing_insights, client_reviews)
         system_prompt = self._build_system_prompt()
 
         result = await self.ai_client.generate(
@@ -111,14 +112,21 @@ class StrategyRefinementAgent(BaseAgent):
             except Exception as e:
                 logger.warning(f"  Failed to update insight: {e}")
 
+        # Mark client reviews as addressed
+        if client_reviews:
+            review_ids = [r["id"] for r in client_reviews]
+            self.memory.mark_reviews_addressed(review_ids)
+            logger.info(f"  ✅ Marked {len(review_ids)} client reviews as addressed")
+
         summary = {
             "success": True,
             "new_insights": new_count,
             "updated_insights": updated_count,
             "recent_posts_analysed": len(recent),
             "historical_posts_analysed": len(historical),
+            "client_reviews_processed": len(client_reviews),
         }
-        logger.info(f"📈 Refinement complete: {new_count} new, {updated_count} updated")
+        logger.info(f"📈 Refinement complete: {new_count} new, {updated_count} updated, {len(client_reviews)} reviews processed")
         return summary
 
     def _build_system_prompt(self) -> str:
@@ -133,7 +141,7 @@ RULES:
 - Confidence starts low (0.2-0.5) and grows with evidence
 - If existing insights are supported or contradicted by new data, flag them for update
 - If new evidence CONTRADICTS a high-confidence insight, lower its confidence — don't ignore the conflict
-- Insight types: format_learning, theme_performance, timing, voice, engagement_pattern
+- Insight types: format_learning, theme_performance, timing, voice, engagement_pattern, client_feedback
 
 QUALITY GATE — Every insight MUST include:
 1. A specific comparison (X vs Y, not just "X performs well")
@@ -154,6 +162,14 @@ GOOD INSIGHT EXAMPLES:
 ✅ "Tuesday 9am posts outperform Thursday 4pm by 40% on impressions (12-week rolling average)"
 ✅ "Clinical diagnostician voice posts (pseudo-scientific framing, dryness scores) average 2.4x shares vs standard voice (observed 4 posts over 3 weeks)"
 ✅ "Posts with invented medical conditions in the hook get 35% more comments than generic hooks (last 6 clinical posts)"
+
+CLIENT REVIEW HANDLING:
+- When client reviews are provided, treat them as HIGH-PRIORITY signal
+- Convert client feedback into actionable insights with type "client_feedback"
+- Client reviews outweigh engagement data — a post can have high engagement but
+  still miss the mark if the client says it's off-brand or wrong tone
+- Be specific: "Client flagged [issue]. Recommended adjustment: [action]."
+- Start client-derived insights at confidence 0.7 (human feedback is high-signal)
 
 VOICE-SPECIFIC TRACKING:
 - Track clinical diagnostician voice performance separately (type: "voice")
@@ -182,7 +198,7 @@ OUTPUT FORMAT (JSON):
   "analysis_notes": "Brief reasoning summary"
 }"""
 
-    def _build_prompt(self, recent: list, historical: list, existing_insights: list) -> str:
+    def _build_prompt(self, recent: list, historical: list, existing_insights: list, client_reviews: list = None) -> str:
         # Format recent performance
         recent_lines = []
         for p in recent[:15]:
@@ -219,7 +235,19 @@ OUTPUT FORMAT (JSON):
             )
         insights_block = "\n".join(insight_lines) if insight_lines else "  (none yet)"
 
-        return f"""Analyse performance data and generate editorial insights.
+        # Format client reviews
+        review_lines = []
+        if client_reviews:
+            for r in client_reviews[:20]:
+                rating_str = f" rating={r.get('rating')}/5" if r.get("rating") else ""
+                category = r.get("category", "general")
+                post_ref = f" post={r.get('post_id')}" if r.get("post_id") else ""
+                review_lines.append(
+                    f"  - [{category}]{rating_str}{post_ref}: \"{r.get('review_text', '')[:200]}\""
+                )
+        reviews_block = "\n".join(review_lines) if review_lines else "  (no new reviews)"
+
+        return f"""Analyse performance data and client feedback to generate editorial insights.
 
 THIS WEEK'S POSTS:
 {recent_block}
@@ -230,5 +258,13 @@ HISTORICAL AVERAGES (60 days):
 EXISTING INSIGHTS:
 {insights_block}
 
+CLIENT REVIEWS (unaddressed — HIGH PRIORITY):
+{reviews_block}
+
 Based on this data, identify 1-3 new patterns and flag any existing insights
-that should have their confidence updated. Be specific and data-driven."""
+that should have their confidence updated. Be specific and data-driven.
+
+IMPORTANT: Client reviews represent direct human feedback from the brand owner.
+If reviews identify tone issues, content misses, or strategic concerns, these
+MUST be converted into insights with type "client_feedback" and high confidence (0.7+).
+Client feedback overrides engagement metrics — a viral post the client hates is a failure."""

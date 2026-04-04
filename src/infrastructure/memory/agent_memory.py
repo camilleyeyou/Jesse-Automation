@@ -228,6 +228,19 @@ class AgentMemory:
                 )
             """)
 
+            # Client reviews — human feedback from client on content quality
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS client_reviews (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    post_id TEXT,
+                    rating INTEGER,
+                    category TEXT,
+                    review_text TEXT,
+                    addressed INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # Position memory — what Jesse SAID about topics
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS position_memory (
@@ -271,6 +284,8 @@ class AgentMemory:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_strategy_type ON strategy_insights(insight_type)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_position_theme ON position_memory(theme)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_position_created ON position_memory(created_at)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_client_reviews_created ON client_reviews(created_at)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_client_reviews_addressed ON client_reviews(addressed)")
 
             conn.commit()
 
@@ -1109,6 +1124,69 @@ class AgentMemory:
                 SET confidence = ?, evidence_count = ?, last_validated = datetime('now')
                 WHERE id = ?
             """, (confidence, evidence_count, insight_id))
+            conn.commit()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # CLIENT REVIEWS — Human feedback from client
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def add_client_review(
+        self,
+        review_text: str,
+        rating: int = None,
+        category: str = "general",
+        post_id: str = None,
+    ) -> int:
+        """Add a client review. Returns the row id."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO client_reviews
+                (post_id, rating, category, review_text)
+                VALUES (?, ?, ?, ?)
+            """, (post_id, rating, category, review_text))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_client_reviews(self, limit: int = 50, unaddressed_only: bool = False) -> List[Dict]:
+        """Get client reviews, optionally only unaddressed ones."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            if unaddressed_only:
+                cursor.execute("""
+                    SELECT * FROM client_reviews
+                    WHERE addressed = 0
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                """, (limit,))
+            else:
+                cursor.execute("""
+                    SELECT * FROM client_reviews
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                """, (limit,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def mark_reviews_addressed(self, review_ids: List[int]):
+        """Mark reviews as addressed after refinement processes them."""
+        if not review_ids:
+            return
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            placeholders = ",".join("?" for _ in review_ids)
+            cursor.execute(f"""
+                UPDATE client_reviews
+                SET addressed = 1
+                WHERE id IN ({placeholders})
+            """, review_ids)
+            conn.commit()
+
+    def delete_client_review(self, review_id: int):
+        """Delete a client review by id."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM client_reviews WHERE id = ?", (review_id,))
             conn.commit()
 
     # ═══════════════════════════════════════════════════════════════════════════
