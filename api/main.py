@@ -81,6 +81,45 @@ strategy_refinement: StrategyRefinementAgent = None
 portfolio_qc: PortfolioQCAgent = None
 weekly_review: WeeklyReviewAgent = None
 
+# Job status tracker — stores last result/error for each agent
+import traceback as _tb
+from datetime import datetime as _dt
+
+_job_status: Dict[str, Dict] = {}
+
+
+def _track_job(name: str):
+    """Decorator-style context: tracks a background job's result or error."""
+    import functools
+
+    def decorator(coro_func):
+        @functools.wraps(coro_func)
+        async def wrapper(*args, **kwargs):
+            _job_status[name] = {"status": "running", "started_at": _dt.utcnow().isoformat()}
+            try:
+                result = await coro_func(*args, **kwargs)
+                _job_status[name] = {
+                    "status": "completed",
+                    "result": str(result)[:500] if result else None,
+                    "started_at": _job_status[name]["started_at"],
+                    "completed_at": _dt.utcnow().isoformat(),
+                    "error": None,
+                }
+                logger.info(f"✅ {name} completed: {str(result)[:200]}")
+                return result
+            except Exception as e:
+                tb = _tb.format_exc()
+                _job_status[name] = {
+                    "status": "failed",
+                    "started_at": _job_status[name]["started_at"],
+                    "completed_at": _dt.utcnow().isoformat(),
+                    "error": str(e),
+                    "traceback": tb[-1000:],
+                }
+                logger.error(f"❌ {name} FAILED: {e}\n{tb}")
+        return wrapper
+    return decorator
+
 
 # ============== Pydantic Models ==============
 
@@ -925,9 +964,9 @@ async def trigger_ingestion(background_tasks: BackgroundTasks):
     if not performance_ingestion:
         raise HTTPException(503, "Performance ingestion service not initialized")
 
+    @_track_job("ingestion")
     async def _run():
-        result = await performance_ingestion.run()
-        logger.info(f"Manual ingestion result: {result}")
+        return await performance_ingestion.run()
 
     background_tasks.add_task(_run)
     return {"status": "started", "message": "Performance ingestion running in background"}
@@ -939,9 +978,9 @@ async def trigger_refinement(background_tasks: BackgroundTasks):
     if not strategy_refinement:
         raise HTTPException(503, "Strategy refinement agent not initialized")
 
+    @_track_job("refinement")
     async def _run():
-        result = await strategy_refinement.execute()
-        logger.info(f"Manual refinement result: {result}")
+        return await strategy_refinement.execute()
 
     background_tasks.add_task(_run)
     return {"status": "started", "message": "Strategy refinement running in background"}
@@ -953,9 +992,9 @@ async def trigger_portfolio_qc(background_tasks: BackgroundTasks):
     if not portfolio_qc:
         raise HTTPException(503, "Portfolio QC agent not initialized")
 
+    @_track_job("portfolio_qc")
     async def _run():
-        result = await portfolio_qc.execute()
-        logger.info(f"Manual portfolio QC result: {result}")
+        return await portfolio_qc.execute()
 
     background_tasks.add_task(_run)
     return {"status": "started", "message": "Portfolio QC running in background"}
@@ -967,9 +1006,9 @@ async def trigger_weekly_review(background_tasks: BackgroundTasks):
     if not weekly_review:
         raise HTTPException(503, "Weekly review agent not initialized")
 
+    @_track_job("weekly_review")
     async def _run():
-        result = await weekly_review.execute()
-        logger.info(f"Manual weekly review result: {result}")
+        return await weekly_review.execute()
 
     background_tasks.add_task(_run)
     return {"status": "started", "message": "Weekly review running in background"}
@@ -981,12 +1020,29 @@ async def trigger_strategist(background_tasks: BackgroundTasks):
     if not weekly_strategist:
         raise HTTPException(503, "Weekly strategist not initialized")
 
+    @_track_job("strategist")
     async def _run():
-        result = await weekly_strategist.execute()
-        logger.info(f"Manual strategist result: {result}")
+        return await weekly_strategist.execute()
 
     background_tasks.add_task(_run)
     return {"status": "started", "message": "Weekly strategist running in background"}
+
+
+@app.get("/api/automation/job-status")
+async def get_job_status():
+    """Get the last result/error for each background agent job."""
+    return {
+        "success": True,
+        "jobs": _job_status,
+        "agents_initialized": {
+            "performance_ingestion": performance_ingestion is not None,
+            "strategy_refinement": strategy_refinement is not None,
+            "weekly_strategist": weekly_strategist is not None,
+            "portfolio_qc": portfolio_qc is not None,
+            "weekly_review": weekly_review is not None,
+            "scheduler_running": scheduler.is_running if scheduler else False,
+        },
+    }
 
 
 @app.get("/api/automation/performance")
