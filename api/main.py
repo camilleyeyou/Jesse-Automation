@@ -85,7 +85,7 @@ weekly_review: WeeklyReviewAgent = None
 import traceback as _tb
 from datetime import datetime as _dt
 
-_job_status: Dict[str, Dict] = {}
+_job_status: dict[str, dict] = {}
 
 
 def _track_job(name: str):
