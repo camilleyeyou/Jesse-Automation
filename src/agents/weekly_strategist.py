@@ -268,19 +268,52 @@ class WeeklyStrategistAgent(BaseAgent):
         if brief_result and brief_result.get("success"):
             logger.info(f"✅ Weekly brief written: {len(brief_result.get('entries', []))} calendar entries")
             return brief_result
-        else:
-            logger.warning("⚠️ Agent did not write a weekly brief")
-            # Extract the last assistant text as the reasoning
-            last_text = ""
-            for msg in reversed(messages):
-                if msg.get("role") == "assistant" and msg.get("content"):
-                    last_text = msg["content"]
-                    break
-            return {
-                "success": False,
-                "error": "Agent did not call write_weekly_brief",
-                "reasoning": last_text[:500],
-            }
+
+        # Agent didn't call write_weekly_brief — nudge it once more
+        logger.warning("⚠️ Agent did not call write_weekly_brief — sending nudge")
+        messages.append({
+            "role": "user",
+            "content": "You described a plan but did not save it. Call the write_weekly_brief tool NOW with your content_slots to save the editorial calendar. Do not respond with text — call the tool.",
+        })
+
+        try:
+            response = await self.ai_client.generate_with_tools(
+                messages=messages,
+                tools=STRATEGIST_TOOLS,
+                model="gpt-4o",
+                temperature=0.5,
+            )
+            assistant_message = response.get("message", {})
+            tool_calls = assistant_message.get("tool_calls")
+            if tool_calls:
+                for tool_call in tool_calls:
+                    fn_name = tool_call["function"]["name"]
+                    fn_args = json.loads(tool_call["function"]["arguments"] or "{}")
+                    logger.info(f"  🔧 Nudge tool: {fn_name}({fn_args})")
+                    result = await self._execute_tool(fn_name, fn_args, week_dates)
+                    if fn_name == "write_weekly_brief" and result.get("success"):
+                        logger.info(f"✅ Weekly brief written after nudge: {len(result.get('entries', []))} entries")
+                        return result
+        except Exception as e:
+            logger.error(f"Nudge failed: {e}")
+
+        # Final fallback — auto-populate with balanced rotation
+        logger.warning("⚠️ Agent still didn't write brief — using fallback calendar")
+        fallback_entries = self.generate_fallback_calendar(week_dates)
+        if fallback_entries:
+            return {"success": True, "entries": fallback_entries, "source": "fallback_auto"}
+
+        # Extract the last assistant text as the reasoning
+        last_text = ""
+        for msg in reversed(messages):
+            if msg.get("role") == "assistant" and msg.get("content"):
+                last_text = msg["content"]
+                break
+        return {
+            "success": False,
+            "error": "Agent did not call write_weekly_brief",
+            "reasoning": last_text[:500],
+        }
 
     # ═══════════════════════════════════════════════════════════════════════════
     # TOOL EXECUTION
@@ -616,7 +649,12 @@ attention to adherence issues and adjust your plan to be more realistic. Look fo
 - Recurring missed days → avoid scheduling ambitious content on those days
 - planning_alert insights → the previous week's plan was too ambitious or misaligned
 
-DO NOT skip the data-gathering steps. Read the data first, then decide."""
+DO NOT skip the data-gathering steps. Read the data first, then decide.
+
+CRITICAL: You MUST call the write_weekly_brief tool to save your plan. Do NOT
+just describe what you would plan — actually call the tool with content_slots.
+If you respond with text instead of calling write_weekly_brief, the calendar
+will be empty and no content will be generated. ALWAYS end by calling the tool."""
 
     def _build_user_prompt(self, week_dates: list) -> str:
         dates_str = "\n".join(
