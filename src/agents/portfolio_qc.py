@@ -149,6 +149,8 @@ DRIFT DETECTION THRESHOLDS (apply these strictly):
 - diversity_score < 4 → drift_detected = true (theme/format monotony)
 - If 3+ posts in a row have the same emotional tone → flag as "one-note"
 - If 0 posts answer HOW TO COPE or WHY IT MATTERS → flag as "missing warmth"
+- If any single pillar exceeds 40% of posts → flag as "pillar_imbalance" (e.g., "ai_economy is 72% of content — target is ~20%")
+- If 0 posts from AI Slop, AI Safety, Rituals, or Humanity → flag as "pillar_starvation"
 - If clinical diagnostician posts hedge or wink at their own format → flag as "clinical_commitment_break"
 - If same invented condition is reused across posts → flag as "dryness_repetition"
 - If 0 posts use clinical/diagnostic/pseudo-scientific framing → flag as "underusing_dry_comedy_engine"

@@ -120,18 +120,23 @@ class TrendService:
         'season', 'finale', 'streaming', 'box office',
     ]
 
-    # Brave Search category queries — focused on topics relevant to working professionals
+    # Brave Search category queries — balanced across all Five Questions pillars
     CATEGORY_QUERIES = {
-        "ai_workplace": "AI tools changing how people work today",
-        "ai_news": "AI news announcement launch today",
-        "workplace_culture": "workplace culture remote work trend this week",
-        "tech_business": "tech company business news today",
-        "career_workforce": "career hiring layoffs workforce news today",
-        "leadership_management": "leadership management corporate news today",
-        "burnout_wellness": "burnout wellness work-life balance trending",
-        "viral_linkedin": "viral LinkedIn post professional discussion today",
-        "economy_business": "economy business market news impact workers today",
-        "productivity_tools": "productivity tools software launch trending today",
+        # THE WHAT — AI Slop (celebration + reckoning)
+        "ai_slop": "AI generated content creative viral deepfake synthetic media 2026",
+        "ai_content": "AI art AI music AI video creator tools democratization 2026",
+        # THE WHAT IF — AI Safety
+        "ai_safety": "AI alignment safety research regulation guardrails 2026",
+        "ai_regulation": "AI policy EU AI Act executive order compliance audit 2026",
+        # THE WHO PROFITS — AI Economy (max 2 categories)
+        "ai_economy": "AI investment earnings capex valuation bubble funding 2026",
+        "ai_labor": "AI hiring layoffs workforce automation jobs impact 2026",
+        # THE HOW TO COPE — Rituals
+        "rituals": "mindfulness attention practice meditation neuroscience wellbeing 2026",
+        "human_practice": "digital detox handwriting walking meeting slow living ritual 2026",
+        # THE WHY IT MATTERS — Humanity
+        "humanity": "philosophy meaning connection awe compassion human flourishing 2026",
+        "humanity_tech": "technology humanity ethics embodiment creativity purpose 2026",
     }
 
     def __init__(self, db_path: str = "data/automation/queue.db"):
@@ -471,111 +476,116 @@ class TrendService:
         return candidates
 
     def _get_fallback_list(self) -> List[TrendingNews]:
-        """Return curated fallback topics aligned with Jesse's audience: working professionals.
+        """Return curated fallback topics balanced across all Five Questions pillars.
 
-        These are evergreen workplace/AI/culture topics that the content strategist
-        can always find a fresh angle on. NOT celebrity gossip or sports.
+        4 entries per pillar = 20 total. Evergreen topics the content strategist
+        can always find a fresh angle on.
         """
         fallbacks = [
+            # ── THE WHAT — AI Slop (4 entries) ──
             TrendingNews(
-                headline="Return-to-office mandates spark backlash",
-                summary="Major companies forcing employees back to the office full-time, workers pushing back on rigid policies",
-                source="fallback", category="workplace_culture",
+                headline="Someone trained a model on five years of their own journal entries",
+                summary="The output reads like them. They're not sure how to feel about that.",
+                source="fallback", category="ai_slop",
             ),
             TrendingNews(
-                headline="AI tools replacing junior roles faster than expected",
-                summary="Companies quietly eliminating entry-level positions as AI handles tasks previously done by new hires",
-                source="fallback", category="ai_workplace",
+                headline="AI-generated LinkedIn posts now indistinguishable from human ones in blind tests",
+                summary="Researchers couldn't tell the difference. Neither could the algorithm. Neither could the commenters.",
+                source="fallback", category="ai_slop",
             ),
             TrendingNews(
-                headline="Meeting overload reaches new heights",
-                summary="Average knowledge worker now spends over 50% of their week in meetings, productivity plummets",
-                source="fallback", category="workplace_culture",
+                headline="Dead Internet Theory gains new evidence as bot engagement outpaces human activity",
+                summary="Analysis suggests majority of online engagement on major platforms is now synthetic.",
+                source="fallback", category="ai_slop",
             ),
             TrendingNews(
-                headline="LinkedIn engagement farming hits new levels",
-                summary="Viral LinkedIn posts increasingly follow the same formulaic patterns, users grow skeptical",
-                source="fallback", category="viral_linkedin",
+                headline="Indie musician produces full album using AI tools in 48 hours",
+                summary="The album has 2 million streams. The artist has complicated feelings about authorship.",
+                source="fallback", category="ai_content",
+            ),
+            # ── THE WHAT IF — AI Safety (4 entries) ──
+            TrendingNews(
+                headline="New alignment paper: capability gains outpacing interpretability research by 3:1",
+                summary="MIRI and ARC Evals publish joint assessment of the gap between what models can do and what researchers understand about why.",
+                source="fallback", category="ai_safety",
+            ),
+            TrendingNews(
+                headline="Automated hiring system rejects candidate who later outperforms all hired cohort",
+                summary="The boring AI story is always scarier than the sci-fi one.",
+                source="fallback", category="ai_safety",
+            ),
+            TrendingNews(
+                headline="EU AI Act enforcement begins: first audits reveal compliance gaps",
+                summary="Companies self-reported compliance. Auditors found otherwise.",
+                source="fallback", category="ai_regulation",
+            ),
+            TrendingNews(
+                headline="AI model exhibits unexpected behavior during safety evaluation",
+                summary="Lab publishes incident report. The capability wasn't in the training objective. It emerged anyway.",
+                source="fallback", category="ai_safety",
+            ),
+            # ── THE WHO PROFITS — AI Economy (4 entries) ──
+            TrendingNews(
+                headline="AI company valuations vs actual revenue",
+                summary="Massive gap between AI startup valuations and their actual revenue, echoing previous tech bubbles.",
+                source="fallback", category="ai_economy",
             ),
             TrendingNews(
                 headline="Tech layoffs continue despite record profits",
-                summary="Companies reporting strong earnings while simultaneously cutting workforce, citing AI efficiency",
-                source="fallback", category="career_workforce",
-            ),
-            TrendingNews(
-                headline="The 'quiet promotion' trend",
-                summary="Workers taking on more responsibilities without corresponding title or pay increases",
-                source="fallback", category="career_workforce",
-            ),
-            TrendingNews(
-                headline="AI-generated content flooding the internet",
-                summary="Researchers estimate a growing percentage of online content is now AI-generated, raising questions about authenticity",
-                source="fallback", category="ai_news",
-            ),
-            TrendingNews(
-                headline="Burnout rates among knowledge workers at all-time high",
-                summary="New surveys show record burnout levels, especially in tech, finance, and healthcare sectors",
-                source="fallback", category="burnout_wellness",
-            ),
-            TrendingNews(
-                headline="Companies mandating AI tool adoption",
-                summary="Organizations requiring employees to integrate AI into daily workflows, with mixed results",
-                source="fallback", category="ai_workplace",
-            ),
-            TrendingNews(
-                headline="The death of the corporate career ladder",
-                summary="Traditional career progression models breaking down as companies flatten hierarchies and restructure",
-                source="fallback", category="career_workforce",
-            ),
-            TrendingNews(
-                headline="Slack and email overload destroying deep work",
-                summary="Studies show average worker checks messages every 6 minutes, sustained focus becoming impossible",
-                source="fallback", category="productivity_tools",
-            ),
-            TrendingNews(
-                headline="AI company valuations vs actual revenue",
-                summary="Massive gap between AI startup valuations and their actual revenue, echoing previous tech bubbles",
-                source="fallback", category="economy_business",
-            ),
-            TrendingNews(
-                headline="Remote workers face promotion penalties",
-                summary="Data shows remote employees promoted at significantly lower rates than in-office peers despite equal performance",
-                source="fallback", category="workplace_culture",
-            ),
-            TrendingNews(
-                headline="Corporate jargon reaches peak absurdity",
-                summary="Workplace buzzwords like 'synergy', 'circle back', and 'move the needle' proliferating in AI-generated corporate communications",
-                source="fallback", category="workplace_culture",
+                summary="Companies reporting strong earnings while simultaneously cutting workforce, citing AI efficiency.",
+                source="fallback", category="ai_labor",
             ),
             TrendingNews(
                 headline="The productivity paradox of AI adoption",
-                summary="Despite massive AI investment, overall worker productivity gains remain modest, puzzling economists",
-                source="fallback", category="ai_workplace",
+                summary="Despite massive AI investment, overall worker productivity gains remain modest, puzzling economists.",
+                source="fallback", category="ai_economy",
             ),
             TrendingNews(
-                headline="Side hustles becoming survival strategy",
-                summary="Growing number of professionals taking on freelance work to keep pace with cost of living",
-                source="fallback", category="economy_business",
+                headline="Specific sector disruption: legal research assistants displaced by AI tools",
+                summary="Mid-tier law firms cut paralegal teams by 40%. Senior partners say quality improved. Paralegals disagree.",
+                source="fallback", category="ai_labor",
+            ),
+            # ── THE HOW TO COPE — Rituals (4 entries) ──
+            TrendingNews(
+                headline="Neuroscience confirms: handwriting activates memory regions typing cannot reach",
+                summary="The analog practice engages neural pathways that have no digital equivalent. The brain knows the difference.",
+                source="fallback", category="rituals",
             ),
             TrendingNews(
-                headline="Self-care industry worth trillions while workers burn out",
-                summary="Wellness market booms as the structural causes of burnout go unaddressed by employers",
-                source="fallback", category="burnout_wellness",
+                headline="MBSR research: eight weeks of attention training measurably changes cortical thickness",
+                summary="The practice is older than every app trying to gamify it.",
+                source="fallback", category="rituals",
             ),
             TrendingNews(
-                headline="AI hallucinations causing real workplace problems",
-                summary="Employees relying on AI-generated information making costly errors, raising liability questions",
-                source="fallback", category="ai_news",
+                headline="Walking meetings shown to increase creative output by 81% vs seated equivalents",
+                summary="Stanford study: the body moving changes what the mind produces. The technology for this is two feet.",
+                source="fallback", category="human_practice",
             ),
             TrendingNews(
-                headline="The open office plan backlash",
-                summary="Workers increasingly vocal about productivity losses in open floor plans, noise cancelling headphones now a workplace essential",
-                source="fallback", category="workplace_culture",
+                headline="Digital detox retreats report 300% growth in bookings among tech workers",
+                summary="The people building the attention economy are the first to flee it.",
+                source="fallback", category="human_practice",
+            ),
+            # ── THE WHY IT MATTERS — Humanity (4 entries) ──
+            TrendingNews(
+                headline="Berkeley Greater Good: awe experiences reduce self-reported anxiety for up to 72 hours",
+                summary="The effect is strongest in people who spend the most time in digital environments.",
+                source="fallback", category="humanity",
             ),
             TrendingNews(
-                headline="Performance reviews in the age of AI",
-                summary="How do you evaluate human performance when AI handles an increasing share of the work?",
-                source="fallback", category="ai_workplace",
+                headline="Philosopher Byung-Chul Han: the achievement society is producing burnout, not excellence",
+                summary="The self that optimizes endlessly eventually has nothing left to optimize with.",
+                source="fallback", category="humanity",
+            ),
+            TrendingNews(
+                headline="Study: people who make ugly things and love them anyway report higher life satisfaction",
+                summary="The irreducibly imperfect human product. Unmeasurable. Unoptimizable. Apparently essential.",
+                source="fallback", category="humanity_tech",
+            ),
+            TrendingNews(
+                headline="Grief researchers find communal mourning practices outperform individual therapy for resilience",
+                summary="The oldest human technology is being together when it hurts. No app required.",
+                source="fallback", category="humanity",
             ),
         ]
         random.shuffle(fallbacks)

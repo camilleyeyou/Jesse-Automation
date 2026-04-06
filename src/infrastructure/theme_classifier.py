@@ -127,7 +127,7 @@ class ThemeClassifier:
             result = json.loads(result_text)
 
             classification = ThemeClassification(
-                theme=result.get("theme", "ai_economy"),
+                theme=result.get("theme", "ai_slop"),
                 sub_theme=result.get("sub_theme", ""),
                 confidence=result.get("confidence", 0.5),
                 reasoning=result.get("reasoning", "")
@@ -146,12 +146,21 @@ class ThemeClassifier:
 
         except Exception as e:
             self.logger.error(f"Classification failed: {e}")
-            # Return default classification
+            # Rotate default across all pillars instead of always defaulting to ai_economy
+            import random as _rng
+            fallback_themes = [
+                ("ai_slop", "content_creation"),
+                ("ai_safety", "alignment_research"),
+                ("ai_economy", "labor_impact"),
+                ("rituals", "attention_practice"),
+                ("meditations", "human_connection"),
+            ]
+            theme, sub = _rng.choice(fallback_themes)
             return ThemeClassification(
-                theme="ai_economy",
-                sub_theme="labor_impact",
-                confidence=0.3,
-                reasoning="Fallback classification due to error"
+                theme=theme,
+                sub_theme=sub,
+                confidence=0.2,
+                reasoning="Fallback classification due to error — randomly assigned to avoid pillar bias"
             )
 
     def _get_system_prompt(self) -> str:

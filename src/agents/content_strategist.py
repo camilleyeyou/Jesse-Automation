@@ -846,7 +846,7 @@ TONE TRAPS:
         if requested_pillar:
             pillar = requested_pillar
         elif trending_context:
-            pillar = self._match_trend_to_pillar(trending_context)
+            pillar = self._match_trend_to_pillar(trending_context, avoid_patterns)
         else:
             pillar = self._weighted_pillar_selection(avoid_patterns)
         
@@ -1010,24 +1010,34 @@ TONE TRAPS:
         
         return random.choice(style_options)
 
-    def _match_trend_to_pillar(self, trending_context: str) -> ContentPillar:
-        """Match a trending topic to the best Five Questions theme"""
+    def _match_trend_to_pillar(self, trending_context: str, avoid_patterns: dict = None) -> ContentPillar:
+        """Match a trending topic to the best Five Questions theme.
+
+        Applies recency penalties so a trend that *could* be economy won't be
+        classified as economy if the last 2 posts were already economy.
+        """
 
         trend_lower = trending_context.lower()
+        avoid_patterns = avoid_patterns or {}
 
         # Check for explicit theme tags from the trend service / theme classifier
         theme_map = {
             "ai_slop": ContentPillar.AI_SLOP,
+            "ai_content": ContentPillar.AI_SLOP,
             "ai_safety": ContentPillar.AI_SAFETY,
+            "ai_regulation": ContentPillar.AI_SAFETY,
             "ai_economy": ContentPillar.AI_ECONOMY,
+            "ai_labor": ContentPillar.AI_ECONOMY,
             "rituals": ContentPillar.RITUALS,
+            "human_practice": ContentPillar.RITUALS,
             "humanity": ContentPillar.HUMANITY,
+            "humanity_tech": ContentPillar.HUMANITY,
         }
         for theme_key, pillar in theme_map.items():
             if theme_key in trend_lower:
                 return pillar
 
-        # Score each theme by keyword matches
+        # Score each theme by keyword matches — balanced at ~20 keywords each
         pillar_keywords = {
             ContentPillar.AI_SLOP: [
                 'ai generated', 'deepfake', 'ai content', 'slop', 'dead internet',
@@ -1040,15 +1050,13 @@ TONE TRAPS:
                 'anthropic', 'miri', 'arc eval', 'redwood', 'oversight',
                 'rogue', 'risk', 'existential', 'superintelligence', 'agi',
                 'executive order', 'ai bill', 'ai policy', 'incident',
-                'bias', 'hallucination', 'jailbreak', 'misuse',
+                'bias', 'jailbreak', 'misuse',
             ],
             ContentPillar.AI_ECONOMY: [
-                'layoff', 'hiring', 'job', 'capex', 'earnings', 'nvidia',
-                'billion', 'funding', 'vc', 'startup', 'valuation', 'bubble',
-                'labor', 'workforce', 'freelance', 'upwork', 'automation',
-                'replace', 'disrupt', 'revenue', 'profit', 'investment',
-                'microsoft', 'google', 'amazon', 'meta', 'openai', 'salary',
-                'stock', 'ipo', 'acquisition', 'merger',
+                'layoff', 'hiring', 'capex', 'earnings', 'nvidia',
+                'billion', 'funding', 'startup', 'valuation', 'bubble',
+                'labor', 'workforce', 'automation', 'revenue', 'profit',
+                'investment', 'salary', 'stock', 'ipo', 'acquisition',
             ],
             ContentPillar.RITUALS: [
                 'wellness', 'self-care', 'burnout', 'mental health', 'mindful',
@@ -1070,15 +1078,21 @@ TONE TRAPS:
             if score > 0:
                 scores[pillar] = score
 
+        # Apply recency penalty — halve score for saturated pillars
+        recent_pillars = avoid_patterns.get("recent_pillars", [])
+        from collections import Counter
+        pillar_counts = Counter(recent_pillars)
+        for pillar in list(scores.keys()):
+            if pillar_counts.get(pillar.value, 0) >= 2:
+                scores[pillar] = scores[pillar] * 0.3  # Heavy penalty
+
         if scores:
             return max(scores, key=scores.get)
 
-        # Default: most AI/tech stories fit AI_SLOP (celebration & reckoning)
-        # unless they're clearly about money (economy) or danger (safety)
+        # Default: AI Slop is the most flexible theme
         if any(kw in trend_lower for kw in ['ai', 'chatgpt', 'gpt', 'llm', 'claude', 'copilot', 'gemini']):
             return ContentPillar.AI_SLOP
 
-        # Broad fallback — AI Slop is the most flexible theme
         return ContentPillar.AI_SLOP
 
     def _weighted_pillar_selection(self, avoid_patterns: Dict[str, Any]) -> ContentPillar:

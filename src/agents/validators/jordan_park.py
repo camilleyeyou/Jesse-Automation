@@ -176,7 +176,7 @@ WHAT MAKES ME REJECT:
             content = result.get("content", {})
             if isinstance(content, str):
                 content = json.loads(content)
-            return self._parse_validation(content)
+            return self._parse_validation(content, post)
         except Exception as e:
             self.logger.error(f"Jordan Park validation failed: {e}")
             return self._create_error_score(str(e))
@@ -191,8 +191,19 @@ WHAT MAKES ME REJECT:
         lines = post.content.split('\n')
         hook = '\n'.join(lines[:2])[:150] if len(lines) > 1 else post.content[:150]
 
-        return f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Jordan Park, The Algorithm Whisperer.
+        pillar = getattr(post.cultural_reference, 'category', '') if post.cultural_reference else ''
 
+        pillar_frames = {
+            "the_how_to_cope": "\nPILLAR CONTEXT: This is a RITUALS post. Evaluate for RESONANCE, not virality.\nThe screenshot test: 'would someone save this to read again later?'\nWarm, specific, quietly true content outperforms aggressive hooks for this pillar.\n'solid' or 'moderate' engagement is correct for reflective content — do NOT require 'viral'.\n",
+            "the_why_it_matters": "\nPILLAR CONTEXT: This is a HUMANITY post. Evaluate for DEPTH, not shareability.\nThe screenshot test: 'does this make someone feel more human?'\nQuiet impact outperforms hot takes for this pillar.\n'solid' or 'moderate' engagement is correct — do NOT require 'viral'.\n",
+            "the_what": "\nPILLAR CONTEXT: This is an AI SLOP post — celebration OR reckoning.\nThe screenshot test: 'would someone send this to a friend who works in tech?'\nAbsurdist specificity and deadpan commitment are what make this pillar land.\n",
+            "the_what_if": "\nPILLAR CONTEXT: This is an AI SAFETY post. Evaluate for CLARITY and CALM AUTHORITY.\nThe screenshot test: 'is Jesse the calm friend who actually read the paper?'\nPrimary source comparisons and boring-but-true observations are the currency here.\n",
+            "the_who_profits": "\nPILLAR CONTEXT: This is an AI ECONOMY post. Evaluate for SPECIFICITY.\nThe screenshot test: 'does this say something specific nobody else said?'\nNamed companies, actual numbers, and deadpan gap analysis are what work.\n",
+        }
+        pillar_frame = pillar_frames.get(pillar, "")
+
+        return f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Jordan Park, The Algorithm Whisperer.
+{pillar_frame}
 POST:
 {post.content}
 
@@ -258,7 +269,7 @@ Return JSON:
     "fix": "what would make this screenshot-worthy if not approved"
 }}"""
     
-    def _parse_validation(self, content: Dict[str, Any]) -> ValidationScore:
+    def _parse_validation(self, content: Dict[str, Any], post: LinkedInPost = None) -> ValidationScore:
         """Parse Jordan Park's validation response with Liquid Death criteria"""
 
         try:
@@ -298,14 +309,26 @@ Return JSON:
             "specific_reaction": str(content.get("specific_reaction", ""))
         }
 
-        # Approval requires: screenshot-worthy + strong hook + right length
+        # Pillar-aware approval gate
+        pillar = ""
+        if hasattr(post, 'cultural_reference') and post.cultural_reference:
+            pillar = getattr(post.cultural_reference, 'category', '')
+
+        non_viral_pillars = ["the_how_to_cope", "the_why_it_matters"]
+        engagement_ok = (
+            engagement_prediction in ["viral", "solid"] if pillar not in non_viral_pillars
+            else engagement_prediction in ["viral", "solid", "moderate"]
+        )
+        score_floor = 6.5 if pillar in non_viral_pillars else 7.0
+        hook_floor = 6 if pillar in non_viral_pillars else 7
+
         approved = (
-            score >= 7.0 and
+            score >= score_floor and
             screenshot_worthy and
             would_share and
-            hook_strength >= 7 and
+            hook_strength >= hook_floor and
             length_verdict == "perfect" and
-            engagement_prediction in ["viral", "solid"]
+            engagement_ok
         )
 
         feedback = ""

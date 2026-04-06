@@ -201,7 +201,7 @@ WHAT MAKES ME SCROLL PAST:
             content = result.get("content", {})
             if isinstance(content, str):
                 content = json.loads(content)
-            return self._parse_validation(content)
+            return self._parse_validation(content, post)
         except Exception as e:
             self.logger.error(f"Sarah Chen validation failed: {e}")
             return self._create_error_score(str(e))
@@ -212,8 +212,19 @@ WHAT MAKES ME SCROLL PAST:
         # Count words in post
         word_count = len(post.content.split())
 
-        return f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Sarah Chen.
+        pillar = getattr(post.cultural_reference, 'category', '') if post.cultural_reference else ''
 
+        pillar_frames = {
+            "the_how_to_cope": "\nPILLAR CONTEXT: This is a RITUALS post. Evaluate for personal resonance.\nThe test: 'would I save this and re-read it when I need grounding?'\nThis content is meant to feel like a deep breath, not a hot take.\n",
+            "the_why_it_matters": "\nPILLAR CONTEXT: This is a HUMANITY post. Evaluate for emotional truth.\nThe test: 'does this make me feel more human, not just smarter?'\nQuiet recognition matters more than workplace specificity here.\n",
+            "the_what": "\nPILLAR CONTEXT: This is an AI SLOP post. The recognition test: 'is this the gap between AI content and human content that I notice but can't articulate?'\n",
+            "the_what_if": "\nPILLAR CONTEXT: This is an AI SAFETY post. The test: 'does this make a scary technical thing feel real and relevant to my life?'\n",
+            "the_who_profits": "\nPILLAR CONTEXT: This is an AI ECONOMY post. The test: 'does this name something specific happening to people like me?'\n",
+        }
+        pillar_frame = pillar_frames.get(pillar, "")
+
+        return f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Sarah Chen.
+{pillar_frame}
 POST:
 {post.content}
 
@@ -278,7 +289,7 @@ Return JSON:
     "fix": "what would make this screenshot-worthy if not approved"
 }}"""
     
-    def _parse_validation(self, content: Dict[str, Any]) -> ValidationScore:
+    def _parse_validation(self, content: Dict[str, Any], post: LinkedInPost = None) -> ValidationScore:
         """Parse Sarah Chen's validation response with Liquid Death criteria"""
 
         try:
@@ -312,9 +323,16 @@ Return JSON:
             "specific_reaction": str(content.get("specific_reaction", ""))
         }
 
-        # Approval requires: screenshot-worthy + right length + full commitment
+        # Pillar-aware approval gate
+        pillar = ""
+        if hasattr(post, 'cultural_reference') and post.cultural_reference:
+            pillar = getattr(post.cultural_reference, 'category', '')
+
+        non_viral_pillars = ["the_how_to_cope", "the_why_it_matters"]
+        score_floor = 6.5 if pillar in non_viral_pillars else 7.0
+
         approved = (
-            score >= 7.0 and
+            score >= score_floor and
             screenshot_worthy and
             would_send and
             commitment_level == "full_send" and

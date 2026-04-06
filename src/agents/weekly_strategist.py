@@ -537,7 +537,15 @@ WORKFLOW:
 7. Call write_weekly_brief with your plan
 
 ADAPTIVE WEIGHTS: The system computes recommended theme weights from engagement data.
-Use these as guidance — favour high-weight themes but don't ignore the rest.
+Use these as ONE input, not the final decision. Engagement data has a known bias
+toward news-reactive content (economy, safety) over reflective content (rituals, humanity).
+
+HARD PILLAR CAPS (non-negotiable):
+- NO theme may appear more than 2 times in a 5-day week
+- EVERY week must include at least 1 Rituals OR Humanity post
+- If adaptive weights suggest 3+ economy posts, cap at 2 and redistribute
+- Target distribution: 1-2 AI Slop, 1 AI Safety, 1 AI Economy, 1 Rituals, 1 Humanity
+  (adjust within bounds, but never let one pillar dominate)
 
 A/B FORMAT TESTING: If underexplored formats are flagged, schedule at least one this week
 to gather data. Vary formats across the week (don't repeat the same format two days in a row).

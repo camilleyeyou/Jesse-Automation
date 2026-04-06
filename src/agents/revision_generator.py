@@ -218,8 +218,22 @@ BAD REVISION EXAMPLES (NEVER DO THIS):
         validator_instructions = self._build_validator_instructions(failed_validators)
         
         cultural_ref = f"\nCultural Reference: {post.cultural_reference.reference}" if post.cultural_reference else ""
-        
+        pillar = getattr(post.cultural_reference, 'category', '') if post.cultural_reference else ''
+
+        pillar_names = {
+            "the_what": "AI SLOP (THE WHAT)",
+            "the_what_if": "AI SAFETY (THE WHAT IF)",
+            "the_who_profits": "AI ECONOMY (THE WHO PROFITS)",
+            "the_how_to_cope": "RITUALS (THE HOW TO COPE)",
+            "the_why_it_matters": "HUMANITY (THE WHY IT MATTERS)",
+        }
+        pillar_label = pillar_names.get(pillar, "UNKNOWN")
+
         return f"""Revise this Jesse A. Eisenbalm LinkedIn post to address validator feedback while maintaining brand voice.
+
+⚠️ PILLAR PRESERVATION: This is a {pillar_label} post. Do NOT change the content pillar.
+Fix execution, not strategy. The post must still answer the same Five Question after revision.
+Do NOT drift toward AI Economy or news-reactive content just because it's "safer."
 
 ORIGINAL POST:
 {post.content}

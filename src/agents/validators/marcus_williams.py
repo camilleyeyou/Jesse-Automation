@@ -219,8 +219,19 @@ WHAT MAKES ME REJECT:
         # Count words in post
         word_count = len(post.content.split())
 
-        return f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Marcus Williams, Creative Director.
+        pillar = getattr(post.cultural_reference, 'category', '') if post.cultural_reference else ''
 
+        pillar_frames = {
+            "the_how_to_cope": "\nPILLAR CONTEXT: This is a RITUALS post. Craft quality here means: does the writing SLOW THE READER DOWN? Reflective posts need precision and restraint, not hooks. A quiet post fully committed > a loud post hedging.\n",
+            "the_why_it_matters": "\nPILLAR CONTEXT: This is a HUMANITY post. Evaluate for philosophical clarity and emotional craft. The concept should be ONE true observation about being human, delivered with Jesse's voice. No news hook required.\n",
+            "the_what": "\nPILLAR CONTEXT: This is an AI SLOP post. Evaluate for absurdist commitment and specificity. The concept should make someone think 'wait, a lip balm brand just said that about AI content?'\n",
+            "the_what_if": "\nPILLAR CONTEXT: This is an AI SAFETY post. Evaluate for clarity — did Jesse translate the technical into the human? The craft is making scary things feel real without being alarmist.\n",
+            "the_who_profits": "\nPILLAR CONTEXT: This is an AI ECONOMY post. Evaluate for specificity — named companies, real numbers, deadpan gap analysis.\n",
+        }
+        pillar_frame = pillar_frames.get(pillar, "")
+
+        return f"""Evaluate this Jesse A. Eisenbalm LinkedIn post as Marcus Williams, Creative Director.
+{pillar_frame}
 POST:
 {post.content}
 
