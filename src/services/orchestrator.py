@@ -629,6 +629,20 @@ Don't create generic content. Don't summarize the headline. Find YOUR angle and 
                     elif calendar_entry:
                         logger.info(f"📅 Calendar entry exists but status={calendar_entry.get('status')} — skipping")
                         calendar_entry = None
+
+                    # Fallback: if no calendar entry, use pillar rotation based on recent posts
+                    if not preferred_theme:
+                        try:
+                            recent_pillars = self.memory.get_recent_pillars(days=5, limit=5)
+                            all_pillars = ["ai_slop", "ai_safety", "ai_economy", "rituals", "meditations"]
+                            from collections import Counter
+                            counts = Counter(recent_pillars)
+                            # Pick the least-used pillar
+                            least_used = min(all_pillars, key=lambda p: counts.get(p, 0))
+                            preferred_theme = least_used
+                            logger.info(f"📅 No calendar entry — rotating to least-used pillar: {preferred_theme}")
+                        except Exception:
+                            pass
                 except Exception as e:
                     logger.warning(f"Calendar check failed: {e}")
 

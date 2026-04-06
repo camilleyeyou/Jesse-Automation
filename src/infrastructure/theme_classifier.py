@@ -198,6 +198,34 @@ CLASSIFICATION RULES:
    - 0.0-0.4: Weak fit, forced connection
 4. Choose the most specific sub-theme within the main theme
 5. Briefly explain your reasoning (1-2 sentences)
+6. IMPORTANT: All five themes are equally valid. Do NOT default to ai_economy for ambiguous stories.
+   Stories about human experiences, wellbeing, philosophy, or creativity belong in rituals or meditations — not economy.
+
+FEW-SHOT EXAMPLES (use these to calibrate your classification):
+
+HEADLINE: "Someone trained a model on five years of their own journal entries"
+→ {{"theme": "ai_slop", "sub_theme": "content_creation", "confidence": 0.85, "reasoning": "AI-generated personal content — celebration/reckoning of AI creative tools"}}
+
+HEADLINE: "New alignment paper shows capability gains outpacing interpretability research"
+→ {{"theme": "ai_safety", "sub_theme": "alignment_research", "confidence": 0.90, "reasoning": "Technical safety research with direct implications for oversight"}}
+
+HEADLINE: "Nvidia Q4 earnings show $22B AI revenue, 265% YoY growth"
+→ {{"theme": "ai_economy", "sub_theme": "investment_bubble", "confidence": 0.90, "reasoning": "Specific capex/revenue data — follow the money"}}
+
+HEADLINE: "Neuroscience confirms handwriting activates memory regions typing cannot reach"
+→ {{"theme": "rituals", "sub_theme": "attention_practice", "confidence": 0.85, "reasoning": "Analog practice with no digital equivalent — human technology that predates AI"}}
+
+HEADLINE: "Study: people who make ugly things and love them anyway report higher life satisfaction"
+→ {{"theme": "meditations", "sub_theme": "human_connection", "confidence": 0.85, "reasoning": "Irreducibly human experience — imperfection as source of meaning"}}
+
+HEADLINE: "Walking meetings increase creative output by 81% vs seated equivalents"
+→ {{"theme": "rituals", "sub_theme": "embodiment", "confidence": 0.80, "reasoning": "Body-based practice that improves outcomes — NOT about productivity tools or economy"}}
+
+HEADLINE: "AI and job loss: the identity crisis no one is preparing for"
+→ {{"theme": "ai_economy", "sub_theme": "labor_impact", "confidence": 0.80, "reasoning": "Job displacement and its human cost — economy pillar"}}
+
+HEADLINE: "Philosopher argues the achievement society produces burnout, not excellence"
+→ {{"theme": "meditations", "sub_theme": "well_lived_life", "confidence": 0.85, "reasoning": "Philosophical critique of optimization culture — NOT economy or rituals"}}
 
 RESPOND IN JSON FORMAT:
 {{

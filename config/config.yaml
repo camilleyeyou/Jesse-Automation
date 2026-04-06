@@ -194,24 +194,33 @@ content_strategy:
       refresh_minutes: 60
       weight: 0.4  # 40% of candidate trends
       sources:
+        # AI Slop + AI Economy
         - name: "HuggingFace Daily Papers"
           type: "rss"
           url: "https://huggingface.co/papers"
-          enabled: true  # RSS integration implemented
+          enabled: true
         - name: "arXiv CS.AI"
           type: "rss"
           url: "https://arxiv.org/list/cs.AI/recent"
           enabled: true
-        - name: "Reddit r/MachineLearning"
-          type: "api"
-          subreddit: "MachineLearning"
-          sort: "rising"
-          enabled: false
-        - name: "Reddit r/LocalLLaMA"
-          type: "api"
-          subreddit: "LocalLLaMA"
-          sort: "rising"
-          enabled: false
+        # AI Safety
+        - name: "Anthropic Research Blog"
+          type: "rss"
+          url: "https://www.anthropic.com/research/rss.xml"
+          enabled: true
+        - name: "Alignment Forum"
+          type: "rss"
+          url: "https://www.alignmentforum.org/feed.xml"
+          enabled: true
+        # Rituals + Humanity
+        - name: "Greater Good Science Center"
+          type: "rss"
+          url: "https://greatergood.berkeley.edu/feed"
+          enabled: true
+        - name: "Aeon Essays"
+          type: "rss"
+          url: "https://aeon.co/feed.rss"
+          enabled: true
 
     tier_2:
       name: "Editorial Filter (24-72 hours)"
@@ -219,21 +228,29 @@ content_strategy:
       refresh_minutes: 360  # 6 hours
       weight: 0.3  # 30% of candidate trends
       sources:
+        # AI Slop + Economy
         - name: "Simon Willison Blog"
           type: "rss"
           url: "https://simonwillison.net/atom/everything/"
-          enabled: true  # RSS integration implemented
-        - name: "Alpha Signal"
-          type: "newsletter"
-          enabled: false
-          note: "Newsletter integration deferred"
+          enabled: true
         - name: "Import AI"
           type: "rss"
           url: "https://importai.substack.com/feed"
           enabled: true
+        # AI Safety + Criticism
         - name: "AI Snake Oil"
           type: "rss"
           url: "https://www.aisnakeoil.com/feed"
+          enabled: true
+        # Rituals + Wellbeing
+        - name: "Mindful.org"
+          type: "rss"
+          url: "https://www.mindful.org/feed/"
+          enabled: true
+        # Humanity + Philosophy
+        - name: "The Marginalian (Brain Pickings)"
+          type: "rss"
+          url: "https://www.themarginalian.org/feed/"
           enabled: true
 
     tier_3:
@@ -259,14 +276,15 @@ content_strategy:
       refresh_minutes: 10080  # 1 week
       weight: 0.1  # 10% of candidate trends
       sources:
+        # AI Safety + Policy
         - name: "CSET Georgetown"
           type: "rss"
           url: "https://cset.georgetown.edu/feed/"
-          enabled: false
+          enabled: true
         - name: "AI Now Institute"
           type: "rss"
           url: "https://ainowinstitute.org/feed"
-          enabled: false
+          enabled: true
         - name: "AIAAIC Repository"
           type: "rss"
           url: "https://www.aiaaic.org/aiaaic-repository/ai-algorithmic-and-automation-incidents"

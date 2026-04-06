@@ -406,6 +406,60 @@ class WeeklyStrategistAgent(BaseAgent):
             logger.error(f"Trending signals fetch failed: {e}")
             return {"error": str(e), "signals": []}
 
+    def _validate_pillar_distribution(self, content_slots: list) -> tuple:
+        """Validate that calendar slots respect pillar caps.
+        Returns (is_valid, message).
+        """
+        from collections import Counter
+        themes = [s.get("theme", "") for s in content_slots]
+        counts = Counter(themes)
+
+        # No theme more than 2x in 5 days
+        over_represented = {t: c for t, c in counts.items() if c > 2}
+        if over_represented:
+            return False, f"Pillar cap exceeded: {over_represented}. Max 2 per theme per week."
+
+        # Must include at least 1 rituals or humanity post
+        warm_pillars = {"rituals", "meditations", "humanity"}
+        has_warm = any(t in warm_pillars for t in themes)
+        if not has_warm and len(content_slots) >= 4:
+            return False, "Missing rituals or humanity post. Every week needs at least 1."
+
+        return True, "Distribution OK"
+
+    def generate_fallback_calendar(self, week_dates: list) -> list:
+        """Generate a balanced calendar when the strategist agent fails or isn't available.
+        Ensures even pillar distribution across the week.
+        """
+        if not self.memory:
+            return []
+
+        import random
+        # Default balanced distribution: rotate through all 5 pillars
+        pillar_rotation = [
+            {"theme": "ai_slop", "format": "observation", "angle_seed": "React to a real example of AI-generated content. Rate it like a sommelier — a slop brand with standards."},
+            {"theme": "ai_safety", "format": "observation", "angle_seed": "Find the boring AI safety story that's actually scary. Translate the 'so what' for normal people."},
+            {"theme": "ai_economy", "format": "contrast", "angle_seed": "Follow the money. Find the gap between AI investment and realized value. Name the company, cite the number."},
+            {"theme": "rituals", "format": "philosophy", "angle_seed": "Name a human technology that predates and will outlast AI. Write about it with the intensity it deserves."},
+            {"theme": "meditations", "format": "celebration", "angle_seed": "Celebrate something irreducibly human. Jesse notices these things because Jesse can't do them."},
+        ]
+        random.shuffle(pillar_rotation)
+
+        entries = []
+        for i, date in enumerate(week_dates[:5]):
+            slot = pillar_rotation[i % len(pillar_rotation)]
+            entry_id = self.memory.add_calendar_entry(
+                scheduled_for=date.isoformat(),
+                theme=slot["theme"],
+                format=slot["format"],
+                angle_seed=slot["angle_seed"],
+                created_by="fallback_auto",
+            )
+            entries.append({"id": entry_id, "scheduled_for": date.isoformat(), **slot})
+
+        logger.info(f"📅 Auto-populated fallback calendar: {len(entries)} entries")
+        return entries
+
     def _tool_write_weekly_brief(self, args: Dict, week_dates: list) -> Dict:
         if not self.memory:
             return {"success": False, "error": "Memory not available"}
@@ -416,6 +470,12 @@ class WeeklyStrategistAgent(BaseAgent):
 
         if not content_slots:
             return {"success": False, "error": "No content_slots provided"}
+
+        # Validate pillar distribution before writing
+        is_valid, msg = self._validate_pillar_distribution(content_slots)
+        if not is_valid:
+            logger.warning(f"⚠️ Calendar rejected: {msg}")
+            return {"success": False, "error": f"Pillar distribution invalid: {msg}. Replan with max 2 of any theme and at least 1 rituals/humanity post."}
 
         # Map day names to dates
         day_map = {
