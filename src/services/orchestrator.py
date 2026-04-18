@@ -278,8 +278,13 @@ class ContentOrchestrator:
             preferred_format=preferred_format,
         )
 
-        was_approved = post is not None
+        # Real approval requires 2-of-3 validator consensus. Previously the
+        # orchestrator shipped any non-None post, which included max-revisions
+        # fallbacks that never hit consensus — observed at 88% of shipped posts.
+        # Now: the post must actually have 2+ approvals to count as approved.
         validation_scores = post.validation_scores if post else []
+        approval_count = sum(1 for vs in validation_scores if vs.approved)
+        was_approved = post is not None and approval_count >= 2
 
         # Store in memory
         if self.memory:
@@ -340,6 +345,21 @@ class ContentOrchestrator:
                         post_id=post_id,
                         content=content,
                         trend=trend,
+                    )
+
+                # Auto-grow the gold-standard retrieval corpus from clean wins.
+                # A "clean win" is a post that passed 3-of-3 validators on the
+                # first attempt with a high average — no revisions, no fallback.
+                # Those are the exemplars future retrieval should anchor voice on.
+                if was_approved and post and content:
+                    await self._maybe_promote_to_gold_standard(
+                        post_id=post_id,
+                        content=content,
+                        pillar=pillar_name,
+                        format_name=getattr(post.cultural_reference, "reference", None)
+                            if post.cultural_reference else None,
+                        validation_scores=validation_scores,
+                        revision_count=getattr(post, "revision_count", 0),
                     )
 
             except Exception as e:
@@ -529,10 +549,95 @@ Don't create generic content. Don't summarize the headline. Find YOUR angle and 
             post.validation_scores = validation_scores
             return post
 
-        # All revision attempts exhausted — return best version as fallback
-        logger.warning(f"Max revisions reached. Using best version (avg score: {best_score:.1f})")
+        # All revision attempts exhausted without 2-of-3 consensus.
+        # REJECT the post — do NOT ship as "best version" fallback. The caller
+        # inspects post.approval_count and treats this as rejected.
+        # We still return the best attempt (rather than None) so it lands in
+        # content_memory with was_approved=False for the supervisor to analyze.
+        if best_post is None:
+            best_post = post
+            best_post.validation_scores = validation_scores
+        logger.warning(
+            f"❌ Max revisions reached with only {approvals}/3 approvals (best avg: {best_score:.1f}). "
+            f"Post REJECTED — will not ship."
+        )
         return best_post
     
+    async def _maybe_promote_to_gold_standard(
+        self,
+        post_id: str,
+        content: str,
+        pillar: Optional[str],
+        format_name: Optional[str],
+        validation_scores,
+        revision_count: int,
+    ):
+        """If the post is a clean 3-of-3 win, embed it and add to gold_standard_posts.
+
+        Promotion criteria:
+          - All three validators approved (not Jordan abstention)
+          - Average score >= 8.5
+          - Zero revisions (first-pass win — proves the generator hit the voice)
+          - Not already in the gold-standard corpus (prefix-match dedup)
+
+        This is the closed loop that makes retrieval get BETTER over time
+        without manual curation. Every organically-great post becomes a voice
+        anchor for future generations.
+        """
+        if not self.memory:
+            return
+        if not validation_scores:
+            return
+
+        # All three approved = True (including Jordan if genuine, not abstention)
+        real_approvals = [
+            vs for vs in validation_scores
+            if vs.approved and not (vs.criteria_breakdown or {}).get("abstained")
+        ]
+        if len(real_approvals) < 3:
+            return
+
+        avg = sum(vs.score for vs in validation_scores) / len(validation_scores)
+        if avg < 8.5 or revision_count > 0:
+            return
+
+        # Dedup: if this content (prefix) is already in the corpus, skip.
+        try:
+            import sqlite3 as _sq
+            prefix = content.strip()[:80]
+            with _sq.connect(self.memory.db_path) as conn:
+                row = conn.execute(
+                    "SELECT id FROM gold_standard_posts WHERE content LIKE ? LIMIT 1",
+                    (prefix + "%",),
+                ).fetchone()
+            if row:
+                logger.debug(f"  ↩️  Post {post_id} already in gold-standard corpus, skipping auto-promote")
+                return
+        except Exception as e:
+            logger.debug(f"  dedup check failed ({e}), proceeding anyway")
+
+        try:
+            embedding = await self.ai_client.embed_text(content)
+            if not embedding:
+                logger.warning(f"  ⚠️  Auto-promote skipped (embedding failed) for {post_id}")
+                return
+
+            entry_id = self.memory.add_gold_standard_post(
+                content=content.strip(),
+                pillar=pillar,
+                format=format_name,
+                embedding=embedding,
+                notes=f"Auto-promoted: clean 3-of-3 win (avg {avg:.1f}, 0 revisions)",
+                curator="auto_promoted",
+                source_post_id=post_id,
+            )
+            logger.info(
+                f"  ⭐ Auto-promoted post {post_id} to gold-standard corpus "
+                f"(avg {avg:.1f}, 3/3 approvals, id={entry_id})"
+            )
+        except Exception as e:
+            logger.warning(f"  ⚠️  Auto-promote failed for {post_id}: {e}")
+
     async def _extract_and_store_position(
         self,
         post_id: str,
@@ -649,6 +754,24 @@ Don't create generic content. Don't summarize the headline. Find YOUR angle and 
                             logger.info(f"📅 No calendar entry — rotating to least-used pillar: {preferred_theme}")
                         except Exception:
                             pass
+
+                    # Safety valve: if a pillar has been starved for the full
+                    # 7-day window, override whatever the calendar or rotation
+                    # chose. This is the closed loop from the supervisor's
+                    # pillar_imbalance finding — autonomy without waiting for
+                    # Sunday's weekly planner to notice.
+                    try:
+                        starved = self.memory.get_severely_starved_pillar(days=7)
+                        if starved and starved != preferred_theme:
+                            logger.warning(
+                                f"⚠️  Pillar '{starved}' has zero posts in the last 7 days. "
+                                f"Overriding calendar theme '{preferred_theme}' → '{starved}' to restore balance."
+                            )
+                            preferred_theme = starved
+                            # Angle seed from the calendar doesn't apply anymore if we changed pillars
+                            angle_seed = None
+                    except Exception as e:
+                        logger.debug(f"Starvation check failed (non-blocking): {e}")
                 except Exception as e:
                     logger.warning(f"Calendar check failed: {e}")
 

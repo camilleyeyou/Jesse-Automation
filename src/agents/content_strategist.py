@@ -448,6 +448,17 @@ phrasing — write a new post in the same voice register."""
                 if "recent_pillars" not in avoid_patterns:
                     avoid_patterns["recent_pillars"] = self.memory.get_recent_pillars(days=7, limit=5)
 
+                # Closed loop from the QualityDriftAgent. Any phrases/details
+                # the supervisor has flagged as recycled or drifting are
+                # currently-active in generator_avoid_list; surface them into
+                # the user prompt below so the next generation avoids them.
+                if "learned_avoid_phrases" not in avoid_patterns:
+                    try:
+                        avoid_patterns["learned_avoid_phrases"] = self.memory.get_active_avoid_phrases(limit=40)
+                    except Exception as e:
+                        self.logger.warning(f"Could not load learned avoid phrases: {e}")
+                        avoid_patterns["learned_avoid_phrases"] = []
+
                 # Get memory context for prompt
                 memory_context = self.memory.get_memory_context_for_generation(days=7)
 
@@ -1271,6 +1282,27 @@ humans, lips, and the absurdity of selling physical products in a digital age.
             if avoid_patterns.get("recent_hooks"):
                 recent_hooks = ', '.join(avoid_patterns['recent_hooks'][:2])
 
+        # Supervisor-identified avoid phrases (closed loop from QualityDriftAgent).
+        # When drift is detected — recycled tube numbers, generic tagline phrases,
+        # overused ritual closers — the supervisor writes them here and they
+        # appear in the generator prompt on the very next generation.
+        learned_avoids_block = ""
+        if avoid_patterns and avoid_patterns.get("learned_avoid_phrases"):
+            by_cat: Dict[str, List[str]] = {}
+            for entry in avoid_patterns["learned_avoid_phrases"][:30]:
+                cat = entry.get("category") or "phrase"
+                phrase = entry.get("phrase") or ""
+                if phrase:
+                    by_cat.setdefault(cat, []).append(phrase)
+            if by_cat:
+                lines = [
+                    "⛔ SUPERVISOR-FLAGGED AVOIDS (the Quality Drift supervisor caught these "
+                    "recycling / drifting across recent posts — do NOT reuse them):"
+                ]
+                for cat, phrases in by_cat.items():
+                    lines.append(f"  • [{cat}] " + "  |  ".join(f'"{p}"' for p in phrases[:15]))
+                learned_avoids_block = "\n".join(lines)
+
         # Build the angle injection block
         angle_block = self._build_angle_block(strategy)
 
@@ -1357,6 +1389,8 @@ Generic = death. But repeating the same "specific" detail is worse than generic.
 VARIETY GUARD — avoid these for freshness:
 ❌ Recent topics covered: {recent_topics}
 ❌ Recent opening moves: {recent_hooks}
+
+{learned_avoids_block}
 
 {memory_context}
 

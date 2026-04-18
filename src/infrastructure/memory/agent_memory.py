@@ -306,6 +306,28 @@ class AgentMemory:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_client_reviews_addressed ON client_reviews(addressed)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_gold_pillar ON gold_standard_posts(pillar)")
 
+            # Generator avoid-list — the closed-loop receiving end of the
+            # QualityDriftAgent. When the supervisor detects recycled phrases,
+            # template overuse, or voice drift, it writes entries here; the
+            # content strategist reads them before each generation and injects
+            # them into the VARIETY GUARD section of the user prompt. Entries
+            # expire so short-term fixes don't permanently constrain the model.
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS generator_avoid_list (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    phrase TEXT NOT NULL,
+                    reason TEXT,
+                    category TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP,
+                    active INTEGER DEFAULT 1
+                )
+            """)
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_avoid_active_expires "
+                "ON generator_avoid_list(active, expires_at)"
+            )
+
             conn.commit()
 
         logger.debug("Memory tables initialized")
@@ -858,6 +880,140 @@ class AgentMemory:
             )
             conn.commit()
             return cursor.lastrowid
+
+    def add_to_avoid_list(
+        self,
+        phrase: str,
+        reason: str,
+        category: str = "phrase",
+        days_active: int = 14,
+    ) -> Optional[int]:
+        """Add a phrase/pattern to the generator avoid-list.
+
+        Called by the QualityDriftAgent when it detects a recycled phrase,
+        template overuse, or voice drift. The content strategist reads active
+        entries before each generation. Duplicate phrases extend the existing
+        entry's expiration rather than creating a new row.
+
+        Category is a free-form tag ('phrase' / 'specific_detail' / 'structure')
+        that lets the strategist group avoids in the prompt.
+        """
+        from datetime import datetime as _dt, timedelta as _td
+        if not phrase or not phrase.strip():
+            return None
+
+        phrase_norm = phrase.strip()
+        expires_at = _dt.utcnow() + _td(days=max(1, days_active))
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            # Deduplicate: if an identical active phrase exists, bump its
+            # expiry rather than adding another row.
+            cursor.execute(
+                "SELECT id FROM generator_avoid_list "
+                "WHERE phrase = ? AND active = 1 LIMIT 1",
+                (phrase_norm,),
+            )
+            row = cursor.fetchone()
+            if row:
+                cursor.execute(
+                    "UPDATE generator_avoid_list "
+                    "SET expires_at = ?, reason = ?, category = ? "
+                    "WHERE id = ?",
+                    (expires_at.isoformat(), reason, category, row[0]),
+                )
+                conn.commit()
+                return row[0]
+
+            cursor.execute(
+                """INSERT INTO generator_avoid_list
+                   (phrase, reason, category, expires_at, active)
+                   VALUES (?, ?, ?, ?, 1)""",
+                (phrase_norm, reason, category, expires_at.isoformat()),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_active_avoid_phrases(self, limit: int = 40) -> List[Dict]:
+        """Return currently-active avoid-list entries (not expired).
+
+        Used by the content strategist before each generation to pull in
+        supervisor-identified phrases to avoid.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT phrase, reason, category, created_at, expires_at
+                   FROM generator_avoid_list
+                   WHERE active = 1
+                   AND (expires_at IS NULL OR expires_at > datetime('now'))
+                   ORDER BY created_at DESC
+                   LIMIT ?""",
+                (limit,),
+            )
+            return [dict(r) for r in cursor.fetchall()]
+
+    def get_severely_starved_pillar(self, days: int = 7) -> Optional[str]:
+        """Return a pillar name that has ZERO posts in the window, or None.
+
+        Used by the orchestrator as a safety valve: if the editorial calendar
+        has left a pillar completely uncovered for the full window, the
+        orchestrator overrides the day's planned theme to cover the gap.
+        Returns at most one pillar (preferring alphabetical order for
+        determinism when multiple are starved).
+        """
+        expected = [
+            "the_what", "the_what_if", "the_who_profits",
+            "the_how_to_cope", "the_why_it_matters",
+        ]
+        # Map to theme keys used by the curator (config uses different names)
+        pillar_to_theme = {
+            "the_what": "ai_slop",
+            "the_what_if": "ai_safety",
+            "the_who_profits": "ai_economy",
+            "the_how_to_cope": "rituals",
+            "the_why_it_matters": "meditations",
+        }
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT pillar, COUNT(*) FROM content_memory
+                   WHERE created_at >= datetime('now', ?)
+                   AND pillar IS NOT NULL
+                   GROUP BY pillar""",
+                (f"-{days} days",),
+            )
+            counts = {row[0]: row[1] for row in cursor.fetchall()}
+
+            # If no posts at all in window, no starvation (system is just idle)
+            cursor.execute(
+                "SELECT COUNT(*) FROM content_memory WHERE created_at >= datetime('now', ?)",
+                (f"-{days} days",),
+            )
+            total = cursor.fetchone()[0] or 0
+
+        if total < 3:
+            # Not enough activity to declare starvation
+            return None
+
+        starved = [p for p in expected if counts.get(p, 0) == 0]
+        if not starved:
+            return None
+        # Map to theme for news_curator's preferred_theme parameter
+        return pillar_to_theme.get(starved[0], starved[0])
+
+    def prune_expired_avoid_entries(self) -> int:
+        """Mark expired avoid entries inactive. Returns number of entries pruned."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE generator_avoid_list SET active = 0 "
+                "WHERE active = 1 AND expires_at IS NOT NULL AND expires_at <= datetime('now')"
+            )
+            conn.commit()
+            return cursor.rowcount
 
     def get_recent_drift_findings(self, days: int = 14, limit: int = 50) -> List[Dict]:
         """Pull recent drift findings for the dashboard."""

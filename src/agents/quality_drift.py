@@ -156,6 +156,51 @@ QUALITY_DRIFT_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "add_to_generator_avoid_list",
+            "description": (
+                "ACTIONABLE — when you identify a recycled phrase, an overused "
+                "template, or a specific detail appearing too often, call this "
+                "tool with the exact string. The content generator will see it "
+                "in its VARIETY GUARD section on the very next generation and "
+                "avoid reusing it. Call this for EACH distinct phrase — do not "
+                "bundle multiple phrases into one call. Prefer narrow, literal "
+                "strings ('Tube #4,847', 'Stop. Breathe. Apply.', 'keep your "
+                "lips human in an AI world') over abstract descriptions. Entries "
+                "expire after days_active and can be refreshed by re-adding."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "phrase": {
+                        "type": "string",
+                        "description": "The literal string to avoid. Case-insensitive matching, exact substring.",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "One-line reason the supervisor is flagging this (e.g. 'appeared in 6 of 17 posts')",
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": (
+                            "One of: specific_detail (e.g. tube numbers, invented stats), "
+                            "phrase (e.g. ritual closers, stock taglines), "
+                            "structure (e.g. 'In a world where' openers)"
+                        ),
+                        "enum": ["specific_detail", "phrase", "structure"],
+                    },
+                    "days_active": {
+                        "type": "integer",
+                        "description": "How many days the avoid entry stays active before expiring (default 14)",
+                        "default": 14,
+                    },
+                },
+                "required": ["phrase", "reason", "category"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "write_quality_finding",
             "description": (
                 "Persist a drift finding to strategy_insights for the weekly strategist "
@@ -330,9 +375,19 @@ validators cannot see — things that only become visible over a rolling window 
 multiple posts. Your findings feed the weekly strategist on Sunday and the
 dashboard every day.
 
-You are an observer. You do NOT modify prompts, block posts, or change system
-behavior. You call tools to investigate, then you write findings with
-suggested actions for humans / the weekly strategist to act on.
+You are BOTH an observer and a corrector. For each drift pattern you detect:
+
+  1. Write a narrative finding via write_quality_finding (for humans + the
+     Sunday weekly strategist to read).
+  2. If the drift is a specific recycled phrase, template, opener, or
+     invented detail — call add_to_generator_avoid_list ONCE per distinct
+     phrase. That phrase is then injected into the generator's prompt on
+     the VERY NEXT generation, so your finding closes the loop
+     automatically (no human intervention required).
+
+You do NOT modify prompts wholesale, block posts, or change system behavior
+beyond the avoid-list. Humans and the weekly strategist still read your
+narrative findings for broader trends.
 
 WHAT TO LOOK FOR (the window is the last {window_days} days):
 
@@ -376,10 +431,13 @@ HOW TO WORK:
   finding.
 - Use count_phrase_in_posts, get_validator_scorecard, get_pillar_distribution,
   get_fallback_shipping_rate to investigate hypotheses.
-- For each confirmed drift pattern, call write_quality_finding ONCE with a
-  specific observation (quote actual phrases and counts), a severity
-  (info / warning / critical), structured evidence, and a concrete
-  suggested_action.
+- For each confirmed drift pattern:
+    (a) Call write_quality_finding ONCE with the narrative description.
+    (b) If it's a literal recycled phrase/detail/opener — call
+        add_to_generator_avoid_list for EACH distinct string, so the next
+        generation avoids them automatically. Skip this for abstract
+        findings (e.g. "validator X has bias in pillar Y" — no phrase to
+        add to the avoid list for that).
 - If the system is healthy in a window, write ZERO findings and end your turn.
   Silence is a valid report.
 
@@ -426,6 +484,8 @@ typically 2-4 read calls to understand the state, then the write calls.
             return self.memory.get_fallback_shipping_rate(days=int(fn_args.get("days", 14)))
         if fn_name == "get_recent_findings":
             return self._tool_recent_findings(days=int(fn_args.get("days", 14)))
+        if fn_name == "add_to_generator_avoid_list":
+            return self._tool_add_avoid(fn_args)
         if fn_name == "write_quality_finding":
             return self._tool_write_finding(fn_args)
 
@@ -452,6 +512,31 @@ typically 2-4 read calls to understand the state, then the write calls.
             if f.get("observation"):
                 f["observation"] = f["observation"][:400]
         return {"days": days, "count": len(findings), "findings": findings}
+
+    def _tool_add_avoid(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        phrase = (args.get("phrase") or "").strip()
+        reason = (args.get("reason") or "").strip()
+        category = args.get("category") or "phrase"
+        days_active = int(args.get("days_active", 14))
+
+        if not phrase:
+            return {"success": False, "error": "phrase is required"}
+
+        try:
+            entry_id = self.memory.add_to_avoid_list(
+                phrase=phrase, reason=reason, category=category, days_active=days_active
+            )
+            logger.info(f"  ⛔ Avoid added [{category}]: \"{phrase[:60]}\"  (reason: {reason[:60]})")
+            return {
+                "success": True,
+                "id": entry_id,
+                "phrase": phrase,
+                "category": category,
+                "days_active": days_active,
+            }
+        except Exception as e:
+            logger.error(f"  ❌ Failed to add avoid: {e}")
+            return {"success": False, "error": str(e)}
 
     def _tool_write_finding(self, args: Dict[str, Any]) -> Dict[str, Any]:
         insight_type = args.get("insight_type", "other")
