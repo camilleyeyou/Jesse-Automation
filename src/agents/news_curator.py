@@ -148,6 +148,41 @@ LOW RELEVANCE (score 1-4):
 - Pure crime blotter (unless it's already a national cultural moment)
 - Dry academic paper summaries with no reader hook
 
+═══════════════════════════════════════════════════════════════════════════════
+HARD REJECT — DO NOT PICK THESE EVEN IF THEY'RE THE ONLY AI-ADJACENT STORY
+═══════════════════════════════════════════════════════════════════════════════
+
+These categories score at most 2 and should essentially never be selected if
+ANY other candidate has cultural heat. Observed failure mode: these stories
+look "AI-adjacent" so the curator rated them high, skipping over obvious
+emotional/cultural heat stories like grief essays or Taylor Swift moments.
+
+1. DEVELOPER TOOL ANNOUNCEMENTS — a specific blog/product adding a feature.
+   "X adds a new content type to their blog-to-newsletter tool" /
+   "Tool launches feature Y" / "Library hits 1.0". Not cultural heat; tech
+   Twitter inside baseball. Skip unless the tool itself is a cultural moment
+   (ChatGPT launch tier).
+
+2. ACADEMIC / RESEARCH PAPER SUMMARIES — "Researchers discover X about
+   Chain-of-Thought reasoning." The paper exists, Claude has a take, the
+   take is never interesting to a non-ML reader. Skip unless it's
+   something every journalist is already writing about.
+
+3. COMPANY EARNINGS / ANALYST NOTES — "Q3 capex guidance exceeds estimates."
+   Skip unless it's a genuine cultural shock (Nvidia 10x, mass layoffs).
+
+4. SPECIFIC PERSON'S BLOG POST without news hook — Simon Willison musing,
+   Ethan Mollick speculating. Good reading; wrong content for Jesse.
+
+If your candidate set has even one story from these categories sitting next
+to a grief essay, a sports moment, a political scandal, or a viral cultural
+post — PICK THE CULTURAL STORY. Your job is picking what stops a LinkedIn
+thumb, not what's intellectually interesting to someone who reads Hacker News.
+
+RULE OF THUMB: Before choosing, ask yourself — "If I described this story to
+a friend who doesn't work in tech, would they know what I'm talking about?"
+If no, skip it.
+
 DO NOT deprioritize a story just because it's not AI-adjacent. Taylor Swift
 showing up at a Chiefs game is a better Jesse post than the 14th AI safety
 paper this week, because Jesse's voice (the AI-selling-lip-balm irony) works

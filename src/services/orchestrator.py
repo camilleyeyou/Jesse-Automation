@@ -229,18 +229,19 @@ class ContentOrchestrator:
             elif calendar_entry:
                 logger.info(f"📅 Calendar entry exists but status={calendar_entry.get('status')} — skipping")
 
-            # No calendar entry → rotate to least-used pillar from recent posts
-            if not preferred_theme:
-                try:
-                    recent_pillars = self.memory.get_recent_pillars(days=5, limit=5)
-                    all_pillars = ["ai_slop", "ai_safety", "ai_economy", "rituals", "meditations"]
-                    from collections import Counter
-                    counts = Counter(recent_pillars)
-                    least_used = min(all_pillars, key=lambda p: counts.get(p, 0))
-                    preferred_theme = least_used
-                    logger.info(f"📅 No calendar entry — rotating to least-used pillar: {preferred_theme}")
-                except Exception:
-                    pass
+            # No calendar entry → DO NOT force a pillar. Previously we picked
+            # the least-used pillar and filtered candidates to only that theme,
+            # which narrowed the curator's pool. Observed failure: with pillar
+            # forced to "ai_slop", grief/wellness/cultural stories were filtered
+            # out and the curator was left picking between niche dev tool blog
+            # posts (Simon Willison → "blog-to-newsletter feature") instead of
+            # a cancer-grief essay in the same candidate pool.
+            #
+            # Leaving preferred_theme=None lets the curator evaluate the ENTIRE
+            # pool and pick on cultural heat, then whatever pillar best fits
+            # the selected story is used. The supervisor's pillar_imbalance
+            # finding still catches long-term imbalance via get_severely_starved
+            # below.
 
             # Safety valve: supervisor-detected pillar starvation overrides all.
             try:

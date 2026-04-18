@@ -1631,6 +1631,37 @@ Now write something that makes someone stop scrolling."""
             content = bait_re.sub("", content).rstrip()
             self.logger.info("Stripped trailing engagement bait")
 
+        # 4) Strip tube number mentions. "Tube #4,847" / "tube number 4847" /
+        # "Tube no. 312" — the generator invents specific numbers every post
+        # and recycles them, but specific numbers aren't a brand mechanic
+        # (deck never assigns them). Hand-numbering is a character trait;
+        # the specific number is always filler.
+        #
+        # Regex also consumes surrounding commas / em-dashes / parens so the
+        # strip doesn't leave orphaned punctuation like "Jesse A. Eisenbalm, —can".
+        tube_number_re = _re.compile(
+            r"[\s,\-\u2014\u2013]*[Tt]ube\s*(?:#|number\s*|no\.?\s*|\b)\s*\d[\d,]*[.]?[\s,\-\u2014\u2013]*",
+        )
+        match_count = len(tube_number_re.findall(content))
+        if match_count:
+            content = tube_number_re.sub(" ", content)
+            self.logger.info(f"Stripped {match_count} tube-number reference(s)")
+
+        # 5) Strip "Remember:" / "Remember that" lecture lines. Can appear
+        # mid-sentence or at line start; always banned. Removes the whole
+        # sentence so we don't leave orphaned fragments.
+        remember_re = _re.compile(
+            r"(?:^|(?<=[.!?])\s+)Remember(?:\s+that)?[,:]?\s*[^.!?]*[.!?]?",
+            _re.IGNORECASE,
+        )
+        if remember_re.search(content):
+            content = remember_re.sub("", content)
+            self.logger.info("Stripped 'Remember:' lecture line")
+
+        # Collapse any double spaces / orphaned punctuation from strips
+        content = _re.sub(r"\s+([.,!?])", r"\1", content)
+        content = _re.sub(r"[ \t]{2,}", " ", content)
+
         # Fix spacing after all the strips
         lines = content.split('\n')
         lines = [line.strip() for line in lines]
