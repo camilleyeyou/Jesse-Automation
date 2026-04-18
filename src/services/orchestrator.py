@@ -191,6 +191,75 @@ class ContentOrchestrator:
         else:
             logger.warning("⚠️ ContentOrchestrator initialized WITHOUT image generator")
     
+    def _determine_post_context(self):
+        """Decide today's (theme, angle_seed, format) — the editorial guidance
+        that travels with a generation.
+
+        Same logic the scheduled 'generate_and_post_now' flow runs, extracted
+        here so the batch / manual 'generate-content' path gets IDENTICAL
+        treatment — including the QualityDriftAgent's pillar-starvation
+        override and the weekly strategist's calendar entry. Without this,
+        the dashboard's Generate button skipped all the supervisor protections.
+
+        Returns: (preferred_theme: Optional[str], angle_seed: Optional[str],
+                  preferred_format: Optional[str])
+        """
+        from datetime import datetime as _dt
+
+        preferred_theme = None
+        angle_seed = None
+        preferred_format = None
+
+        if not self.memory:
+            return preferred_theme, angle_seed, preferred_format
+
+        try:
+            # Calendar — weekly strategist's editorial guidance
+            today_str = _dt.utcnow().strftime("%Y-%m-%d")
+            calendar_entry = self.memory.get_calendar_entry(today_str)
+            if calendar_entry and calendar_entry.get("status") == "planned":
+                preferred_theme = calendar_entry.get("theme")
+                angle_seed = calendar_entry.get("angle_seed")
+                preferred_format = calendar_entry.get("format")
+                logger.info(
+                    f"📅 Calendar entry found: theme={preferred_theme}, "
+                    f"format={preferred_format}, angle={angle_seed}"
+                )
+                self.memory.update_calendar_status(calendar_entry["id"], "generating")
+            elif calendar_entry:
+                logger.info(f"📅 Calendar entry exists but status={calendar_entry.get('status')} — skipping")
+
+            # No calendar entry → rotate to least-used pillar from recent posts
+            if not preferred_theme:
+                try:
+                    recent_pillars = self.memory.get_recent_pillars(days=5, limit=5)
+                    all_pillars = ["ai_slop", "ai_safety", "ai_economy", "rituals", "meditations"]
+                    from collections import Counter
+                    counts = Counter(recent_pillars)
+                    least_used = min(all_pillars, key=lambda p: counts.get(p, 0))
+                    preferred_theme = least_used
+                    logger.info(f"📅 No calendar entry — rotating to least-used pillar: {preferred_theme}")
+                except Exception:
+                    pass
+
+            # Safety valve: supervisor-detected pillar starvation overrides all.
+            try:
+                starved = self.memory.get_severely_starved_pillar(days=7)
+                if starved and starved != preferred_theme:
+                    logger.warning(
+                        f"⚠️  Pillar '{starved}' has zero posts in the last 7 days. "
+                        f"Overriding theme '{preferred_theme}' → '{starved}' to restore balance."
+                    )
+                    preferred_theme = starved
+                    # Calendar-sourced angle seed doesn't match if we switched pillars
+                    angle_seed = None
+            except Exception as e:
+                logger.debug(f"Starvation check failed (non-blocking): {e}")
+        except Exception as e:
+            logger.warning(f"Calendar/context check failed: {e}")
+
+        return preferred_theme, angle_seed, preferred_format
+
     async def generate_batch(self, num_posts: int = 1, use_video: bool = False) -> BatchResult:
         """Generate a batch of posts, each with a unique fresh trend."""
 
@@ -214,10 +283,19 @@ class ContentOrchestrator:
             post_id = f"{batch_id[:8]}_{post_number}"  # Create tracking ID
             logger.info(f"\n--- Post {post_number}/{num_posts} ---")
 
-            # Fetch curated trend for THIS post
+            # Determine the post's editorial context — calendar guidance,
+            # pillar rotation, starvation override. This was previously only
+            # run in the scheduled live-post flow; now batch/manual generation
+            # (dashboard "Generate" button) gets the same protections.
+            preferred_theme, angle_seed, preferred_format = self._determine_post_context()
+
+            # Fetch curated trend for THIS post (curator respects preferred_theme)
             trend = None
             if self.news_curator:
-                trend = await self.news_curator.execute(post_id=post_id)
+                curator_kwargs = {"post_id": post_id}
+                if preferred_theme:
+                    curator_kwargs["preferred_theme"] = preferred_theme
+                trend = await self.news_curator.execute(**curator_kwargs)
                 if trend:
                     logger.info(f"📰 Curated trend ({trend.category}): {trend.headline[:70]}...")
             elif self.trend_service:
@@ -230,7 +308,9 @@ class ContentOrchestrator:
                     post_number=post_number,
                     batch_id=batch_id,
                     trend=trend,
-                    use_video=use_video
+                    use_video=use_video,
+                    angle_seed=angle_seed,
+                    preferred_format=preferred_format,
                 )
 
                 if was_approved and post:
@@ -722,58 +802,8 @@ Don't create generic content. Don't summarize the headline. Find YOUR angle and 
             if self.memory:
                 self.memory.start_session(f"live_{uuid.uuid4().hex[:8]}")
 
-            # Step 1: Check editorial calendar for today's guidance
-            calendar_entry = None
-            preferred_theme = None
-            angle_seed = None
-            preferred_format = None
-            if self.memory:
-                try:
-                    today_str = datetime.utcnow().strftime("%Y-%m-%d")
-                    calendar_entry = self.memory.get_calendar_entry(today_str)
-                    if calendar_entry and calendar_entry.get("status") == "planned":
-                        preferred_theme = calendar_entry.get("theme")
-                        angle_seed = calendar_entry.get("angle_seed")
-                        preferred_format = calendar_entry.get("format")
-                        logger.info(f"📅 Calendar entry found: theme={preferred_theme}, format={preferred_format}, angle={angle_seed}")
-                        self.memory.update_calendar_status(calendar_entry["id"], "generating")
-                    elif calendar_entry:
-                        logger.info(f"📅 Calendar entry exists but status={calendar_entry.get('status')} — skipping")
-                        calendar_entry = None
-
-                    # Fallback: if no calendar entry, use pillar rotation based on recent posts
-                    if not preferred_theme:
-                        try:
-                            recent_pillars = self.memory.get_recent_pillars(days=5, limit=5)
-                            all_pillars = ["ai_slop", "ai_safety", "ai_economy", "rituals", "meditations"]
-                            from collections import Counter
-                            counts = Counter(recent_pillars)
-                            # Pick the least-used pillar
-                            least_used = min(all_pillars, key=lambda p: counts.get(p, 0))
-                            preferred_theme = least_used
-                            logger.info(f"📅 No calendar entry — rotating to least-used pillar: {preferred_theme}")
-                        except Exception:
-                            pass
-
-                    # Safety valve: if a pillar has been starved for the full
-                    # 7-day window, override whatever the calendar or rotation
-                    # chose. This is the closed loop from the supervisor's
-                    # pillar_imbalance finding — autonomy without waiting for
-                    # Sunday's weekly planner to notice.
-                    try:
-                        starved = self.memory.get_severely_starved_pillar(days=7)
-                        if starved and starved != preferred_theme:
-                            logger.warning(
-                                f"⚠️  Pillar '{starved}' has zero posts in the last 7 days. "
-                                f"Overriding calendar theme '{preferred_theme}' → '{starved}' to restore balance."
-                            )
-                            preferred_theme = starved
-                            # Angle seed from the calendar doesn't apply anymore if we changed pillars
-                            angle_seed = None
-                    except Exception as e:
-                        logger.debug(f"Starvation check failed (non-blocking): {e}")
-                except Exception as e:
-                    logger.warning(f"Calendar check failed: {e}")
+            # Step 1: Determine post context (calendar + pillar starvation override)
+            preferred_theme, angle_seed, preferred_format = self._determine_post_context()
 
             # Step 2: Reset trend tracking for fresh selection
             if self.trend_service:

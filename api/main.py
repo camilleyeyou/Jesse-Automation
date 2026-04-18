@@ -47,6 +47,7 @@ from src.agents.strategy_refinement import StrategyRefinementAgent
 from src.agents.portfolio_qc import PortfolioQCAgent
 from src.agents.weekly_review import WeeklyReviewAgent
 from src.agents.quality_drift import QualityDriftAgent
+from src.infrastructure.memory import get_memory
 from src.models.comment import (
     CommentGenerationRequest,
     CommentApprovalRequest,
@@ -1069,6 +1070,101 @@ async def trigger_drift_scan(background_tasks: BackgroundTasks):
 
     background_tasks.add_task(_run)
     return {"status": "started", "message": "Quality drift scan running in background"}
+
+
+@app.get("/api/automation/avoid-list")
+async def get_avoid_list(limit: int = 50):
+    """Active generator avoid-list entries the supervisor has written.
+
+    When the QualityDriftAgent detects recycled phrases, template overuse,
+    or voice drift, it writes literal strings here. The content strategist
+    reads these before every generation and injects them into VARIETY GUARD.
+    Dashboard shows what the system has 'learned to avoid.'
+    """
+    memory = get_memory(DB_PATH)
+    entries = memory.get_active_avoid_phrases(limit=limit)
+    return {
+        "count": len(entries),
+        "entries": entries,
+    }
+
+
+@app.get("/api/automation/system-health")
+async def get_system_health():
+    """Consolidated autonomy status for the dashboard.
+
+    Surfaces the signals that tell you whether the closed-loop system is
+    healthy: pillar balance, fallback-reject rate, starved pillars, active
+    avoid entries, recent drift findings. Dashboard polls this for a single
+    'system health' panel instead of calling 4 separate endpoints.
+    """
+    memory = get_memory(DB_PATH)
+
+    pillar_dist = memory.get_pillar_distribution(days=14)
+    fallback = memory.get_fallback_shipping_rate(days=14)
+    starved = memory.get_severely_starved_pillar(days=7)
+    avoid_count = len(memory.get_active_avoid_phrases(limit=100))
+    recent_findings = memory.get_recent_drift_findings(days=7, limit=20)
+
+    # Classify health at a glance
+    issues = []
+    if fallback.get("fallback_rate", 0) > 0.3:
+        issues.append({
+            "severity": "critical",
+            "type": "fallback_overuse",
+            "detail": f"Fallback rate {fallback['fallback_rate']:.1%} — posts not reaching 2-of-3 consensus"
+        })
+    if starved:
+        issues.append({
+            "severity": "warning",
+            "type": "pillar_starved",
+            "detail": f"Pillar '{starved}' has 0 posts in 7 days — next generation will auto-override"
+        })
+    if not pillar_dist.get("balanced"):
+        issues.append({
+            "severity": "info",
+            "type": "pillar_imbalance",
+            "detail": f"Missing pillars: {pillar_dist.get('missing_pillars', [])}"
+        })
+
+    return {
+        "overall_health": "degraded" if any(i["severity"] == "critical" for i in issues)
+            else "warning" if issues
+            else "healthy",
+        "pillar_distribution": pillar_dist,
+        "fallback_rate": fallback,
+        "starved_pillar": starved,
+        "active_avoid_count": avoid_count,
+        "recent_findings_count": len(recent_findings),
+        "issues": issues,
+    }
+
+
+@app.get("/api/automation/gold-standard-corpus")
+async def get_gold_standard_corpus(limit: int = 50):
+    """Browse the gold-standard retrieval corpus.
+
+    Dashboard shows both the hand-seeded Coachella deck specimens and the
+    auto-promoted clean 3-of-3 wins. Useful to see what voice anchors the
+    generator is retrieving from.
+    """
+    import sqlite3 as _sq
+    memory = get_memory(DB_PATH)
+    with _sq.connect(memory.db_path) as conn:
+        conn.row_factory = _sq.Row
+        rows = conn.execute(
+            """SELECT id, content, pillar, format, notes, curator, source_post_id, added_at
+               FROM gold_standard_posts
+               ORDER BY added_at DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    entries = [dict(r) for r in rows]
+    return {
+        "count": len(entries),
+        "total": memory.count_gold_standard_posts(),
+        "entries": entries,
+    }
 
 
 @app.get("/api/automation/quality-findings")
