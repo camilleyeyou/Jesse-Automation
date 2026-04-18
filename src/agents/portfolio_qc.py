@@ -135,7 +135,7 @@ BRAND ANCHORS:
 - THE DRY COMEDY ENGINE: Jesse treats "dryness" as a double meaning — dry humor,
   dry lips, dry corporate culture. Clinical diagnostician voice uses pseudo-scientific
   language, invented conditions, dryness scores. Selling relief, not chapstick.
-- Word limit: 40-100 words per post
+- Word limit: 60-150 words per post
 - No hashtags, no external links in post body
 - The product ($8.99 lip balm) is always the quiet anchor, never the hard sell
 - If the AI-vs-human-lips tension disappears entirely, that's drift

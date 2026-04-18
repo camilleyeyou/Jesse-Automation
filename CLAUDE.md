@@ -195,7 +195,7 @@ Jesse A. Eisenbalm LinkedIn content automation system. Currently operates as a *
 
 ## Conventions
 
-- Word limit: 40-100 words per post
+- Word limit: 60-150 words per post
 - No hashtags
 - No external links in post body (CTA goes in first comment)
 - CTA link: jesseaeisenbalm.com

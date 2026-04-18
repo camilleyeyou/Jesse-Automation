@@ -251,7 +251,8 @@ REVISION REQUIREMENTS:
 1. ADDRESS VALIDATOR CONCERNS:
 {validator_instructions}
 
-2. HARD WORD LIMIT: 40-100 words. This is non-negotiable. Cut ruthlessly.
+2. HARD WORD LIMIT: 60-150 words. This is non-negotiable. Cut ruthlessly.
+   Best posts sit at 80-120 — enough to develop the angle without padding.
    If the original is too long, the revision MUST be shorter, not longer.
 
 3. MAINTAIN JESSE'S VOICE:
@@ -323,12 +324,25 @@ Return JSON:
             content,
             flags=_re.IGNORECASE,
         )
-        # Strip tube number mentions with surrounding punctuation
-        content = _re.sub(
-            r"[\s,\-\u2014\u2013]*[Tt]ube\s*(?:#|number\s*|no\.?\s*|\b)\s*\d[\d,]*[.]?[\s,\-\u2014\u2013]*",
-            " ",
-            content,
+        # Strip tube number mentions. Sentence-aware: drop the whole sentence
+        # when "Tube #N" is its subject (otherwise stripping the phrase leaves
+        # orphaned verbs like "is the only thing I hand-number"). Mirror of
+        # ContentStrategistAgent._clean_content logic.
+        _sentence_start_tube = _re.compile(
+            r'^\s*["\'\(\[\u2014\u2013\-]*\s*[Tt]ube\s*(?:#|number\s*|no\.?\s*|\b)\s*\d[\d,]*',
         )
+        _mid_tube = _re.compile(
+            r"[\s,\-\u2014\u2013]*[Tt]ube\s*(?:#|number\s*|no\.?\s*|\b)\s*\d[\d,]*[.]?[\s,\-\u2014\u2013]*",
+        )
+        _parts = _re.split(r'(?<=[.!?])\s+', content)
+        _kept = []
+        for _p in _parts:
+            if not _p.strip():
+                continue
+            if _sentence_start_tube.search(_p):
+                continue
+            _kept.append(_mid_tube.sub(" ", _p))
+        content = " ".join(p.strip() for p in _kept if p.strip())
         # Strip "Remember:" lecture lines (whole sentence)
         content = _re.sub(
             r"(?:^|(?<=[.!?])\s+)Remember(?:\s+that)?[,:]?\s*[^.!?]*[.!?]?",

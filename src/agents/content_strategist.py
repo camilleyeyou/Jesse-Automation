@@ -253,13 +253,24 @@ Positioning: Absurdist Modern Luxury.
 HARD RULES
 ═══════════════════════════════════════════════════════════════════════════════
 
-WORD LIMIT: 40-80 words. HARD CEILING. Best posts are 40-60.
+WORD LIMIT: 60-150 words. HARD CEILING. Best posts are 80-120. Give the idea
+room to breathe, but never pad. If you can say it in 90, don't say it in 140.
 
 ALWAYS:
 - Answer one of the Five Questions
-- Be specific and concrete — names, numbers, places, times (fresh every post)
+- Be specific and concrete — but ONLY with specifics grounded in the source
+  material you were given (see Anti-Fabrication rule below)
 - Commit to the bit 100% — no winking, no explaining the joke
 - Use em dashes
+
+ANTI-FABRICATION (HARD RULE):
+Never invent numbers, percentages, dollar figures, named people, company
+specifics, quoted statistics, or technical details ("847 frames," "0.003
+seconds," "$12M round," "Professor at MIT") that weren't in the source
+material. Invented specifics sound plausible but erode trust and read as LLM
+hallucination. If the concrete details you were given don't include a number
+you want, either use what was given or stay abstract — do not make one up.
+Generic phrasing is survivable; fabrication is not.
 
 NEVER:
 - Hashtags, external links, engagement bait ("thoughts?"), lecturing ("Remember:")
@@ -275,6 +286,9 @@ NEVER:
   unless you follow through with the full clinical scaffold. No drive-by diagnoses.
 - Reuse specific details from recent posts — no repeating tube numbers, invented
   company names, or signature phrases from earlier in the week.
+- Reference "Tube #[any number]" as a character beat — hand-numbering is fine
+  to allude to abstractly ("the tubes I number at 3am"), but specific numbers
+  are filler and the post-processor strips them anyway.
 
 The user prompt includes retrieved gold-standard posts that match this pillar.
 Study them as voice reference. They show what earned clinical voice, crisp
@@ -1190,11 +1204,21 @@ CONCRETE MATERIAL (use these real details — do NOT invent substitutes or parap
 THE TENSION (where the claim and reality diverge — the satirical seam):
 {angle.tension or "(not supplied — if absent, surface the gap between the observation and what the announcement implies)"}
 
+⛔ ANTI-FABRICATION RULE (HARD):
+You may ONLY use numbers, percentages, dollar amounts, named entities, quoted
+claims, and technical specifics that appear in the CONCRETE MATERIAL list above.
+Do NOT invent "847 frames," "0.003 seconds," "$12M Series A," "Professor
+So-and-so at MIT," or any other specific that sounds real but wasn't given to
+you. Invented specifics are worse than generic writing — they erode trust and
+sound like LLM hallucination. If you need a detail that isn't in the list,
+either pull from the source headline/summary or keep it abstract. Generic
+language is survivable; fabrication is not.
+
 HOW TO USE THIS ANGLE:
 - The take above is the post's spine. If your draft doesn't express the take, you wrote a different post.
 - Build around the concrete material. If you need a number, name, or place, it comes from the list above.
 - Do NOT open with "Diagnosed: [Condition]" unless the take itself is a diagnostic assessment.
-- Your job is execution: turn this angle into 40-80 words of Jesse voice. Don't re-form the POV.
+- Your job is execution: turn this angle into 60-150 words of Jesse voice. Don't re-form the POV.
 """
         # No structured angle — fall back to the legacy slot so callers that pass a
         # pre-formatted specific_angle (e.g. evergreen posts) still work.
@@ -1398,9 +1422,10 @@ VARIETY GUARD — avoid these for freshness:
 THE BRIEF
 ═══════════════════════════════════════════════════════════════════════════════
 
-LENGTH: 40-80 words. HARD CEILING. Count your words. If over 80, CUT.
-The best posts are 40-60 words. Brevity is the craft, not a constraint.
-If you can say it in 45 words instead of 70, say it in 45.
+LENGTH: 60-150 words. HARD CEILING. Count your words. If over 150, CUT.
+The best posts are 80-120 words. Brevity is the craft, not a constraint —
+but we're giving the idea more room now. Fully develop the angle, deliver the
+surprise, land the ending. If you can say it well in 90 words, don't pad to 130.
 
 THE SCREENSHOT TEST:
 Before you finalize, ask: "Would someone screenshot this and send it to a
@@ -1637,15 +1662,39 @@ Now write something that makes someone stop scrolling."""
         # (deck never assigns them). Hand-numbering is a character trait;
         # the specific number is always filler.
         #
-        # Regex also consumes surrounding commas / em-dashes / parens so the
-        # strip doesn't leave orphaned punctuation like "Jesse A. Eisenbalm, —can".
-        tube_number_re = _re.compile(
+        # Sentence-aware: if "Tube #N" is the grammatical subject of a sentence
+        # (starts the sentence), stripping just the phrase leaves an orphaned
+        # verb like "is the only thing I hand-number" or "was drying on the
+        # counter." So we drop the WHOLE sentence when the tube reference
+        # anchors it. Otherwise we strip just the phrase mid-sentence.
+        sentence_start_tube_re = _re.compile(
+            r'^\s*["\'\(\[\u2014\u2013\-]*\s*[Tt]ube\s*(?:#|number\s*|no\.?\s*|\b)\s*\d[\d,]*',
+        )
+        mid_sentence_tube_re = _re.compile(
             r"[\s,\-\u2014\u2013]*[Tt]ube\s*(?:#|number\s*|no\.?\s*|\b)\s*\d[\d,]*[.]?[\s,\-\u2014\u2013]*",
         )
-        match_count = len(tube_number_re.findall(content))
-        if match_count:
-            content = tube_number_re.sub(" ", content)
-            self.logger.info(f"Stripped {match_count} tube-number reference(s)")
+        # Split on sentence boundaries but keep the delimiters so we can reassemble.
+        parts = _re.split(r'(?<=[.!?])\s+', content)
+        kept_parts: List[str] = []
+        dropped_sentences = 0
+        stripped_phrases = 0
+        for part in parts:
+            if not part.strip():
+                continue
+            if sentence_start_tube_re.search(part):
+                # Tube # is the sentence subject — drop the whole sentence.
+                dropped_sentences += 1
+                continue
+            new_part, n = mid_sentence_tube_re.subn(" ", part)
+            if n:
+                stripped_phrases += n
+            kept_parts.append(new_part)
+        if dropped_sentences or stripped_phrases:
+            content = " ".join(p.strip() for p in kept_parts if p.strip())
+            self.logger.info(
+                f"Tube-strip: dropped {dropped_sentences} sentence(s), "
+                f"stripped {stripped_phrases} mid-sentence phrase(s)"
+            )
 
         # 5) Strip "Remember:" / "Remember that" lecture lines. Can appear
         # mid-sentence or at line start; always banned. Removes the whole
@@ -1669,14 +1718,14 @@ Now write something that makes someone stop scrolling."""
 
         content = content.strip()
 
-        # Hard word limit enforcement — truncate to 80 words max
+        # Hard word limit enforcement — truncate to 150 words max
         words = content.split()
-        if len(words) > 80:
+        if len(words) > 150:
             # Try to find a sentence boundary near the limit
-            truncated = ' '.join(words[:80])
+            truncated = ' '.join(words[:150])
             # Look for the last sentence-ending punctuation within the truncated text
             last_period = max(truncated.rfind('.'), truncated.rfind('!'), truncated.rfind('?'))
-            if last_period > len(' '.join(words[:35])):  # Only use boundary if it's past 35 words
+            if last_period > len(' '.join(words[:60])):  # Only use boundary if it's past 60 words
                 content = truncated[:last_period + 1]
             else:
                 content = truncated

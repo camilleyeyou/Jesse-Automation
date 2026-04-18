@@ -65,7 +65,7 @@ no markdown, no code fences."""
 {post.content}
 \"\"\"
 
-Word count: {word_count} (hard range: 40-100)
+Word count: {word_count} (hard range: 60-150)
 
 Answer FOUR diagnostic questions. Quote exact phrases from the post. No hedging.
 
@@ -123,7 +123,7 @@ Return STRICT JSON:
             word_count = int(content.get("word_count", len(post.content.split()) if post else 0))
         except (ValueError, TypeError):
             word_count = len(post.content.split()) if post else 0
-        length_ok = 40 <= word_count <= 100
+        length_ok = 60 <= word_count <= 150
 
         # Marcus's approval: require 2 of 3 core dimensions to pass (not all 3).
         # In production, Q3 (LLM tells) was flagging nearly every post because
@@ -166,7 +166,7 @@ Return STRICT JSON:
                 f"Template crutch \"{q4.get('crutch_opener','')}\" not earned. Try: {q4.get('alternative_opener','')}"
             )
         if not length_ok:
-            reasons.append(f"Length: {word_count} words (must be 40-100).")
+            reasons.append(f"Length: {word_count} words (must be 60-150).")
 
         feedback = " | ".join(reasons) if reasons else ""
 
