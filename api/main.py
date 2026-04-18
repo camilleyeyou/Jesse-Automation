@@ -46,6 +46,7 @@ from src.agents.weekly_strategist import WeeklyStrategistAgent
 from src.agents.strategy_refinement import StrategyRefinementAgent
 from src.agents.portfolio_qc import PortfolioQCAgent
 from src.agents.weekly_review import WeeklyReviewAgent
+from src.agents.quality_drift import QualityDriftAgent
 from src.models.comment import (
     CommentGenerationRequest,
     CommentApprovalRequest,
@@ -80,6 +81,7 @@ weekly_strategist: WeeklyStrategistAgent = None
 strategy_refinement: StrategyRefinementAgent = None
 portfolio_qc: PortfolioQCAgent = None
 weekly_review: WeeklyReviewAgent = None
+quality_drift: QualityDriftAgent = None
 
 # Job status tracker — stores last result/error for each agent
 import traceback as _tb
@@ -289,6 +291,18 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ WeeklyReviewAgent init failed: {e}")
 
+    # Initialize Quality Drift Agent — Claude-powered daily supervisor that
+    # detects drift patterns per-post validators can't see. Writes findings to
+    # strategy_insights with 'drift:' prefix for the weekly strategist + dashboard.
+    global quality_drift
+    try:
+        quality_drift = QualityDriftAgent(
+            ai_client=ai_client, config=config, db_path=DB_PATH
+        )
+        logger.info("✅ QualityDriftAgent initialized — daily drift supervision ready")
+    except Exception as e:
+        logger.warning(f"⚠️ QualityDriftAgent init failed: {e}")
+
     # Auto-start scheduler if configured
     if os.getenv("AUTO_START_SCHEDULER", "false").lower() == "true":
         scheduler.start()
@@ -455,6 +469,17 @@ def _schedule_all_jobs():
         )
         logger.info("📋 Friday 6:30 PM: Weekly Review")
 
+    # Daily Claude supervisor — runs an hour after daily post so today's post
+    # is in the window along with the preceding week.
+    if quality_drift:
+        drift_hour = (hour + 1) % 24
+        scheduler.schedule_daily_job(
+            job_func=daily_drift_job,
+            hour=drift_hour, minute=minute, timezone=timezone,
+            job_id="daily_drift_scan", job_name="Daily Drift Supervisor",
+        )
+        logger.info(f"🔎 Daily {drift_hour:02d}:{minute:02d} {timezone}: Quality Drift Supervisor")
+
 
 # ============== Background Jobs ==============
 
@@ -564,6 +589,33 @@ async def friday_qc_job():
         logger.info(f"🔍 QC result: {result}")
     except Exception as e:
         logger.error(f"❌ Friday QC job exception: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+async def daily_drift_job():
+    """Daily Claude-powered supervisor scan for quality drift patterns.
+
+    Runs 07:30 PT — an hour after the daily post generation at 06:30, so the
+    day's fresh post is in the window along with the preceding week.
+    """
+    logger.info("=" * 60)
+    logger.info("🔎 DAILY DRIFT SUPERVISOR JOB TRIGGERED")
+    logger.info("=" * 60)
+
+    if not quality_drift:
+        logger.warning("QualityDriftAgent not initialized — skipping")
+        return
+
+    try:
+        result = await quality_drift.execute(window_days=7)
+        findings_count = result.get("findings_count", 0)
+        if findings_count:
+            logger.info(f"🔎 Drift scan wrote {findings_count} finding(s)")
+        else:
+            logger.info("🔎 Drift scan found no issues worth flagging")
+    except Exception as e:
+        logger.error(f"❌ Daily drift job exception: {e}")
         import traceback
         traceback.print_exc()
 
@@ -998,6 +1050,41 @@ async def trigger_portfolio_qc(background_tasks: BackgroundTasks):
 
     background_tasks.add_task(_run)
     return {"status": "started", "message": "Portfolio QC running in background"}
+
+
+@app.post("/api/automation/run-drift-scan")
+async def trigger_drift_scan(background_tasks: BackgroundTasks):
+    """Manually trigger the Quality Drift Supervisor.
+
+    Normally runs daily on a schedule; this endpoint lets the dashboard force a
+    scan on demand (e.g. after a batch of revisions to see what the supervisor
+    flags).
+    """
+    if not quality_drift:
+        raise HTTPException(503, "Quality drift agent not initialized")
+
+    @_track_job("quality_drift")
+    async def _run():
+        return await quality_drift.execute(window_days=7)
+
+    background_tasks.add_task(_run)
+    return {"status": "started", "message": "Quality drift scan running in background"}
+
+
+@app.get("/api/automation/quality-findings")
+async def get_quality_findings(days: int = 14, limit: int = 50):
+    """Return drift findings written by the QualityDriftAgent.
+
+    Dashboard polls this to show what the supervisor has flagged. Findings are
+    stored in strategy_insights with 'drift:' prefix on insight_type.
+    """
+    memory = get_memory(DB_PATH)
+    findings = memory.get_recent_drift_findings(days=days, limit=limit)
+    return {
+        "days": days,
+        "count": len(findings),
+        "findings": findings,
+    }
 
 
 @app.post("/api/automation/run-weekly-review")

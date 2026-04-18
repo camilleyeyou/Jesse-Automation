@@ -217,6 +217,51 @@ class SchedulerService:
             logger.error(f"Failed to schedule daily post: {e}")
             return False
     
+    def schedule_daily_job(
+        self,
+        job_func: Callable,
+        hour: int,
+        minute: int,
+        timezone: str,
+        job_id: str,
+        job_name: str,
+    ) -> bool:
+        """Generic daily-cron scheduler — same mechanics as schedule_daily_post
+        but accepts a custom job_id/name so multiple daily jobs can coexist.
+        Used by the Claude supervisor jobs (QualityDriftAgent, etc).
+        """
+        if not APSCHEDULER_AVAILABLE:
+            return False
+
+        try:
+            existing = self.scheduler.get_job(job_id)
+            if existing:
+                self.scheduler.remove_job(job_id)
+
+            if ZoneInfo:
+                try:
+                    trigger = CronTrigger(hour=hour, minute=minute, timezone=ZoneInfo(timezone))
+                except Exception:
+                    trigger = CronTrigger(hour=hour, minute=minute)
+            else:
+                trigger = CronTrigger(hour=hour, minute=minute)
+
+            self.scheduler.add_job(
+                job_func,
+                trigger=trigger,
+                id=job_id,
+                name=job_name,
+                replace_existing=True,
+                misfire_grace_time=3600,
+                coalesce=True,
+                max_instances=1,
+            )
+            logger.info(f"Scheduled {job_name} at {hour:02d}:{minute:02d} {timezone}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to schedule {job_name}: {e}")
+            return False
+
     def schedule_weekly_job(
         self,
         job_func: Callable,

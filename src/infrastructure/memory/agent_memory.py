@@ -607,6 +607,274 @@ class AgentMemory:
 
         logger.debug(f"Remembered post {post_id} (approved={was_approved})")
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # QUALITY DRIFT TOOLS (read helpers the QualityDriftAgent calls)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def get_recent_posts_with_validation(self, days: int = 7, limit: int = 30) -> List[Dict]:
+        """Return recent posts joined with their per-validator scores.
+
+        Used by QualityDriftAgent. Each row includes:
+          - content, pillar, format, created_at, was_approved, average_score
+          - validators: list of {agent_name, score, approved, feedback}
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT post_id, content, pillar, format, created_at,
+                          was_approved, average_score, theme, sub_theme
+                   FROM content_memory
+                   WHERE created_at >= datetime('now', ?)
+                   ORDER BY created_at DESC
+                   LIMIT ?""",
+                (f"-{days} days", limit),
+            )
+            posts = [dict(r) for r in cursor.fetchall()]
+
+            # Attach validator scores for each post
+            for p in posts:
+                cursor.execute(
+                    """SELECT validator_name, score, approved, feedback
+                       FROM validator_memory
+                       WHERE post_id = ?
+                       ORDER BY validator_name""",
+                    (p["post_id"],),
+                )
+                p["validators"] = [dict(r) for r in cursor.fetchall()]
+
+        return posts
+
+    def count_phrase_occurrences(self, phrase: str, days: int = 14) -> Dict[str, Any]:
+        """Count how many recent posts contain a phrase (case-insensitive).
+
+        Used by QualityDriftAgent to detect pattern recycling — e.g.
+        "Tube #4,847", "Stop. Breathe.", "Hyper-Arid Social Desiccation".
+        Returns the count, the sample post excerpts, and the total posts checked.
+        """
+        if not phrase or not phrase.strip():
+            return {"count": 0, "total_posts": 0, "samples": []}
+
+        pattern = f"%{phrase.strip()}%"
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT COUNT(*) FROM content_memory
+                   WHERE created_at >= datetime('now', ?)""",
+                (f"-{days} days",),
+            )
+            total_posts = cursor.fetchone()[0]
+
+            cursor.execute(
+                """SELECT post_id, content, created_at FROM content_memory
+                   WHERE created_at >= datetime('now', ?)
+                   AND content LIKE ? COLLATE NOCASE
+                   ORDER BY created_at DESC
+                   LIMIT 10""",
+                (f"-{days} days", pattern),
+            )
+            hits = [dict(r) for r in cursor.fetchall()]
+
+        return {
+            "phrase": phrase,
+            "count": len(hits),
+            "total_posts": total_posts,
+            "rate": round(len(hits) / total_posts, 3) if total_posts else 0.0,
+            "samples": [
+                {"post_id": h["post_id"], "excerpt": h["content"][:200], "when": h["created_at"]}
+                for h in hits[:5]
+            ],
+        }
+
+    def get_validator_scorecard(self, days: int = 14) -> Dict[str, Any]:
+        """Per-validator approval rate + score distribution over the window.
+
+        Used by QualityDriftAgent to detect validator bias drift — e.g. Marcus
+        rejecting 80% of AI_Economy posts while Sarah approves 95%.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """SELECT validator_name,
+                          COUNT(*) as total,
+                          SUM(CASE WHEN approved THEN 1 ELSE 0 END) as approvals,
+                          AVG(score) as avg_score,
+                          MIN(score) as min_score,
+                          MAX(score) as max_score
+                   FROM validator_memory
+                   WHERE created_at >= datetime('now', ?)
+                   GROUP BY validator_name
+                   ORDER BY validator_name""",
+                (f"-{days} days",),
+            )
+            per_validator = []
+            for r in cursor.fetchall():
+                total = r["total"] or 0
+                approvals = r["approvals"] or 0
+                per_validator.append({
+                    "validator": r["validator_name"],
+                    "total": total,
+                    "approvals": approvals,
+                    "approval_rate": round(approvals / total, 3) if total else 0.0,
+                    "avg_score": round(r["avg_score"] or 0, 2),
+                    "score_range": [round(r["min_score"] or 0, 1), round(r["max_score"] or 0, 1)],
+                })
+
+            # Cross-tabulate approval rate by pillar per validator
+            cursor.execute(
+                """SELECT vm.validator_name, vm.pillar,
+                          COUNT(*) as total,
+                          SUM(CASE WHEN vm.approved THEN 1 ELSE 0 END) as approvals
+                   FROM validator_memory vm
+                   WHERE vm.created_at >= datetime('now', ?)
+                   AND vm.pillar IS NOT NULL
+                   GROUP BY vm.validator_name, vm.pillar""",
+                (f"-{days} days",),
+            )
+            pillar_breakdown = {}
+            for r in cursor.fetchall():
+                v = r["validator_name"]
+                total = r["total"] or 0
+                rate = round((r["approvals"] or 0) / total, 3) if total else 0.0
+                pillar_breakdown.setdefault(v, {})[r["pillar"]] = {
+                    "total": total, "approval_rate": rate,
+                }
+
+        return {
+            "days": days,
+            "per_validator": per_validator,
+            "pillar_breakdown": pillar_breakdown,
+        }
+
+    def get_pillar_distribution(self, days: int = 14) -> Dict[str, Any]:
+        """Distribution of posts across the five pillars.
+
+        Used by QualityDriftAgent to detect rotation imbalance.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT pillar, COUNT(*) as count
+                   FROM content_memory
+                   WHERE created_at >= datetime('now', ?)
+                   AND pillar IS NOT NULL
+                   GROUP BY pillar""",
+                (f"-{days} days",),
+            )
+            distribution = {row[0]: row[1] for row in cursor.fetchall()}
+
+            cursor.execute(
+                """SELECT COUNT(*) FROM content_memory
+                   WHERE created_at >= datetime('now', ?)""",
+                (f"-{days} days",),
+            )
+            total = cursor.fetchone()[0] or 0
+
+        expected = ["the_what", "the_what_if", "the_who_profits", "the_how_to_cope", "the_why_it_matters"]
+        gaps = [p for p in expected if p not in distribution]
+
+        return {
+            "days": days,
+            "total_posts": total,
+            "distribution": distribution,
+            "missing_pillars": gaps,
+            "balanced": len(gaps) == 0 and (
+                total == 0 or max(distribution.values()) <= 2 * min(distribution.values())
+            ),
+        }
+
+    def get_fallback_shipping_rate(self, days: int = 14) -> Dict[str, Any]:
+        """Heuristic: how often did posts ship via the 'max revisions' fallback?
+
+        A fallback-shipped post has was_approved=True but average_score < 7.0 (the
+        normal approval threshold), indicating the orchestrator kept the 'best
+        version' rather than reaching 2-of-3 validator consensus.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT COUNT(*) FROM content_memory
+                   WHERE created_at >= datetime('now', ?)
+                   AND was_approved = 1""",
+                (f"-{days} days",),
+            )
+            total_shipped = cursor.fetchone()[0] or 0
+
+            cursor.execute(
+                """SELECT COUNT(*) FROM content_memory
+                   WHERE created_at >= datetime('now', ?)
+                   AND was_approved = 1
+                   AND average_score > 0
+                   AND average_score < 7.0""",
+                (f"-{days} days",),
+            )
+            fallback_count = cursor.fetchone()[0] or 0
+
+        return {
+            "days": days,
+            "total_shipped": total_shipped,
+            "fallback_shipped": fallback_count,
+            "fallback_rate": round(fallback_count / total_shipped, 3) if total_shipped else 0.0,
+        }
+
+    def write_quality_finding(
+        self,
+        insight_type: str,
+        observation: str,
+        severity: str = "info",
+        evidence: Optional[Dict] = None,
+        suggested_action: Optional[str] = None,
+    ) -> int:
+        """Persist a QualityDriftAgent finding to strategy_insights.
+
+        Uses insight_type prefix 'drift:<type>' so findings are distinguishable
+        from other strategy insights. Evidence and suggested_action are folded
+        into the observation text for display.
+        """
+        sev = (severity or "info").lower()
+        confidence_map = {"critical": 0.9, "warning": 0.7, "info": 0.5}
+        confidence = confidence_map.get(sev, 0.5)
+
+        body_parts = [observation.strip()]
+        if suggested_action:
+            body_parts.append(f"\n\n**Suggested action:** {suggested_action.strip()}")
+        if evidence:
+            import json as _json
+            body_parts.append(f"\n\n**Evidence:** {_json.dumps(evidence, default=str)[:800]}")
+        body = "".join(body_parts)
+
+        prefixed_type = insight_type if insight_type.startswith("drift:") else f"drift:{insight_type}"
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """INSERT INTO strategy_insights
+                   (insight_type, observation, confidence, evidence_count)
+                   VALUES (?, ?, ?, ?)""",
+                (prefixed_type, body, confidence, 1),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_recent_drift_findings(self, days: int = 14, limit: int = 50) -> List[Dict]:
+        """Pull recent drift findings for the dashboard."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT id, insight_type, observation, confidence, created_at
+                   FROM strategy_insights
+                   WHERE insight_type LIKE 'drift:%'
+                   AND created_at >= datetime('now', ?)
+                   ORDER BY created_at DESC
+                   LIMIT ?""",
+                (f"-{days} days", limit),
+            )
+            return [dict(r) for r in cursor.fetchall()]
+
     def get_recent_posts(self, days: int = 7, limit: int = 50) -> List[Dict]:
         """Get recently generated posts"""
 

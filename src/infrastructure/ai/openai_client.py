@@ -263,20 +263,27 @@ class OpenAIClient:
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """
-        Chat completion with tool/function calling support.
+        """Chat completion with tool/function calling — routes by model prefix.
 
-        Args:
-            messages: Full conversation history (system + user + assistant + tool messages)
-            tools: OpenAI-format tool definitions
-            model: Model override (e.g. "gpt-4o")
-            temperature: Temperature override
-
-        Returns:
-            Dict with 'message' key containing the assistant response
-            (which may include tool_calls).
+        Callers pass OpenAI-format `tools` and OpenAI-format `messages`. The
+        response is always normalised to the OpenAI shape (`message.tool_calls`
+        with `function.name` / `function.arguments` JSON string), so agents can
+        reuse the same ReAct loop regardless of which provider handles the call.
+        Under the hood, Claude models run through Anthropic's tool-use API with
+        tools translated on the way in and responses translated on the way out.
         """
         model = model or self.config.openai.model
+        provider = _infer_provider(model)
+
+        if provider == "anthropic":
+            return await self._generate_with_tools_anthropic(
+                messages=messages,
+                tools=tools,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+
         temperature = temperature if temperature is not None else self.config.openai.temperature
         max_tokens = max_tokens or self.config.openai.max_tokens
 
@@ -324,6 +331,151 @@ class OpenAIClient:
 
         except Exception as e:
             logger.error(f"OpenAI tool-calling API error: {e}")
+            raise
+
+    async def _generate_with_tools_anthropic(
+        self,
+        messages: list,
+        tools: list,
+        model: str,
+        temperature: Optional[float],
+        max_tokens: Optional[int],
+    ) -> Dict[str, Any]:
+        """Anthropic tool-use behind the OpenAI-shaped generate_with_tools facade.
+
+        Translates tools in (OpenAI schema → Anthropic schema), messages in
+        (role=tool/tool_calls → Anthropic user/assistant content blocks), and
+        the response back out (Anthropic tool_use blocks → OpenAI tool_calls).
+        """
+        if not self.anthropic_client:
+            raise RuntimeError(
+                "Anthropic client not initialized — set ANTHROPIC_API_KEY or route "
+                "tool-calling to an OpenAI model."
+            )
+
+        anthropic_cfg = getattr(self.config, "anthropic", None)
+        if temperature is None:
+            temperature = getattr(anthropic_cfg, "temperature", 0.5) if anthropic_cfg else 0.5
+        if max_tokens is None:
+            max_tokens = getattr(anthropic_cfg, "max_tokens", 2000) if anthropic_cfg else 2000
+
+        # --- Translate tools: OpenAI schema → Anthropic schema ---
+        anthropic_tools = []
+        for t in tools or []:
+            fn = t.get("function", {}) if isinstance(t, dict) else {}
+            anthropic_tools.append({
+                "name": fn.get("name", ""),
+                "description": fn.get("description", ""),
+                "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
+            })
+
+        # --- Translate messages: OpenAI → Anthropic ---
+        # Anthropic splits system out of messages; tool results come in as user
+        # messages with tool_result content blocks; tool_use lives in assistant
+        # content blocks (not a separate tool_calls array).
+        system_chunks = []
+        anthropic_messages = []
+        for msg in messages:
+            role = msg.get("role")
+            if role == "system":
+                if msg.get("content"):
+                    system_chunks.append(msg["content"])
+                continue
+
+            if role == "tool":
+                # Pack tool results into the most recent user turn (or a new one)
+                tool_block = {
+                    "type": "tool_result",
+                    "tool_use_id": msg.get("tool_call_id", ""),
+                    "content": msg.get("content", ""),
+                }
+                if anthropic_messages and anthropic_messages[-1]["role"] == "user" \
+                        and isinstance(anthropic_messages[-1].get("content"), list):
+                    anthropic_messages[-1]["content"].append(tool_block)
+                else:
+                    anthropic_messages.append({"role": "user", "content": [tool_block]})
+                continue
+
+            if role == "assistant":
+                blocks = []
+                text = msg.get("content") or ""
+                if text:
+                    blocks.append({"type": "text", "text": text})
+                for tc in msg.get("tool_calls") or []:
+                    fn = tc.get("function", {})
+                    raw_args = fn.get("arguments", "{}")
+                    try:
+                        parsed_args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
+                    except json.JSONDecodeError:
+                        parsed_args = {}
+                    blocks.append({
+                        "type": "tool_use",
+                        "id": tc.get("id", ""),
+                        "name": fn.get("name", ""),
+                        "input": parsed_args,
+                    })
+                if not blocks:
+                    blocks = [{"type": "text", "text": ""}]
+                anthropic_messages.append({"role": "assistant", "content": blocks})
+                continue
+
+            # Default: user message
+            content = msg.get("content", "")
+            anthropic_messages.append({"role": "user", "content": content})
+
+        system_prompt = "\n\n".join(system_chunks).strip() or None
+
+        try:
+            response = await self.anthropic_client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system=system_prompt,
+                tools=anthropic_tools,
+                messages=anthropic_messages,
+            )
+
+            # --- Translate response: Anthropic → OpenAI shape ---
+            text_parts = []
+            tool_calls = []
+            for block in response.content or []:
+                btype = getattr(block, "type", None)
+                if btype == "text":
+                    text_parts.append(getattr(block, "text", "") or "")
+                elif btype == "tool_use":
+                    tool_calls.append({
+                        "id": getattr(block, "id", ""),
+                        "type": "function",
+                        "function": {
+                            "name": getattr(block, "name", ""),
+                            "arguments": json.dumps(getattr(block, "input", {}) or {}),
+                        },
+                    })
+
+            assistant_msg: Dict[str, Any] = {
+                "role": "assistant",
+                "content": "".join(text_parts),
+            }
+            if tool_calls:
+                assistant_msg["tool_calls"] = tool_calls
+
+            usage = getattr(response, "usage", None)
+            return {
+                "message": assistant_msg,
+                "usage": {
+                    "prompt_tokens": getattr(usage, "input_tokens", 0) if usage else 0,
+                    "completion_tokens": getattr(usage, "output_tokens", 0) if usage else 0,
+                    "total_tokens": (
+                        (getattr(usage, "input_tokens", 0) + getattr(usage, "output_tokens", 0))
+                        if usage else 0
+                    ),
+                },
+                "model": getattr(response, "model", model),
+                "finish_reason": getattr(response, "stop_reason", "end_turn"),
+            }
+
+        except Exception as e:
+            logger.error(f"Anthropic tool-calling API error: {e}")
             raise
 
     async def _generate_with_anthropic(
