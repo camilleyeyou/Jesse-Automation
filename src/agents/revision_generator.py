@@ -316,13 +316,17 @@ Return JSON:
 
         # Strip hashtags
         content = _re.sub(r"(?:^|\s)#[A-Za-z][A-Za-z0-9_]+", "", content)
-        # Strip trailing Stop. Breathe. X ritual closer
+        # Strip Stop. Breathe. X ritual closer ANYWHERE (not just trailing —
+        # Claude has been embedding it mid-sentence). Matches ". Stop. Breathe.
+        # Apply." as a unit and replaces with a single space.
         content = _re.sub(
-            r"(?:\s*\n+|\s+)Stop[.!]?\s*Breathe[.!]?\s*\w+[.!]?\s*$",
-            "",
+            r"(?:^|\s)Stop[.!]?\s*Breathe[.!]?\s*\w+[.!]?(?=\s|$)",
+            " ",
             content,
             flags=_re.IGNORECASE,
-        ).rstrip()
+        )
+        # Collapse double spaces the strip might have created
+        content = _re.sub(r"[ \t]{2,}", " ", content).strip()
         # Strip trailing engagement bait
         content = _re.sub(
             r"(?:\s*\n+|\s+)(?:thoughts\??|share this|agree\??|like if you agree)[.!?]*\s*$",

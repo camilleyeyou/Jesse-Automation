@@ -1574,15 +1574,19 @@ Now write something that makes someone stop scrolling."""
         if len(content) != original_len:
             self.logger.info("Stripped hashtags from content")
 
-        # 2) Strip trailing "Stop. Breathe. [anything]." ritual closer — not brand canon.
-        # The phrase variants: Stop. Breathe. Apply. / Breathe. Balm. / Breathe. Soothe.
+        # 2) Strip "Stop. Breathe. [anything]." ritual closer wherever it appears —
+        # not brand canon. Variants seen in production: Stop. Breathe. Apply. /
+        # Breathe. Balm. / Breathe. Soothe. Matches mid-sentence AND trailing,
+        # because Claude has started embedding it mid-post to dodge trailing strips.
         stop_breathe_re = _re.compile(
-            r"(?:\s*\n+|\s+)Stop[.!]?\s*Breathe[.!]?\s*\w+[.!]?\s*$",
+            r"(?:^|\s)Stop[.!]?\s*Breathe[.!]?\s*\w+[.!]?(?=\s|$)",
             _re.IGNORECASE,
         )
         if stop_breathe_re.search(content):
-            content = stop_breathe_re.sub("", content).rstrip()
-            self.logger.info("Stripped trailing 'Stop. Breathe. X' ritual closer")
+            content = stop_breathe_re.sub(" ", content)
+            # Collapse any double-spaces the substitution created
+            content = _re.sub(r"[ \t]{2,}", " ", content).strip()
+            self.logger.info("Stripped 'Stop. Breathe. X' ritual closer")
 
         # 3) Strip trailing engagement-bait ("Thoughts?", "Share this.", etc.)
         bait_re = _re.compile(

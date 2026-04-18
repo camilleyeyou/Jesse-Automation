@@ -259,8 +259,17 @@ Return STRICT JSON:
             "model": self.model,
         }
 
+        # Short provider tag derived from the model name — "claude-haiku-4-5..."
+        # → "haiku", "gpt-4o" → "gpt", etc. Keeps logs accurate if we swap providers later.
+        provider_tag = (self.model.split("-")[0] if self.model else "?").lower()
+        if "haiku" in self.model.lower():
+            provider_tag = "haiku"
+        elif "sonnet" in self.model.lower():
+            provider_tag = "sonnet"
+        elif "gemini" in self.model.lower():
+            provider_tag = "gemini"
         self.logger.info(
-            f"Jordan Park (Gemini): {pass_count}/4 passes, {word_count}w "
+            f"Jordan Park ({provider_tag}): {pass_count}/4 passes, {word_count}w "
             f"{'✅' if approved else '❌'}"
         )
 
