@@ -310,6 +310,70 @@ class AgentMemory:
 
         logger.debug("Memory tables initialized")
 
+        # Auto-seed gold-standard corpus from the JSON that ships with the repo
+        # if the table is empty. This matters on fresh deploys where the SQLite
+        # DB lives on a Railway volume — the image-embedded JSON is the only
+        # way the canonical voice specimens reach production.
+        self._autoseed_gold_standard_if_empty()
+
+    def _autoseed_gold_standard_if_empty(self):
+        """Load data/seeds/gold_standard_*.json into the gold-standard table when empty.
+
+        Idempotent: skipped entirely when the table already has rows, so normal
+        runs pay nothing. File format expected:
+            {"version": 1, "specimens": [
+                {"content": ..., "pillar": ..., "format": ..., "notes": ...,
+                 "curator": ..., "embedding": [float, ...]}, ...
+            ]}
+        """
+        try:
+            if self.count_gold_standard_posts() > 0:
+                return
+        except Exception as e:
+            logger.debug(f"Skipping autoseed (count failed): {e}")
+            return
+
+        # Look for seed files shipped in the repo. Resolve relative to this file
+        # so it works regardless of where the process CWD is at startup.
+        seeds_dir = Path(__file__).resolve().parent.parent.parent.parent / "data" / "seeds"
+        if not seeds_dir.exists():
+            return
+
+        seed_files = sorted(seeds_dir.glob("gold_standard_*.json"))
+        if not seed_files:
+            return
+
+        import json as _json
+        total_loaded = 0
+        for seed_file in seed_files:
+            try:
+                with open(seed_file) as f:
+                    payload = _json.load(f)
+                specimens = payload.get("specimens", [])
+                if not isinstance(specimens, list):
+                    continue
+                for spec in specimens:
+                    embedding = spec.get("embedding")
+                    if not embedding or not isinstance(embedding, list):
+                        continue
+                    try:
+                        self.add_gold_standard_post(
+                            content=spec.get("content", ""),
+                            pillar=spec.get("pillar"),
+                            format=spec.get("format"),
+                            embedding=embedding,
+                            notes=spec.get("notes"),
+                            curator=spec.get("curator") or f"seed:{seed_file.name}",
+                        )
+                        total_loaded += 1
+                    except Exception as inner:
+                        logger.warning(f"Failed to load specimen from {seed_file.name}: {inner}")
+            except Exception as outer:
+                logger.warning(f"Failed to read seed file {seed_file}: {outer}")
+
+        if total_loaded:
+            logger.info(f"✅ Autoseeded {total_loaded} gold-standard specimen(s) from data/seeds/")
+
     # ═══════════════════════════════════════════════════════════════════════════
     # GOLD STANDARD POSTS (Fix #4 — retrieval-augmented voice grounding)
     # ═══════════════════════════════════════════════════════════════════════════
