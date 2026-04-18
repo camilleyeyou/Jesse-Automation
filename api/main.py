@@ -1072,6 +1072,86 @@ async def trigger_drift_scan(background_tasks: BackgroundTasks):
     return {"status": "started", "message": "Quality drift scan running in background"}
 
 
+@app.get("/api/automation/post-diagnostics")
+async def get_post_diagnostics(limit: int = 5, approved_only: bool = False):
+    """Return recent posts with FULL validator diagnostic feedback.
+
+    Used for grading individual posts: see the exact content that shipped plus
+    what each of Sarah/Marcus/Jordan quoted as their feedback. Joins
+    content_memory (the post) with validator_memory (per-validator verdicts).
+    """
+    import sqlite3 as _sq
+    memory = get_memory(DB_PATH)
+
+    with _sq.connect(memory.db_path) as conn:
+        conn.row_factory = _sq.Row
+        cursor = conn.cursor()
+
+        where = "WHERE 1=1"
+        if approved_only:
+            where += " AND was_approved = 1"
+
+        cursor.execute(
+            f"""SELECT post_id, batch_id, content, pillar, format, theme, sub_theme,
+                       trending_topic, was_approved, average_score, created_at
+                FROM content_memory
+                {where}
+                ORDER BY created_at DESC
+                LIMIT ?""",
+            (limit,),
+        )
+        rows = [dict(r) for r in cursor.fetchall()]
+
+        for p in rows:
+            cursor.execute(
+                """SELECT validator_name, score, approved, feedback, strengths, weaknesses
+                   FROM validator_memory
+                   WHERE post_id = ?
+                   ORDER BY validator_name""",
+                (p["post_id"],),
+            )
+            p["validators"] = [dict(r) for r in cursor.fetchall()]
+
+    return {
+        "count": len(rows),
+        "posts": rows,
+    }
+
+
+@app.get("/api/automation/post-diagnostics/{post_id}")
+async def get_single_post_diagnostics(post_id: str):
+    """Return one post by content_memory post_id with full validator detail.
+
+    post_id format is typically '<batch_id_prefix>_<post_number>' (e.g. c3f6297f_1).
+    """
+    import sqlite3 as _sq
+    memory = get_memory(DB_PATH)
+    with _sq.connect(memory.db_path) as conn:
+        conn.row_factory = _sq.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT post_id, batch_id, content, pillar, format, theme, sub_theme,
+                      trending_topic, was_approved, average_score, created_at
+               FROM content_memory WHERE post_id = ? LIMIT 1""",
+            (post_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(404, f"No post with post_id={post_id}")
+        post = dict(row)
+
+        cursor.execute(
+            """SELECT validator_name, score, approved, feedback, strengths, weaknesses
+               FROM validator_memory
+               WHERE post_id = ?
+               ORDER BY validator_name""",
+            (post_id,),
+        )
+        post["validators"] = [dict(r) for r in cursor.fetchall()]
+
+    return post
+
+
 @app.get("/api/automation/avoid-list")
 async def get_avoid_list(limit: int = 50):
     """Active generator avoid-list entries the supervisor has written.
