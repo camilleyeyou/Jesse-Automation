@@ -457,12 +457,18 @@ Don't create generic content. Don't summarize the headline. Find YOUR angle and 
             except (ValueError, ImportError):
                 logger.warning(f"⚠️ Unknown calendar format '{preferred_format}', ignoring")
 
+        # Pull structured angle from the trend so the generator can inject the
+        # four fields directly (observation / take / concrete_details / tension)
+        # instead of selecting a random methodology string.
+        structured_angle = getattr(trend, 'structured_angle', None) if trend else None
+
         # Generate content
         post = await self.content_generator.execute(
             post_number=post_number,
             batch_id=batch_id,
             trending_context=trend_context,
             requested_format=requested_format,
+            structured_angle=structured_angle,
         )
         
         # Generate media

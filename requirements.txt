@@ -9,6 +9,7 @@ pydantic~=2.6.0
 
 # AI & ML
 openai~=1.12.0
+anthropic>=0.30.0  # Claude Sonnet for content generation (Fix #2)
 google-genai~=0.3.0
 
 # Scheduling

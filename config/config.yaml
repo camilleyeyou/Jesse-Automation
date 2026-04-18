@@ -5,13 +5,29 @@ openai:
   max_tokens: 600
   timeout: 30
 
+# Anthropic (Claude) configuration — used for the content generator.
+# See Fix #2 in CLAUDE.md: GPT-4o-mini collapses into template openers under
+# heavy prompt constraint; Sonnet holds character voice better at higher temp.
+anthropic:
+  api_key: ${ANTHROPIC_API_KEY}
+  model: claude-sonnet-4-6
+  temperature: 0.9
+  max_tokens: 600
+  timeout: 60
+
 # Google Imagen configuration for image generation
 google:
   api_key: ${GOOGLE_API_KEY}
 
-  # Image model - Imagen 3 production ($0.03/image, reliable)
-  # Options: imagen-3.0-generate-002 (recommended), gemini-2.5-flash-image (experimental)
-  image_model: imagen-3.0-generate-002
+  # Image model.
+  # imagen-3.0-generate-002 was deprecated/removed — calls now 404.
+  # Imagen 4 options (require PAID AI Studio plan, not free tier):
+  #   - imagen-4.0-fast-generate-001   (cheapest, fastest)
+  #   - imagen-4.0-generate-001        (standard)
+  #   - imagen-4.0-ultra-generate-001  (highest quality)
+  # If you hit "Imagen 3 is only available on paid plans", upgrade at ai.dev/projects,
+  # or set use_images: false to skip image generation entirely.
+  image_model: imagen-4.0-fast-generate-001
 
   # Enable/disable image generation
   use_images: true  # Set to false to skip image generation

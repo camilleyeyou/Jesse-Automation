@@ -153,23 +153,36 @@ Identity Note: {self.BRAND_IDENTITY['name']} — {self.BRAND_IDENTITY['note']}
         prompt: str,
         system_prompt: Optional[str] = None,
         response_format = "json",
-        temperature: Optional[float] = None
+        temperature: Optional[float] = None,
+        model: Optional[str] = None,
+        max_tokens: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Generate a response using the AI client"""
-        
+        """Generate a response using the AI client.
+
+        The AI client routes by `model` prefix (gpt-*, claude-*, gemini-*).
+        Subclasses that want a specific provider pass `model=` (and usually
+        `temperature=` / `max_tokens=` matching that provider's config).
+        """
+
         system_prompt = system_prompt or self.get_system_prompt()
-        
+
         self.logger.debug(f"Generating response with prompt length: {len(prompt)}")
-        
-        result = await self.ai_client.generate(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            response_format=response_format,
-            temperature=temperature
-        )
-        
+
+        kwargs: Dict[str, Any] = {
+            "prompt": prompt,
+            "system_prompt": system_prompt,
+            "response_format": response_format,
+            "temperature": temperature,
+        }
+        if model is not None:
+            kwargs["model"] = model
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+
+        result = await self.ai_client.generate(**kwargs)
+
         self.logger.debug(f"Generated response with {result.get('usage', {}).get('total_tokens', 0)} tokens")
-        
+
         return result
     
     def set_context(self, batch_id: str = None, post_number: int = None):

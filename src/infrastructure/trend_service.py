@@ -50,6 +50,7 @@ class TrendingNews:
     description: str = ""
     related_articles: list = field(default_factory=list)
     jesse_angle: str = ""
+    structured_angle: Optional[dict] = None  # observation/take/concrete_details/tension
     news_freshness: str = "today"
     # Theme and tier metadata (added for content strategy)
     theme: str = ""  # Maps to 5 main themes (ai_slop, ai_safety, ai_economy, rituals, meditations)

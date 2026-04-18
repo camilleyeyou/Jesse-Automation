@@ -1,6 +1,12 @@
 """
-AI Client with OpenAI for text and Google Imagen 3 for images
-Fixed to use production Imagen 3 model ($0.03/image) instead of preview model with quota limits
+AI Client — unified text generation with provider routing.
+
+Text routing:
+  - model name starts with "gpt-"      → OpenAI
+  - model name starts with "claude-"   → Anthropic (Fix #2: generator uses Sonnet)
+  - model name starts with "gemini-"   → Google (text; images stay on Imagen)
+
+Images still route through Google Imagen via generate_image().
 """
 
 import asyncio
@@ -14,6 +20,14 @@ from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
+# Anthropic SDK — required for Fix #2 (generator on Claude Sonnet)
+try:
+    from anthropic import AsyncAnthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
+    logger.warning("Anthropic SDK not installed - run: pip install anthropic")
+
 # Try to import Gemini/Imagen
 try:
     from google import genai
@@ -26,19 +40,49 @@ except ImportError:
     logger.warning("Google Gemini SDK not installed - run: pip install google-genai Pillow")
 
 
+def _infer_provider(model: str) -> str:
+    """Map model name to provider. Used by the unified generate() router."""
+    m = (model or "").lower()
+    if m.startswith("claude"):
+        return "anthropic"
+    if m.startswith("gemini"):
+        return "google"
+    # Default to OpenAI — covers gpt-*, o1-*, and legacy names
+    return "openai"
+
+
 class OpenAIClient:
-    """Async AI client with OpenAI (text) and Google Imagen 3 (images)"""
+    """Async AI client with OpenAI (text) and Google Imagen (images)"""
     
     def __init__(self, config):
         self.config = config
-        
+
         # OpenAI client (for text generation)
         self.openai_client = AsyncOpenAI(api_key=config.openai.api_key)
-        
-        # Google client (for image generation with Imagen 3)
+
+        # Anthropic client (Fix #2 — generator uses Claude Sonnet)
+        self.anthropic_client = None
+        anthropic_cfg = getattr(config, 'anthropic', None)
+        anthropic_api_key = (
+            getattr(anthropic_cfg, 'api_key', None) if anthropic_cfg else None
+        ) or os.getenv("ANTHROPIC_API_KEY")
+        if ANTHROPIC_AVAILABLE and anthropic_api_key:
+            try:
+                self.anthropic_client = AsyncAnthropic(api_key=anthropic_api_key)
+                logger.info("✅ Anthropic client initialized")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize Anthropic client: {e}")
+        elif not ANTHROPIC_AVAILABLE:
+            logger.warning("⚠️ Anthropic SDK not installed — Claude routing disabled")
+        else:
+            logger.warning("⚠️ ANTHROPIC_API_KEY not set — Claude routing disabled")
+
+        # Google client (for image generation with Imagen)
         self.gemini_client = None
         self.use_images = False
-        self.image_model = "imagen-3.0-generate-002"  # Production paid model at $0.03/image
+        # Default image model. imagen-3.0-generate-002 was deprecated upstream (404s
+        # with "not found for API version v1beta"). Imagen 4 is the current line.
+        self.image_model = "imagen-4.0-fast-generate-001"
         
         if GEMINI_AVAILABLE:
             # Try config first, then environment variable
@@ -87,15 +131,41 @@ class OpenAIClient:
                       temperature: Optional[float] = None,
                       max_tokens: Optional[int] = None,
                       response_format = "json") -> Dict[str, Any]:
-        """Generate completion from OpenAI API with JSON support.
+        """Generate completion from the provider inferred from `model`.
+
+        Routes by model name prefix: gpt-* → OpenAI, claude-* → Anthropic.
 
         response_format can be:
-          - "json" (string) — basic JSON mode
+          - "json" (string) — basic JSON mode (prompt + parse for Anthropic)
           - "text" (string) — plain text
-          - dict with "type": "json_schema" — structured output with strict schema
+          - dict with "type": "json_schema" — OpenAI-native structured output
+            (for Anthropic, treated as prompt-level JSON)
         """
 
         model = model or self.config.openai.model
+        provider = _infer_provider(model)
+
+        if provider == "anthropic":
+            return await self._generate_with_anthropic(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format=response_format,
+            )
+
+        if provider == "google":
+            return await self._generate_with_gemini_text(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format=response_format,
+            )
+
+        # OpenAI path — unchanged below
         temperature = temperature if temperature is not None else self.config.openai.temperature
         max_tokens = max_tokens if max_tokens is not None else self.config.openai.max_tokens
 
@@ -256,11 +326,274 @@ class OpenAIClient:
             logger.error(f"OpenAI tool-calling API error: {e}")
             raise
 
+    async def _generate_with_anthropic(
+        self,
+        prompt: str,
+        system_prompt: Optional[str],
+        model: str,
+        temperature: Optional[float],
+        max_tokens: Optional[int],
+        response_format,
+    ) -> Dict[str, Any]:
+        """Call Claude via the Anthropic SDK and adapt the response to our shape.
+
+        Shape parity with the OpenAI branch:
+          {"content": parsed_json_or_str, "usage": {...}, "model": ..., "finish_reason": ...}
+        """
+        if not self.anthropic_client:
+            raise RuntimeError(
+                "Anthropic client not initialized — set ANTHROPIC_API_KEY or remove claude-* "
+                "model routing. See Fix #2 in CLAUDE.md."
+            )
+
+        anthropic_cfg = getattr(self.config, 'anthropic', None)
+        if temperature is None:
+            temperature = getattr(anthropic_cfg, 'temperature', 0.9) if anthropic_cfg else 0.9
+        if max_tokens is None:
+            max_tokens = getattr(anthropic_cfg, 'max_tokens', 600) if anthropic_cfg else 600
+
+        is_json_mode = response_format == "json" or (
+            isinstance(response_format, dict)
+            and response_format.get("type") in ("json_object", "json_schema")
+        )
+
+        # If a JSON schema is provided, inject its shape into the system prompt so
+        # Claude knows exactly which fields to return. (Anthropic doesn't have
+        # OpenAI's "json_schema" strict mode, but Sonnet follows shape instructions
+        # reliably when they're explicit.)
+        schema_hint = ""
+        if isinstance(response_format, dict) and response_format.get("type") == "json_schema":
+            try:
+                schema_block = response_format.get("json_schema", {}).get("schema", {})
+                schema_hint = (
+                    "\n\nYour output MUST be a single JSON object matching this schema:\n"
+                    + json.dumps(schema_block, indent=2)
+                )
+            except Exception:
+                schema_hint = ""
+
+        effective_system = system_prompt or ""
+        if is_json_mode:
+            effective_system += (
+                "\n\nCRITICAL: Respond with valid JSON only. No markdown. No prose before or "
+                "after. No code fences. Just the JSON object."
+            )
+        effective_system += schema_hint
+
+        user_prompt = prompt
+        if is_json_mode:
+            user_prompt += "\n\nReturn ONLY valid JSON. No other text."
+
+        try:
+            response = await self.anthropic_client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system=effective_system.strip() or None,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+
+            # Extract text from the content blocks
+            parts = []
+            for block in response.content or []:
+                text = getattr(block, "text", None)
+                if text:
+                    parts.append(text)
+            raw = "".join(parts).strip()
+
+            if is_json_mode:
+                # Strip any markdown code fences Claude might add despite instructions
+                cleaned = raw
+                if cleaned.startswith("```json"):
+                    cleaned = cleaned[7:]
+                elif cleaned.startswith("```"):
+                    cleaned = cleaned[3:]
+                if cleaned.endswith("```"):
+                    cleaned = cleaned[:-3]
+                cleaned = cleaned.strip()
+
+                try:
+                    parsed = json.loads(cleaned) if cleaned else {}
+                except json.JSONDecodeError:
+                    parsed = self._extract_json_from_text(cleaned) or {
+                        "error": "Failed to parse Claude JSON", "raw_content": cleaned[:500]
+                    }
+                content_value: Any = parsed
+            else:
+                content_value = raw
+
+            usage = getattr(response, "usage", None)
+            return {
+                "content": content_value,
+                "usage": {
+                    "prompt_tokens": getattr(usage, "input_tokens", 0) if usage else 0,
+                    "completion_tokens": getattr(usage, "output_tokens", 0) if usage else 0,
+                    "total_tokens": (
+                        (getattr(usage, "input_tokens", 0) + getattr(usage, "output_tokens", 0))
+                        if usage else 0
+                    ),
+                },
+                "model": getattr(response, "model", model),
+                "finish_reason": getattr(response, "stop_reason", "unknown"),
+            }
+
+        except Exception as e:
+            logger.error(f"Anthropic API error: {e}")
+            raise
+
+    async def embed_text(self, text: str, model: str = "text-embedding-3-small") -> list:
+        """Embed text via OpenAI (Fix #4 — retrieval-augmented voice grounding).
+
+        Returns an empty list on failure rather than raising, so retrieval degrades
+        gracefully to no-retrieval instead of blocking generation.
+        """
+        if not text or not text.strip():
+            return []
+        try:
+            response = await self.openai_client.embeddings.create(
+                model=model,
+                input=text.strip(),
+            )
+            return list(response.data[0].embedding)
+        except Exception as e:
+            logger.warning(f"Embedding failed: {e}")
+            return []
+
+    async def _generate_with_gemini_text(
+        self,
+        prompt: str,
+        system_prompt: Optional[str],
+        model: str,
+        temperature: Optional[float],
+        max_tokens: Optional[int],
+        response_format,
+    ) -> Dict[str, Any]:
+        """Call Gemini text generation (via google.genai SDK) and adapt to our shape.
+
+        Used by Fix #3 so Jordan Park runs on a different provider from Sarah (Claude)
+        and Marcus (GPT-4o) — breaking correlated-judgment convergence.
+        """
+        if not self.gemini_client:
+            raise RuntimeError(
+                "Gemini client not initialized — set GOOGLE_API_KEY or remove gemini-* "
+                "model routing. See Fix #3 in CLAUDE.md."
+            )
+
+        if temperature is None:
+            temperature = 0.4  # validators should be more deterministic than the generator
+        if max_tokens is None:
+            max_tokens = 800
+
+        is_json_mode = response_format == "json" or (
+            isinstance(response_format, dict)
+            and response_format.get("type") in ("json_object", "json_schema")
+        )
+
+        effective_system = system_prompt or ""
+        if is_json_mode:
+            effective_system += (
+                "\n\nCRITICAL: Respond with valid JSON only. No markdown. No prose before or "
+                "after. No code fences. Just the JSON object."
+            )
+
+        full_prompt = (effective_system + "\n\n" + prompt) if effective_system.strip() else prompt
+        if is_json_mode:
+            full_prompt += "\n\nReturn ONLY valid JSON. No other text."
+
+        # If the caller passed a json_schema response_format, pin Gemini's output
+        # shape using response_schema. Without this, Gemini returns JSON but with
+        # whatever key names it prefers — which blanks out downstream parsers
+        # (observed: Jordan's q1_insight/q2_surprise_moment/etc. came back as {}).
+        gemini_schema = None
+        if isinstance(response_format, dict) and response_format.get("type") == "json_schema":
+            try:
+                gemini_schema = response_format.get("json_schema", {}).get("schema")
+            except Exception:
+                gemini_schema = None
+
+        try:
+            # google.genai's generate_content is sync — run in a worker thread
+            # to keep our async call chain non-blocking.
+            def _call():
+                config_obj = None
+                try:
+                    from google.genai import types as _types
+                    config_kwargs = dict(
+                        temperature=temperature,
+                        max_output_tokens=max_tokens,
+                        response_mime_type="application/json" if is_json_mode else None,
+                    )
+                    if gemini_schema is not None and is_json_mode:
+                        config_kwargs["response_schema"] = gemini_schema
+                    config_obj = _types.GenerateContentConfig(**config_kwargs)
+                except Exception:
+                    config_obj = None
+                kwargs = {"model": model, "contents": full_prompt}
+                if config_obj is not None:
+                    kwargs["config"] = config_obj
+                return self.gemini_client.models.generate_content(**kwargs)
+
+            response = await asyncio.to_thread(_call)
+
+            # Extract text
+            raw = ""
+            try:
+                raw = (response.text or "").strip()
+            except Exception:
+                # Fallback: walk parts
+                try:
+                    for part in response.candidates[0].content.parts:
+                        t = getattr(part, "text", None)
+                        if t:
+                            raw += t
+                    raw = raw.strip()
+                except Exception:
+                    raw = ""
+
+            if is_json_mode:
+                cleaned = raw
+                if cleaned.startswith("```json"):
+                    cleaned = cleaned[7:]
+                elif cleaned.startswith("```"):
+                    cleaned = cleaned[3:]
+                if cleaned.endswith("```"):
+                    cleaned = cleaned[:-3]
+                cleaned = cleaned.strip()
+                try:
+                    parsed = json.loads(cleaned) if cleaned else {}
+                except json.JSONDecodeError:
+                    parsed = self._extract_json_from_text(cleaned) or {
+                        "error": "Failed to parse Gemini JSON", "raw_content": cleaned[:500]
+                    }
+                content_value: Any = parsed
+            else:
+                content_value = raw
+
+            # Token usage (best-effort — field names vary by SDK version)
+            usage_meta = getattr(response, "usage_metadata", None)
+            in_tokens = getattr(usage_meta, "prompt_token_count", 0) if usage_meta else 0
+            out_tokens = getattr(usage_meta, "candidates_token_count", 0) if usage_meta else 0
+
+            return {
+                "content": content_value,
+                "usage": {
+                    "prompt_tokens": in_tokens,
+                    "completion_tokens": out_tokens,
+                    "total_tokens": in_tokens + out_tokens,
+                },
+                "model": model,
+                "finish_reason": "stop",
+            }
+
+        except Exception as e:
+            logger.error(f"Gemini text API error: {e}")
+            raise
+
     async def generate_image(self,
                            prompt: str,
                            base_image_path: Optional[str] = None) -> Dict[str, Any]:
         """
-        Generate image using Google Imagen 3 (Production model)
+        Generate image using Google Imagen (Production model)
         
         Cost: $0.03 per image
         Model: imagen-3.0-generate-002
@@ -283,7 +616,7 @@ class OpenAIClient:
             is_imagen = "imagen" in self.image_model.lower()
             
             if is_imagen:
-                # Use Imagen 3 API (generate_images)
+                # Use Imagen API (generate_images)
                 return await self._generate_with_imagen(prompt, start_time)
             else:
                 # Use Gemini Flash API (generate_content) - fallback for experimental models
@@ -299,12 +632,12 @@ class OpenAIClient:
             }
     
     async def _generate_with_imagen(self, prompt: str, start_time: float) -> Dict[str, Any]:
-        """Generate image using Imagen 3 API - Production paid model at $0.03/image"""
+        """Generate image using Imagen API - Production paid model at $0.03/image"""
         
-        logger.info(f"🎨 Generating image with Imagen 3 ({self.image_model})")
+        logger.info(f"🎨 Generating image with Imagen ({self.image_model})")
         
         try:
-            # Imagen 3 uses generate_images() method
+            # Imagen uses generate_images() method
             response = self.gemini_client.models.generate_images(
                 model=self.image_model,
                 prompt=prompt,
@@ -327,28 +660,33 @@ class OpenAIClient:
                     "size_mb": round(size_mb, 3),
                     "provider": "google_imagen",
                     "model": self.image_model,
-                    "cost": 0.03  # Imagen 3 costs $0.03 per image
+                    "cost": 0.03  # Imagen costs $0.03 per image
                 }
                 
-                logger.info(f"✅ Imagen 3 image generated in {result['generation_time_seconds']}s ({result['size_mb']}MB) - Cost: $0.03")
+                logger.info(f"✅ Imagen image generated in {result['generation_time_seconds']}s ({result['size_mb']}MB) - Cost: $0.03")
                 
                 return result
             else:
-                logger.error("No image data in Imagen 3 response")
-                return {"error": "No image generated by Imagen 3", "image_data": None}
+                logger.error("No image data in Imagen response")
+                return {"error": "No image generated by Imagen", "image_data": None}
                 
         except Exception as e:
             error_msg = str(e)
-            logger.error(f"❌ Imagen 3 generation failed: {error_msg}")
+            logger.error(f"❌ Imagen generation failed: {error_msg}")
             
             # Provide helpful error messages
             if "RESOURCE_EXHAUSTED" in error_msg or "429" in error_msg:
                 logger.error("💡 Quota exceeded - check billing is enabled at https://console.cloud.google.com/billing")
             elif "PERMISSION_DENIED" in error_msg or "403" in error_msg:
                 logger.error("💡 Permission denied - ensure Generative Language API is enabled")
+            elif "only available on paid plans" in error_msg:
+                logger.error(
+                    "💡 Imagen requires a paid Google AI Studio plan. Upgrade at "
+                    "https://ai.dev/projects, or set google.use_images=false to skip."
+                )
             elif "INVALID_ARGUMENT" in error_msg:
                 logger.error("💡 Invalid argument - check prompt doesn't violate content policies")
-            
+
             return {
                 "error": error_msg,
                 "image_data": None,

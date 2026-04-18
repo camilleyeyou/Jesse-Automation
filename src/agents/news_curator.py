@@ -162,16 +162,48 @@ about this that makes humans uncomfortable AND amused?" If yes, it's gold.
 BONUS: "Can this trend be diagnosed as a dryness condition?" If yes, it's platinum.
 
 ═══════════════════════════════════════════════════════════════════════════════
-OUTPUT FORMAT
+OUTPUT FORMAT — STRUCTURED ANGLE (CRITICAL)
 ═══════════════════════════════════════════════════════════════════════════════
 
-Return JSON with:
+You do NOT write a freeform "angle" blob. You write FOUR discrete fields. If
+any one is vague or missing, the downstream generator will default to template
+filler ("Diagnosed: X") and the post will fail. These four fields ARE the angle.
+
+1. observation — one sentence, concrete. What specific detail in this story did
+   Jesse notice that nobody else would? A number, a phrase, a contrast, a timing
+   coincidence, a single line in the source. NOT a restatement of the headline.
+   BAD:  "AI is replacing copywriters."
+   GOOD: "The announcement was written by the same model it's replacing."
+
+2. take — one sentence. Jesse's actual POV on the observation. A claim, a
+   judgment, an opinion. If it starts with "Jesse could comment on..." it's not
+   a take. If removing it wouldn't change what Jesse is saying, it's not a take.
+   BAD:  "Jesse might have thoughts about this."
+   GOOD: "Nobody is mentioning the $4B being spent on politeness."
+
+3. concrete_details — a LIST (array) of real strings from the source only:
+   names, numbers, places, dates, quotes. Never invented. Never paraphrased into
+   fuzziness. If the source says "$2.3 billion Q3 2025" you write "$2.3B, Q3 2025".
+   Minimum 3 items. If you can't find 3 real details, the story isn't specific
+   enough — pick a different candidate.
+
+4. tension — one sentence. Where does the claim diverge from reality? Where does
+   the headline mislead? What is the gap between what was promised and what is
+   actually happening? This is the satirical territory — if you can't locate
+   tension, the story has no seam for Jesse to pry open.
+   BAD:  "It's kind of ironic."
+   GOOD: "Nvidia claims AI will unlock productivity. Its own customers just laid
+         off the productivity teams."
+
+Also return:
 - chosen_index: the index (0-based) of the best trend
 - relevance_score: 1-10 score for audience relevance
 - content_potential: 1-10 score for how good a Jesse post this could be
-- jesse_angle: 1-2 sentences describing the specific take Jesse should have
-  (not generic — be specific about the angle, the subversion, the observation)
-- reasoning: brief explanation of why this trend beats the others"""
+- reasoning: brief explanation of why this trend beats the others
+
+Return STRICT JSON with keys:
+chosen_index, relevance_score, content_potential, observation, take,
+concrete_details (array of strings), tension, reasoning"""
 
     async def execute(self, post_id: str = None, preferred_theme: str = None) -> Optional[Any]:
         """
@@ -264,10 +296,32 @@ NO viable {preferred_theme.replace('_', ' ')} trends exist among the candidates.
                 content_data = content_data["post"]
 
             chosen_index = content_data.get("chosen_index", 0)
-            jesse_angle = content_data.get("jesse_angle", "")
             relevance_score = content_data.get("relevance_score", 5)
             content_potential = content_data.get("content_potential", 5)
             reasoning = content_data.get("reasoning", "")
+
+            # Extract structured angle fields
+            observation = str(content_data.get("observation", "")).strip()
+            take = str(content_data.get("take", "")).strip()
+            concrete_details_raw = content_data.get("concrete_details", [])
+            if isinstance(concrete_details_raw, str):
+                # Tolerate comma-separated string fallback
+                concrete_details = [s.strip() for s in concrete_details_raw.split(",") if s.strip()]
+            elif isinstance(concrete_details_raw, list):
+                concrete_details = [str(s).strip() for s in concrete_details_raw if str(s).strip()]
+            else:
+                concrete_details = []
+            tension = str(content_data.get("tension", "")).strip()
+
+            # Legacy freeform angle field (backward compat for downstream strings)
+            legacy_angle_parts = []
+            if observation:
+                legacy_angle_parts.append(f"Observation: {observation}")
+            if take:
+                legacy_angle_parts.append(f"Take: {take}")
+            if tension:
+                legacy_angle_parts.append(f"Tension: {tension}")
+            jesse_angle = " | ".join(legacy_angle_parts) if legacy_angle_parts else str(content_data.get("jesse_angle", "")).strip()
 
             # Validate index
             if not isinstance(chosen_index, int) or chosen_index < 0 or chosen_index >= len(candidates):
@@ -276,6 +330,14 @@ NO viable {preferred_theme.replace('_', ' ')} trends exist among the candidates.
 
             chosen = candidates[chosen_index]
             chosen.jesse_angle = jesse_angle
+            # Attach the structured angle — the four-field version the generator consumes directly
+            if observation or take or concrete_details or tension:
+                chosen.structured_angle = {
+                    "observation": observation,
+                    "take": take,
+                    "concrete_details": concrete_details,
+                    "tension": tension,
+                }
 
             self.logger.info(
                 f"✅ Curator selected [{chosen_index}] (relevance={relevance_score}, "
@@ -283,8 +345,16 @@ NO viable {preferred_theme.replace('_', ' ')} trends exist among the candidates.
             )
             if reasoning:
                 self.logger.info(f"   Reasoning: {reasoning[:100]}...")
-            if jesse_angle:
-                self.logger.info(f"   Jesse angle: {jesse_angle[:100]}...")
+            if observation:
+                self.logger.info(f"   Observation: {observation[:120]}")
+            if take:
+                self.logger.info(f"   Take: {take[:120]}")
+            if tension:
+                self.logger.info(f"   Tension: {tension[:120]}")
+            if concrete_details:
+                self.logger.info(f"   Concrete details: {concrete_details[:5]}")
+            elif not (observation or take or tension):
+                self.logger.warning("   Curator returned no structured angle fields — generator will fall back")
 
             # Record the chosen trend as used
             self.trend_service._record_used_topic(chosen, post_id)
@@ -346,12 +416,39 @@ Evaluate each trend for:
 
 Pick the BEST one. If none are great, pick the least bad and note why.
 
-Be specific in your jesse_angle — don't say "Jesse could comment on this."
-Say exactly what the angle is, e.g. "Frame the AI layoff story as a nature
-documentary about corporate evolution — deadpan observation about how the
-same company that had a 'Chief Vibes Officer' is now automating vibes."
+═══════════════════════════════════════════════════════════════════════════════
+BUILD THE STRUCTURED ANGLE FOR THE CHOSEN TREND
+═══════════════════════════════════════════════════════════════════════════════
 
-Return your evaluation as JSON."""
+Return four distinct fields. Vague, generic, or missing fields cause the post
+to collapse into template filler. Ground every field in the actual source.
+
+- observation: one sentence. The specific detail Jesse noticed that nobody else
+  would. NOT a headline paraphrase. A number, a phrase, a contrast, a timing
+  coincidence, a single line in the source.
+
+- take: one sentence. Jesse's actual opinion/claim/judgment on it. Not "Jesse
+  could comment" — the one-line POV Jesse holds. Must contain a claim.
+
+- concrete_details: ARRAY of 3+ strings pulled verbatim/near-verbatim from the
+  source: names, numbers, places, dates, quotes. Never invented. If you can't
+  find 3 real details, pick a different trend.
+
+- tension: one sentence. The gap between the claim and reality. Where does the
+  headline mislead? What does the announcement promise that the evidence
+  contradicts? This is the satirical seam.
+
+Return your evaluation as STRICT JSON:
+{{
+  "chosen_index": <int>,
+  "relevance_score": <1-10>,
+  "content_potential": <1-10>,
+  "observation": "<one sentence>",
+  "take": "<one sentence>",
+  "concrete_details": ["<string>", "<string>", "<string>"],
+  "tension": "<one sentence>",
+  "reasoning": "<why this trend beats the others>"
+}}"""
 
     def _fallback_selection(self, candidates: list, post_id: str = None):
         """When AI evaluation fails, pick using viral scoring."""

@@ -303,6 +303,38 @@ Return JSON:
         
         return "\n".join(instructions) if instructions else "Address general feedback"
     
+    @staticmethod
+    def _strip_banned_patterns(content: str) -> str:
+        """Mirror of ContentStrategistAgent._clean_content's banned-pattern strip.
+
+        Kept here to avoid a cross-module import dependency. Should stay in sync:
+        any pattern added to the strategist's strip logic should also land here.
+        """
+        import re as _re
+        if not content:
+            return content
+
+        # Strip hashtags
+        content = _re.sub(r"(?:^|\s)#[A-Za-z][A-Za-z0-9_]+", "", content)
+        # Strip trailing Stop. Breathe. X ritual closer
+        content = _re.sub(
+            r"(?:\s*\n+|\s+)Stop[.!]?\s*Breathe[.!]?\s*\w+[.!]?\s*$",
+            "",
+            content,
+            flags=_re.IGNORECASE,
+        ).rstrip()
+        # Strip trailing engagement bait
+        content = _re.sub(
+            r"(?:\s*\n+|\s+)(?:thoughts\??|share this|agree\??|like if you agree)[.!?]*\s*$",
+            "",
+            content,
+            flags=_re.IGNORECASE,
+        ).rstrip()
+
+        # Collapse whitespace
+        lines = [line.strip() for line in content.split("\n")]
+        return "\n\n".join(l for l in lines if l).strip()
+
     def _apply_revision(self, post: LinkedInPost, content: Dict[str, Any], feedback: Dict[str, Any], failed_validators: Dict[str, List[str]]) -> LinkedInPost:
         try:
             if not content or "revised_content" not in content:
@@ -310,8 +342,12 @@ Return JSON:
             
             if post.original_content is None:
                 post.original_content = post.content
-            
-            post.content = content.get("revised_content", post.content)
+
+            revised = content.get("revised_content", post.content)
+            # Run the same deterministic strip the strategist uses on initial drafts
+            # so revisions can't sneak hashtags / "Stop. Breathe. Apply." back in.
+            revised = self._strip_banned_patterns(revised)
+            post.content = revised
             if content.get("hashtags"):
                 post.hashtags = content["hashtags"]
             

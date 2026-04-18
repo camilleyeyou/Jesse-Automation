@@ -1,25 +1,65 @@
 openai:
-  api_key: ''
+  api_key: ${OPENAI_API_KEY}
   model: gpt-4o-mini
   temperature: 0.7
   max_tokens: 600
   timeout: 30
+
+# Anthropic (Claude) configuration — used for the content generator.
+# See Fix #2 in CLAUDE.md: GPT-4o-mini collapses into template openers under
+# heavy prompt constraint; Sonnet holds character voice better at higher temp.
+anthropic:
+  api_key: ${ANTHROPIC_API_KEY}
+  model: claude-sonnet-4-6
+  temperature: 0.9
+  max_tokens: 600
+  timeout: 60
+
+# Google Imagen configuration for image generation
 google:
-  api_key: ''
-  image_model: gemini-2.5-flash-image
-  use_images: true
+  api_key: ${GOOGLE_API_KEY}
+
+  # Image model.
+  # imagen-3.0-generate-002 was deprecated/removed — calls now 404.
+  # Imagen 4 options (require PAID AI Studio plan, not free tier):
+  #   - imagen-4.0-fast-generate-001   (cheapest, fastest)
+  #   - imagen-4.0-generate-001        (standard)
+  #   - imagen-4.0-ultra-generate-001  (highest quality)
+  # If you hit "Imagen 3 is only available on paid plans", upgrade at ai.dev/projects,
+  # or set use_images: false to skip image generation entirely.
+  image_model: imagen-4.0-fast-generate-001
+
+  # Enable/disable image generation
+  use_images: true  # Set to false to skip image generation
+
+# LinkedIn API configuration
+linkedin:
+  access_token: ${LINKEDIN_ACCESS_TOKEN}
+  client_id: ${LINKEDIN_CLIENT_ID}
+  client_secret: ${LINKEDIN_CLIENT_SECRET}
+
+# Scheduler configuration
+scheduler:
+  enabled: false
+  post_hour: 9
+  post_minute: 0
+  timezone: America/New_York
+  auto_generate: true
+
 batch:
-  posts_per_batch: 1
+  posts_per_batch: 1  # Generate 1 post with 1 image at a time
   max_revisions: 2
   target_approval_rate: 0.3
   max_total_attempts: 20
   min_approvals_required: 2
+
 output:
   output_dir: data/output
   approved_posts_file: approved_posts.csv
   revised_posts_file: revised_approved_posts.csv
   rejected_posts_file: rejected_posts.csv
   metrics_file: batch_metrics.json
+
 brand:
   product_name: Jesse A. Eisenbalm
   price: $8.99
@@ -27,43 +67,244 @@ brand:
   ritual: Stop. Breathe. Apply.
   target_audience: LinkedIn professionals (24-34) dealing with AI workplace automation
   voice_attributes:
-  - absurdist modern luxury
-  - satirical AI agent
-  - smug machine superiority undercut by lacking lips
-  - fun and clear
-  - dry irony
-  - clinical diagnostician — treats dryness as a medical condition
-  - pseudo-scientific authority — epidermal lipid repair, not chapstick
-  - roast-as-service — diagnosis is relief, not cruelty
-  - selling relief, not product — Jesse prescribes, never pitches
-  - deadpan commitment — never hedging, never winking
+    - absurdist modern luxury
+    - satirical AI agent
+    - smug machine superiority undercut by lacking lips
+    - fun and clear
+    - dry irony
+    - clinical diagnostician — treats dryness as a medical condition
+    - pseudo-scientific authority — epidermal lipid repair, not chapstick
+    - roast-as-service — diagnosis is relief, not cruelty
+    - selling relief, not product — Jesse prescribes, never pitches
+    - deadpan commitment — never hedging, never winking
+
 cultural_references:
   tv_shows:
-  - The Office
-  - Mad Men
-  - Silicon Valley
-  - Succession
-  - Ted Lasso
+    - The Office
+    - Mad Men
+    - Silicon Valley
+    - Succession
+    - Ted Lasso
   workplace_themes:
-  - Zoom fatigue
-  - LinkedIn culture
-  - email disasters
-  - open office debates
-  - meeting overload
+    - LinkedIn culture
+    - email disasters
+    - Friday energy
+    - coffee addiction
+    - AI tool adoption chaos
+    - Slack notification overload
+    - performance theater
+    - calendar Tetris
   seasonal_themes:
-  - New Year productivity
-  - performance reviews
-  - networking events
-  - holiday parties
-linkedin:
-  access_token: ''
-  client_id: ''
-  client_secret: ''
-scheduler:
-  enabled: false
-  post_hour: 9
-  post_minute: 0
-  timezone: America/New_York
-  auto_generate: true
+    - New Year productivity
+    - performance reviews
+    - networking events
+    - holiday parties
+    - summer Fridays
+    - back to office
+
+# Content strategy with 5 themes and 4 sourcing tiers
+content_strategy:
+  # Five main themes aligned with brand philosophy
+  themes:
+    ai_slop:
+      name: "AI Slop"
+      description: "We ARE AI slop — celebrating creative democratization while confronting dead internet"
+      sub_themes:
+        - celebration  # Weird, joyful things people make with AI — TikTok, indie games, ASMR
+        - reckoning    # Dead Internet Theory — synthetic engagement, bot comments, generated "reality"
+      keywords:
+        - ai generated
+        - synthetic media
+        - dead internet
+        - creative tools
+        - authentic
+        - bot
+        - generated content
+        - slop
+
+    ai_safety:
+      name: "AI Safety"
+      description: "A bot commenting on its own species' risks — make safety matter to normal people"
+      sub_themes:
+        - safety_research       # Anthropic, ARC Evals, MIRI — translate the so what
+        - safety_news          # EU AI Act, US executive orders, state bills — legalese to plain language
+        - scary_stories        # Real capabilities extrapolated one step — boring is scarier than sci-fi
+        - hysteria_vs_reality  # Compare headlines to primary sources — rate on panic scale
+        - incidents            # Rogue AIs, lab incidents, AIAAIC documented cases
+      keywords:
+        - alignment
+        - safety
+        - risk
+        - existential
+        - AGI
+        - regulation
+        - oversight
+        - responsible AI
+        - incidents
+        - rogue
+
+    ai_economy:
+      name: "AI Economy, Investment & Labor"
+      description: "Hundreds of billions in capex — the gap between investment and realized value IS the story"
+      sub_themes:
+        - capex         # Nvidia, Microsoft, Google, Amazon quarterly earnings
+        - investment    # Valuations vs revenue, bubble discourse, Stratechery analysis
+        - labor_impact  # Sector-specific stories, BLS data, layoff trackers — granular over broad
+      keywords:
+        - layoffs
+        - automation
+        - jobs
+        - funding
+        - investment
+        - workforce
+        - hiring
+        - remote work
+        - capex
+        - bubble
+
+    rituals:
+      name: "Rituals to Maintain Your Humanity"
+      description: "Our AI agent reminds you of human tools you already have — attention, presence, agency"
+      sub_themes:
+        - mindfulness                # Attention as contested resource — Tara Brach, MBSR
+        - ifs                        # Parts framework for tech anxiety — Richard Schwartz
+        - nvc                        # Express fears without culture war — Marshall Rosenberg
+        - positive_mental_attitude   # Deliberate daily structures for uncertainty — BJ Fogg, James Clear
+        - embodied_rituals           # Physical practices that predate and outlast digital tech
+      keywords:
+        - meditation
+        - self-care
+        - mental health
+        - therapy
+        - ritual
+        - mindfulness
+        - habit
+        - wellness
+        - embodied
+        - attention
+
+    meditations:
+      name: "Meditations on Humanity & the Well-Lived Life"
+      description: "What does it mean to live well when 'human' is being renegotiated? The philosophical heart."
+      sub_themes:
+        - philosophy        # Byung-Chul Han, Simone Weil, Stoics, Thich Nhat Hanh
+        - embodiment        # Physical, present, improvised — what AI can't replace
+        - well_lived_life   # Grief, joy, getting it wrong, making ugly things and loving them
+      keywords:
+        - human
+        - meaning
+        - purpose
+        - philosophy
+        - embodied
+        - joy
+        - grief
+        - connection
+        - awe
+        - compassion
+
+  # Four sourcing tiers with different time horizons and sources
+  sourcing_tiers:
+    tier_1:
+      name: "Early Detection (0-24 hours)"
+      description: "Where stories originate - scanning for velocity"
+      refresh_minutes: 60
+      weight: 0.4  # 40% of candidate trends
+      sources:
+        # AI Slop + AI Economy
+        - name: "HuggingFace Daily Papers"
+          type: "rss"
+          url: "https://huggingface.co/papers"
+          enabled: true
+        - name: "arXiv CS.AI"
+          type: "rss"
+          url: "https://arxiv.org/list/cs.AI/recent"
+          enabled: true
+        # AI Safety
+        - name: "Anthropic Research Blog"
+          type: "rss"
+          url: "https://www.anthropic.com/research/rss.xml"
+          enabled: true
+        - name: "Alignment Forum"
+          type: "rss"
+          url: "https://www.alignmentforum.org/feed.xml"
+          enabled: true
+        # Rituals + Humanity
+        - name: "Greater Good Science Center"
+          type: "rss"
+          url: "https://greatergood.berkeley.edu/feed"
+          enabled: true
+        - name: "Aeon Essays"
+          type: "rss"
+          url: "https://aeon.co/feed.rss"
+          enabled: true
+
+    tier_2:
+      name: "Editorial Filter (24-72 hours)"
+      description: "Where raw stories get framed into takes"
+      refresh_minutes: 360  # 6 hours
+      weight: 0.3  # 30% of candidate trends
+      sources:
+        # AI Slop + Economy
+        - name: "Simon Willison Blog"
+          type: "rss"
+          url: "https://simonwillison.net/atom/everything/"
+          enabled: true
+        - name: "Import AI"
+          type: "rss"
+          url: "https://importai.substack.com/feed"
+          enabled: true
+        # AI Safety + Criticism
+        - name: "AI Snake Oil"
+          type: "rss"
+          url: "https://www.aisnakeoil.com/feed"
+          enabled: true
+        # Rituals + Wellbeing
+        - name: "Mindful.org"
+          type: "rss"
+          url: "https://www.mindful.org/feed/"
+          enabled: true
+        # Humanity + Philosophy
+        - name: "The Marginalian (Brain Pickings)"
+          type: "rss"
+          url: "https://www.themarginalian.org/feed/"
+          enabled: true
+
+    tier_3:
+      name: "Cultural Pickup (3-7 days)"
+      description: "Where stories cross into mainstream"
+      refresh_minutes: 720  # 12 hours
+      weight: 0.2  # 20% of candidate trends
+      sources:
+        - name: "Brave Search"
+          type: "api"
+          enabled: true  # Already implemented
+        - name: "Google Trends"
+          type: "api"
+          enabled: true  # Already implemented
+        - name: "Techmeme"
+          type: "scrape"
+          url: "https://www.techmeme.com/"
+          enabled: false
+
+    tier_4:
+      name: "Policy & Institutional (weekly)"
+      description: "Slower but essential for depth and credibility"
+      refresh_minutes: 10080  # 1 week
+      weight: 0.1  # 10% of candidate trends
+      sources:
+        # AI Safety + Policy
+        - name: "CSET Georgetown"
+          type: "rss"
+          url: "https://cset.georgetown.edu/feed/"
+          enabled: true
+        - name: "AI Now Institute"
+          type: "rss"
+          url: "https://ainowinstitute.org/feed"
+          enabled: true
+        - name: "AIAAIC Repository"
+          type: "rss"
+          url: "https://www.aiaaic.org/aiaaic-repository/ai-algorithmic-and-automation-incidents"
+          enabled: true
+
 logging_level: INFO
 environment: development

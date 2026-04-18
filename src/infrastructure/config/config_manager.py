@@ -19,10 +19,28 @@ class OpenAIConfig(BaseModel):
     timeout: int = 30
 
 
-class GoogleConfig(BaseModel):
-    """Google Gemini API configuration for image generation"""
+class AnthropicConfig(BaseModel):
+    """Anthropic (Claude) API configuration — used for the content generator.
+
+    Introduced as part of Fix #2: the generator moves off GPT-4o-mini because
+    4o-mini collapses into template openers under heavy prompt constraint.
+    Sonnet holds character voice better at higher temperature.
+    """
     api_key: str = ""
-    image_model: str = "gemini-2.5-flash-image"
+    model: str = "claude-sonnet-4-6"
+    temperature: float = 0.9
+    max_tokens: int = 600
+    timeout: int = 60
+
+
+class GoogleConfig(BaseModel):
+    """Google Gemini API configuration for image generation.
+
+    Image generation on AI Studio free-tier keys is quota-zero for both
+    imagen-4.* and gemini-2.5-flash-image. Requires upgrade at ai.dev/projects.
+    """
+    api_key: str = ""
+    image_model: str = "imagen-4.0-fast-generate-001"
     use_images: bool = True
 
 
@@ -129,6 +147,7 @@ class ContentStrategyConfig(BaseModel):
 class AppConfig:
     """Main application configuration"""
     openai: OpenAIConfig
+    anthropic: AnthropicConfig
     google: GoogleConfig
     batch: BatchConfig
     output: OutputConfig
@@ -158,7 +177,12 @@ class AppConfig:
             if 'openai' not in data:
                 data['openai'] = {}
             data['openai']['api_key'] = api_key
-        
+
+        if anthropic_api_key := os.getenv('ANTHROPIC_API_KEY'):
+            if 'anthropic' not in data:
+                data['anthropic'] = {}
+            data['anthropic']['api_key'] = anthropic_api_key
+
         if google_api_key := os.getenv('GOOGLE_API_KEY'):
             if 'google' not in data:
                 data['google'] = {}
@@ -171,6 +195,7 @@ class AppConfig:
         
         return cls(
             openai=OpenAIConfig(**data.get('openai', {})),
+            anthropic=AnthropicConfig(**data.get('anthropic', {})),
             google=GoogleConfig(**data.get('google', {})),
             batch=BatchConfig(**data.get('batch', {})),
             output=OutputConfig(**data.get('output', {})),
@@ -196,7 +221,7 @@ class AppConfig:
             },
             'google': {
                 'api_key': '',
-                'image_model': 'gemini-2.5-flash-image',
+                'image_model': 'imagen-4.0-fast-generate-001',
                 'use_images': True
             },
             'batch': {

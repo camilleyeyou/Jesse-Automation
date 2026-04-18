@@ -256,6 +256,24 @@ class AgentMemory:
                 )
             """)
 
+            # Gold-standard posts — the curated corpus used for retrieval-augmented
+            # voice grounding (Fix #4). The generator retrieves the top-K similar
+            # gold-standard posts and injects them into the user prompt so it
+            # learns voice by example rather than from a 400-line system prompt.
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS gold_standard_posts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    content TEXT NOT NULL,
+                    pillar TEXT,
+                    format TEXT,
+                    embedding BLOB,
+                    notes TEXT,
+                    curator TEXT DEFAULT 'manual',
+                    source_post_id TEXT,
+                    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # Add missing columns to content_memory (safe ALTER TABLE)
             engagement_columns = [
                 ("theme", "TEXT"),
@@ -286,10 +304,170 @@ class AgentMemory:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_position_created ON position_memory(created_at)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_client_reviews_created ON client_reviews(created_at)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_client_reviews_addressed ON client_reviews(addressed)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_gold_pillar ON gold_standard_posts(pillar)")
 
             conn.commit()
 
         logger.debug("Memory tables initialized")
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # GOLD STANDARD POSTS (Fix #4 — retrieval-augmented voice grounding)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    @staticmethod
+    def _encode_embedding(embedding) -> bytes:
+        """Serialize a float embedding vector as compact bytes for SQLite BLOB storage."""
+        import array
+        return array.array('f', embedding).tobytes()
+
+    @staticmethod
+    def _decode_embedding(blob: bytes):
+        """Deserialize an embedding BLOB back to a list of floats."""
+        import array
+        a = array.array('f')
+        a.frombytes(blob)
+        return list(a)
+
+    @staticmethod
+    def _cosine_similarity(a, b) -> float:
+        """Cosine similarity without numpy. Returns 0 if either vector is zero."""
+        if not a or not b:
+            return 0.0
+        # Sum-of-products dot product
+        dot = 0.0
+        na = 0.0
+        nb = 0.0
+        # Guard mismatched lengths
+        n = min(len(a), len(b))
+        for i in range(n):
+            ai = a[i]
+            bi = b[i]
+            dot += ai * bi
+            na += ai * ai
+            nb += bi * bi
+        if na <= 0 or nb <= 0:
+            return 0.0
+        return dot / ((na ** 0.5) * (nb ** 0.5))
+
+    def add_gold_standard_post(
+        self,
+        content: str,
+        pillar: str = None,
+        format: str = None,
+        embedding=None,
+        notes: str = None,
+        curator: str = "manual",
+        source_post_id: str = None,
+    ) -> int:
+        """Insert a gold-standard post (for retrieval-augmented voice grounding).
+
+        Embedding should be a list of floats. If None, the row is stored without
+        an embedding — search will skip it.
+        """
+        blob = self._encode_embedding(embedding) if embedding else None
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """INSERT INTO gold_standard_posts
+                   (content, pillar, format, embedding, notes, curator, source_post_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (content, pillar, format, blob, notes, curator, source_post_id),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def count_gold_standard_posts(self, pillar: str = None) -> int:
+        """How many gold-standard posts are available (optionally scoped to a pillar)."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            if pillar:
+                cursor.execute(
+                    "SELECT COUNT(*) FROM gold_standard_posts WHERE pillar = ? AND embedding IS NOT NULL",
+                    (pillar,),
+                )
+            else:
+                cursor.execute("SELECT COUNT(*) FROM gold_standard_posts WHERE embedding IS NOT NULL")
+            return cursor.fetchone()[0]
+
+    def search_gold_standard_by_embedding(
+        self,
+        query_embedding,
+        pillar: str = None,
+        top_k: int = 5,
+    ) -> List[Dict]:
+        """Return top-K most similar gold-standard posts by cosine similarity.
+
+        If pillar is set, filter to that pillar first; if the pillar-scoped result
+        would be empty, silently broaden to all pillars (voice still matters when
+        the exact pillar has no examples yet).
+        """
+        if not query_embedding:
+            return []
+
+        rows = []
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            # Try pillar-scoped first
+            if pillar:
+                cursor.execute(
+                    """SELECT id, content, pillar, format, embedding, notes
+                       FROM gold_standard_posts
+                       WHERE pillar = ? AND embedding IS NOT NULL""",
+                    (pillar,),
+                )
+                rows = cursor.fetchall()
+
+            # Broaden if pillar-scoped was empty
+            if not rows:
+                cursor.execute(
+                    """SELECT id, content, pillar, format, embedding, notes
+                       FROM gold_standard_posts
+                       WHERE embedding IS NOT NULL"""
+                )
+                rows = cursor.fetchall()
+
+        scored = []
+        for r in rows:
+            emb = self._decode_embedding(r["embedding"])
+            sim = self._cosine_similarity(query_embedding, emb)
+            scored.append(
+                {
+                    "id": r["id"],
+                    "content": r["content"],
+                    "pillar": r["pillar"],
+                    "format": r["format"],
+                    "notes": r["notes"],
+                    "similarity": sim,
+                }
+            )
+
+        scored.sort(key=lambda x: x["similarity"], reverse=True)
+        return scored[:top_k]
+
+    def get_top_engagement_posts_for_curation(self, limit: int = 30) -> List[Dict]:
+        """Pull the top-engagement approved posts for the human to curate into gold-standard.
+
+        Used by scripts/curate_gold_standard.py. Engagement = reactions + comments + shares.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT post_id, content, pillar, format,
+                          COALESCE(reactions, 0) AS reactions,
+                          COALESCE(comments, 0) AS comments,
+                          COALESCE(shares, 0) AS shares,
+                          COALESCE(engagement_score, 0) AS engagement_score
+                   FROM content_memory
+                   WHERE was_approved = 1
+                     AND (COALESCE(reactions, 0) + COALESCE(comments, 0) + COALESCE(shares, 0)) > 0
+                   ORDER BY (COALESCE(reactions, 0) + COALESCE(comments, 0) + COALESCE(shares, 0)) DESC
+                   LIMIT ?""",
+                (limit,),
+            )
+            return [dict(r) for r in cursor.fetchall()]
 
     # ═══════════════════════════════════════════════════════════════════════════
     # CONTENT MEMORY
