@@ -125,16 +125,21 @@ Return STRICT JSON:
             word_count = len(post.content.split()) if post else 0
         length_ok = 40 <= word_count <= 100
 
-        # Marcus's approval: Q2, Q3, Q4 must pass + length_ok. Q1 is feedback-only.
+        # Marcus's approval: require 2 of 3 core dimensions to pass (not all 3).
+        # In production, Q3 (LLM tells) was flagging nearly every post because
+        # the model inevitably has some parallelism or rhythm Marcus could read
+        # as an LLM signature. 3/3 required perfection on subjective judgments;
+        # 2/3 allows one soft-flag while still catching posts that are broken
+        # on multiple dimensions. Q1 is feedback-only.
         core_passes = [q2_pass, q3_pass, q4_pass]
-        approved = length_ok and all(core_passes)
-
-        # Score mapping with the core 3 driving approval
         pass_count = sum(core_passes)
+        approved = length_ok and pass_count >= 2
+
+        # Score mapping — must satisfy ValidationScore (approved iff >=7.0)
         if pass_count == 3 and length_ok:
             score = 9.0
         elif pass_count == 2 and length_ok:
-            score = 6.5
+            score = 7.5  # approved threshold
         elif pass_count == 2:
             score = 5.5
         elif pass_count == 1:

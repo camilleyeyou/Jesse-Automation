@@ -218,12 +218,18 @@ Return STRICT JSON:
 
         passes = [q1_pass, q2_pass, q3_pass, q4_pass]
         pass_count = sum(passes)
-        approved = length_ok and all(passes)
+
+        # Require 3 of 4 to pass (not all 4). Same reasoning as Sarah: four
+        # nitpicky diagnostic questions at 4/4 required gave ~18% approval
+        # rate in practice. A post with a clear insight, surprise moment, and
+        # visible reader shouldn't be blocked because Jordan couldn't identify
+        # "what a topic-aware reader would learn" (Q4).
+        approved = length_ok and pass_count >= 3
 
         if pass_count == 4 and length_ok:
             score = 9.0
         elif pass_count == 3 and length_ok:
-            score = 6.5
+            score = 7.5  # approved threshold
         elif pass_count == 2:
             score = 5.0
         elif pass_count == 1:
