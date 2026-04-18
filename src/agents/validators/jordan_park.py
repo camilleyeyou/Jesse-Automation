@@ -76,14 +76,15 @@ class JordanParkValidator(BaseAgent):
 
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="JordanParkValidator")
-        # Gemini 2.5 Flash — different provider from Sarah (Claude) and Marcus (GPT-4o).
-        # Chose Flash over Pro because Pro has zero free-tier quota on AI Studio
-        # keys (observed 429 RESOURCE_EXHAUSTED every call); Flash has real free-tier
-        # request/token limits and is fast enough that the validator stays cheap.
-        # Override to gemini-2.5-pro in a future config if the key moves to paid tier.
-        self.model = "gemini-2.5-flash"
+        # Claude Haiku 4.5. Previously on Gemini 2.5 Flash, but the AI Studio
+        # free tier is 20 req/day (a single batch exhausts it) AND Flash
+        # intermittently returns truncated/malformed JSON that blew up the
+        # parser. Haiku is a different Anthropic model family from Sarah's
+        # Sonnet — preserves meaningful judgment independence, while being
+        # fast enough and cheap enough to stay in budget.
+        self.model = "claude-haiku-4-5-20251001"
         self.temperature = 0.2
-        self.max_tokens = 800
+        self.max_tokens = 1000
         # Wrap in OpenAI-style json_schema envelope so the unified AI client
         # can route this to Gemini's response_schema (see _generate_with_gemini_text).
         self.response_format = {
@@ -122,26 +123,28 @@ only — no prose, no markdown, no code fences."""
             return self._parse_validation(content, post)
         except Exception as e:
             err = str(e)
-            # Gemini free-tier is 20 req/day on flash — a single batch burns
-            # through it. When the quota error fires, Jordan should ABSTAIN
-            # (not score 0.0 and block approval), so Sarah+Marcus can still
-            # ship a post without Gemini being in the loop.
-            is_quota_error = any(
-                marker in err
-                for marker in ("RESOURCE_EXHAUSTED", "429", "quota", "UNAVAILABLE", "503")
+            # Infrastructure-level provider failures should ABSTAIN, not score 0.0 —
+            # otherwise Jordan silently blocks approvals when the provider hiccups.
+            # Covers quota exhaustion (429), transient outage (503), and overload.
+            infra_markers = (
+                "429", "rate_limit", "rate limit",
+                "529", "overloaded",
+                "503", "UNAVAILABLE",
+                "quota", "RESOURCE_EXHAUSTED",
             )
-            if is_quota_error:
+            is_infra_error = any(marker in err for marker in infra_markers)
+            if is_infra_error:
                 self.logger.warning(
-                    f"Jordan Park abstaining — Gemini unavailable ({err[:120]})"
+                    f"Jordan Park abstaining — provider infrastructure issue ({err[:120]})"
                 )
                 return self._create_abstention_score(err)
             self.logger.error(f"Jordan Park validation failed: {e}")
             return self._create_error_score(err)
 
     def _create_abstention_score(self, reason: str) -> ValidationScore:
-        """Jordan abstains from this post — Gemini is quota-exhausted or temporarily
-        unavailable. Returns score 7.0 approved=True so the quota error doesn't
-        silently block approval; Sarah and Marcus are still the gatekeepers.
+        """Jordan abstains from this post — provider is rate-limited or temporarily
+        unavailable. Returns score 7.0 approved=True so infrastructure failures
+        don't silently block approval; Sarah and Marcus are still the gatekeepers.
         The criteria_breakdown marks this as abstention so downstream analysis
         doesn't conflate it with a real approval.
         """
