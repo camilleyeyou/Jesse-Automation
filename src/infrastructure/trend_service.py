@@ -121,23 +121,29 @@ class TrendService:
         'season', 'finale', 'streaming', 'box office',
     ]
 
-    # Brave Search category queries — balanced across all Five Questions pillars
+    # Brave Search category queries. The Five Questions scaffold is the SPINE,
+    # not the topical ceiling. Jesse is an AI agent commenting on human culture —
+    # the AI angle is the voice, not the subject. A sports story, election
+    # moment, or cultural panic is fair game; the curator reframes it through
+    # Jesse's eyes. Split: ~40% AI-adjacent, ~60% general US cultural heat.
     CATEGORY_QUERIES = {
-        # THE WHAT — AI Slop (celebration + reckoning)
-        "ai_slop": "AI generated content creative viral deepfake synthetic media 2026",
-        "ai_content": "AI art AI music AI video creator tools democratization 2026",
-        # THE WHAT IF — AI Safety
-        "ai_safety": "AI alignment safety research regulation guardrails 2026",
-        "ai_regulation": "AI policy EU AI Act executive order compliance audit 2026",
-        # THE WHO PROFITS — AI Economy (max 2 categories)
-        "ai_economy": "AI investment earnings capex valuation bubble funding 2026",
-        "ai_labor": "AI hiring layoffs workforce automation jobs impact 2026",
-        # THE HOW TO COPE — Rituals
-        "rituals": "mindfulness attention practice meditation neuroscience wellbeing 2026",
-        "human_practice": "digital detox handwriting walking meeting slow living ritual 2026",
-        # THE WHY IT MATTERS — Humanity
-        "humanity": "philosophy meaning connection awe compassion human flourishing 2026",
-        "humanity_tech": "technology humanity ethics embodiment creativity purpose 2026",
+        # ─── AI-adjacent (the original spine) ────────────────────────────
+        "ai_slop": "AI generated content creative viral deepfake synthetic media",
+        "ai_safety": "AI alignment safety research regulation guardrails",
+        "ai_economy": "AI investment earnings capex valuation bubble funding",
+        "ai_labor": "AI hiring layoffs workforce automation jobs impact",
+
+        # ─── Top US cultural heat (what people actually talk about) ──────
+        "top_us_news": "top news story today United States breaking",
+        "politics_culture": "politics election congress scandal protest controversy",
+        "workplace_reality": "layoffs return to office corporate culture burnout remote work",
+        "celebrity_moment": "celebrity viral moment pop culture entertainment music film",
+        "sports_moment": "sports game winner upset championship rivalry athlete",
+        "internet_moment": "viral tweet meme internet discourse trending conversation",
+        "economic_pulse": "stock market earnings recession inflation housing tech layoffs",
+        "weather_disaster": "weather storm hurricane disaster climate extreme emergency",
+        "cultural_ritual": "wellness burnout mental health digital detox slow living ritual",
+        "humanity_moment": "philosophy meaning connection grief joy community awe flourishing",
     }
 
     def __init__(self, db_path: str = "data/automation/queue.db"):
@@ -163,7 +169,14 @@ class TrendService:
             if not HTTPX_AVAILABLE:
                 self.logger.info("⚠️ httpx not installed — Brave Search unavailable")
 
-        # Initialize pytrends connection
+        # Initialize pytrends connection.
+        # Note: we intentionally pass retries=0 and backoff_factor=0. pytrends 4.9
+        # builds a urllib3 Retry object using the legacy `method_whitelist` kwarg,
+        # which was renamed to `allowed_methods` in urllib3 v2 — any non-zero
+        # retry config blows up with a TypeError the moment the Retry object is
+        # constructed (observed in production: "got unexpected keyword argument
+        # 'method_whitelist'"). With retries=0 the incompatible code path never
+        # fires, and we handle failures at the call site instead.
         self.pytrends = None
         if PYTRENDS_AVAILABLE:
             try:
@@ -171,8 +184,8 @@ class TrendService:
                     hl='en-US',
                     tz=360,
                     timeout=(10, 25),
-                    retries=2,
-                    backoff_factor=0.5
+                    retries=0,
+                    backoff_factor=0,
                 )
                 self.logger.info("✅ Google Trends (pytrends) initialized")
             except Exception as e:
@@ -329,26 +342,37 @@ class TrendService:
         Unlike get_one_fresh_trend(), this does NOT record topics as used.
         The caller (NewsCuratorAgent) picks the best one and records it.
 
+        Balance: reserve ~1/3 of slots for Google Trends US top trending
+        (what people are ACTUALLY searching/talking about) and fill the rest
+        with Brave Search category queries. Previously Brave filled the whole
+        budget and Google Trends never fired — which meant Jesse only ever saw
+        the slice of stories that matched our AI-leaning category queries.
+
         Returns:
             List of TrendingNews candidates, scored but unrecorded.
         """
         candidates = []
 
-        # Collect from Brave Search (richest context)
-        if self.brave_api_key and HTTPX_AVAILABLE:
-            brave_candidates = await self._get_brave_candidates(count)
-            candidates.extend(brave_candidates)
+        # Reserve a third of the budget for "what's actually trending in the US"
+        google_budget = max(2, count // 3)
 
-        # Collect from Google Trends
-        if self.pytrends and len(candidates) < count:
-            google_candidates = await self._get_google_candidates(count - len(candidates))
-            # Enrich bare topics with Brave context
+        # Google Trends first (guaranteed presence in candidate pool)
+        if self.pytrends:
+            google_candidates = await self._get_google_candidates(google_budget)
+            # Enrich bare topics with Brave context so the curator has real news
+            # text to evaluate, not just a bare search term
             if self.brave_api_key and HTTPX_AVAILABLE:
                 for i, trend in enumerate(google_candidates):
                     if i > 0:
                         await asyncio.sleep(0.4)
                     google_candidates[i] = await self._enrich_with_brave(trend)
             candidates.extend(google_candidates)
+
+        # Brave Search fills the remaining budget with category queries
+        remaining = count - len(candidates)
+        if remaining > 0 and self.brave_api_key and HTTPX_AVAILABLE:
+            brave_candidates = await self._get_brave_candidates(remaining)
+            candidates.extend(brave_candidates)
 
         # Add fallbacks if we still don't have enough
         if len(candidates) < 3:
