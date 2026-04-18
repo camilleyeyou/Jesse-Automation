@@ -1110,10 +1110,32 @@ class MultiTierTrendService(TrendService):
         if preferred_theme:
             candidates = [c for c in candidates if c.theme == preferred_theme]
 
-        # Deduplicate and limit
+        # Deduplicate within this call
         unique_candidates = self._deduplicate_candidates(candidates)
 
-        return unique_candidates[:count]
+        # Exclude trends already used in this batch OR in the DB cooldown window.
+        # The legacy TrendService helpers filter per-source via _is_topic_used,
+        # but tier-based fetching bypasses those helpers — without this guard,
+        # a batch of 3 posts ends up with 3 drafts on the same trend because
+        # the curator gets offered the same top candidate on every iteration.
+        filtered: List[TrendingNews] = []
+        dropped_used = 0
+        for candidate in unique_candidates:
+            # Ensure fingerprint exists (some custom sources may skip it)
+            if not getattr(candidate, "fingerprint", None):
+                candidate.fingerprint = self._generate_fingerprint(
+                    candidate.headline, candidate.summary or ""
+                )
+            if self._is_topic_used(candidate.fingerprint):
+                dropped_used += 1
+                continue
+            filtered.append(candidate)
+        if dropped_used:
+            self.logger.info(
+                f"🧹 Filtered {dropped_used} already-used trend(s) from candidate pool"
+            )
+
+        return filtered[:count]
 
     async def get_candidate_trends_by_tier(
         self,
