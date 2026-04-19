@@ -309,12 +309,31 @@ concrete_details (array of strings), tension, reasoning"""
             self.trend_service._record_used_topic(candidates[0], post_id)
             return candidates[0]
 
-        self.logger.info(f"Evaluating {len(candidates)} candidate trends...")
+        # Fetch recently-picked trends so the curator can avoid same-topic dupes.
+        # Fingerprint-based dedup catches exact-headline duplicates but NOT the
+        # case where different outlets report the same story with different
+        # wording (e.g. "Meta cuts 8,000 jobs" vs "Meta laying off 8,000 people"
+        # get different fingerprints). Passing recent topics to the prompt lets
+        # the LLM judge topic-level overlap. User 2026-04-19: "all the posts
+        # are on meta, it's like we move one step ahead and one step back."
+        recent_topics: List[Dict[str, Any]] = []
+        try:
+            if hasattr(self.trend_service, "get_recent_topics"):
+                recent_topics = self.trend_service.get_recent_topics(limit=10) or []
+        except Exception as e:
+            self.logger.debug(f"Could not fetch recent topics: {e}")
+            recent_topics = []
+
+        self.logger.info(
+            f"Evaluating {len(candidates)} candidate trends "
+            f"(avoiding {len(recent_topics)} recently-picked topics)..."
+        )
 
         # Step 2: Build evaluation prompt (with theme priority if calendar specified one)
         prompt = self._build_evaluation_prompt(
             candidates,
-            preferred_theme=preferred_theme if (preferred_theme and not theme_filtered) else None
+            preferred_theme=preferred_theme if (preferred_theme and not theme_filtered) else None,
+            recent_topics=recent_topics,
         )
 
         # Augment system prompt with preferred theme when unfiltered candidates need guidance
@@ -361,6 +380,10 @@ NO viable {preferred_theme.replace('_', ' ')} trends exist among the candidates.
             low_recognizability_batch = bool(
                 content_data.get("low_recognizability_batch", False)
             )
+            topic_duplicates_recent = content_data.get("topic_duplicates_recent") or []
+            chosen_is_duplicate_fallback = bool(
+                content_data.get("chosen_is_duplicate_fallback", False)
+            )
             reasoning = content_data.get("reasoning", "")
 
             # Extract structured angle fields
@@ -403,13 +426,19 @@ NO viable {preferred_theme.replace('_', ' ')} trends exist among the candidates.
                 }
 
             reco_warn = " ⚠ LOW-RECOGNIZABILITY" if low_recognizability_batch or recognizability_score < 7 else ""
+            dup_warn = " ⚠ TOPIC-DUP-FALLBACK" if chosen_is_duplicate_fallback else ""
             self.logger.info(
                 f"✅ Curator selected [{chosen_index}] (recognizability={recognizability_score}, "
-                f"relevance={relevance_score}, potential={content_potential}){reco_warn}: "
+                f"relevance={relevance_score}, potential={content_potential}){reco_warn}{dup_warn}: "
                 f"{chosen.headline[:60]}..."
             )
             if recognizability_reasoning:
                 self.logger.info(f"   Recognizability: {recognizability_reasoning[:140]}")
+            if topic_duplicates_recent:
+                self.logger.info(
+                    f"   🧹 Curator flagged {len(topic_duplicates_recent)} candidate(s) as "
+                    f"topic-duplicates of recent picks: indices {topic_duplicates_recent}"
+                )
             if reasoning:
                 self.logger.info(f"   Reasoning: {reasoning[:100]}...")
             if observation:
@@ -432,7 +461,12 @@ NO viable {preferred_theme.replace('_', ' ')} trends exist among the candidates.
             self.logger.error(f"AI curation failed: {e}, falling back to viral scoring")
             return self._fallback_selection(candidates, post_id)
 
-    def _build_evaluation_prompt(self, candidates: list, preferred_theme: str = None) -> str:
+    def _build_evaluation_prompt(
+        self,
+        candidates: list,
+        preferred_theme: str = None,
+        recent_topics: List[Dict[str, Any]] = None,
+    ) -> str:
         """Build the prompt that asks AI to evaluate and rank candidates."""
         trend_list = []
         for i, trend in enumerate(candidates):
@@ -466,8 +500,43 @@ prefer trends matching this theme. Only choose a different theme if NO viable
 
 """
 
+        # Recent-topics block: tell the curator what's been covered recently so
+        # it can reject same-topic candidates. Critical because fingerprint
+        # dedup misses different-wording-same-story cases. When Meta layoffs
+        # are saturating the news cycle, multiple outlets report the same
+        # story with slight variations; without this check the curator picks
+        # Meta every single time.
+        recent_block = ""
+        if recent_topics:
+            recent_lines = []
+            for i, t in enumerate(recent_topics[:10], 1):
+                headline = (t.get("headline") or "")[:140]
+                if headline:
+                    recent_lines.append(f"  {i}. {headline}")
+            if recent_lines:
+                recent_block = f"""
+═══════════════════════════════════════════════════════════════════════════════
+RECENTLY PICKED (do NOT pick anything on these same topics)
+═══════════════════════════════════════════════════════════════════════════════
+
+{chr(10).join(recent_lines)}
+
+TOPIC-DUPLICATE RULE (HARD): Reject any candidate that covers the same
+underlying story / event / subject as any entry above — EVEN IF the exact
+headline differs. "Meta cuts 8,000 jobs" and "Meta laying off 8k by May 20"
+and "Meta restructures workforce in Q2" are the SAME topic. Pick a different
+trend. If every single candidate is a topic-duplicate of something in the
+recent list, pick the LEAST-recognizable non-duplicate (we accept lower
+recognizability over topic repetition).
+
+When scoring: if a candidate is a topic-duplicate, set its effective
+recognizability to 0 in your reasoning and pick something else.
+═══════════════════════════════════════════════════════════════════════════════
+
+"""
+
         return f"""Here are {len(candidates)} candidate topics. Pick the ONE that would make the best Jesse A. Eisenbalm LinkedIn post — using the criteria below HARD.
-{theme_priority}
+{theme_priority}{recent_block}
 ═══════════════════════════════════════════════════════════════════════════════
 CANDIDATE TRENDS
 ═══════════════════════════════════════════════════════════════════════════════
@@ -554,13 +623,15 @@ Return your evaluation as STRICT JSON:
   "chosen_index": <int>,
   "recognizability_score": <0-10 — the #1 criterion above>,
   "recognizability_reasoning": "<one sentence — would an average US reader say 'oh yeah' to this?>",
+  "topic_duplicates_recent": [<list of candidate indices that are topic-duplicates of recently-picked trends, empty list if none>],
+  "chosen_is_duplicate_fallback": <true if you had to pick a duplicate because every non-duplicate candidate was unusable, false otherwise — this should ALMOST ALWAYS be false>,
   "relevance_score": <1-10>,
   "content_potential": <1-10>,
   "observation": "<one sentence>",
   "take": "<one sentence>",
   "concrete_details": ["<recognizable proper noun>", "<string>", "<string>"],
   "tension": "<one sentence>",
-  "reasoning": "<why this trend beats the others — lead with the recognizability call>",
+  "reasoning": "<why this trend beats the others — lead with the recognizability call AND note if any were topic-dupes>",
   "low_recognizability_batch": <true if chosen trend scored < 7, false otherwise>
 }}"""
 
