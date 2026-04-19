@@ -102,10 +102,16 @@ Q2. screenshot_sentence — Quote the SINGLE sentence most likely to make someon
     screenshot this post and send it to a friend. If no sentence qualifies, quote
     the WEAKEST sentence instead and set found=false.
 
-Q3. specifically_jesse — Could this post be posted by any satirical brand, or only
-    by Jesse A. Eisenbalm? If it could be any brand, name ONE specific change that
-    would make it unmistakably Jesse (the double-satire, the dry-comedy engine, the
-    AI-selling-lip-balm irony, the hand-numbered tubes, etc.).
+Q3. has_point_of_view — Does this post have a sharp, specific point of view on
+    the actual story, or does it retreat into brand promotion / generic
+    observations? A good post has a clear TAKE on the real thing happening in
+    the world. Brand-stamped openers ("INTERNAL MEMO — Jesse A. Eisenbalm
+    R&D Division", "Field Report", "From the desk of...") are DISQUALIFYING —
+    they replace a POV with letterhead. Product mentions ($8.99 tube, lip
+    balm, hand-numbering) appearing anywhere in the post are a yellow flag:
+    most posts should not mention any of that. The voice, not the name,
+    signals Jesse. Set passes=true if the post has a real POV on the story
+    AND does NOT lead with brand letterhead.
 
 Q4. story_specific_detail — Name ONE detail in this post that could only have come
     from the specific news story / angle this post is reacting to. If none — if the
@@ -115,7 +121,7 @@ Return STRICT JSON:
 {{
   "q1_emotion": {{"word": "<one word or 'none'>", "passes": <true if a real emotion, else false>}},
   "q2_screenshot_sentence": {{"sentence": "<exact quote>", "found": <bool>, "why": "<brief>"}},
-  "q3_specifically_jesse": {{"verdict": "<'only_jesse' | 'any_brand'>", "change_needed": "<one concrete change or 'none'>", "passes": <true if only_jesse else false>}},
+  "q3_has_point_of_view": {{"pov_summary": "<one-sentence summary of the post's actual TAKE on the story, or 'none' if it doesn't have one>", "brand_stamped": <true if the post opens with a memo/letterhead/brand-dropping frame>, "product_mentioned": <true if lip balm / tube / $8.99 / hand-numbering / Jesse A. Eisenbalm appears anywhere>, "passes": <true if pov_summary is a real take AND brand_stamped is false>}},
   "q4_story_specific_detail": {{"detail": "<exact detail or 'none'>", "found": <bool>}},
   "overall_reaction": "<one sentence — your honest reaction as Sarah>",
   "word_count": {word_count}
@@ -125,12 +131,26 @@ Return STRICT JSON:
         # Extract the four passes
         q1 = content.get("q1_emotion", {}) if isinstance(content, dict) else {}
         q2 = content.get("q2_screenshot_sentence", {}) if isinstance(content, dict) else {}
-        q3 = content.get("q3_specifically_jesse", {}) if isinstance(content, dict) else {}
+        # Q3 key renamed from q3_specifically_jesse → q3_has_point_of_view. Fall
+        # back to the legacy key in case the model emits the old schema mid-transition.
+        q3 = (
+            content.get("q3_has_point_of_view")
+            or content.get("q3_specifically_jesse")
+            or {}
+        ) if isinstance(content, dict) else {}
         q4 = content.get("q4_story_specific_detail", {}) if isinstance(content, dict) else {}
 
         q1_pass = bool(q1.get("passes", False)) and str(q1.get("word", "none")).lower() != "none"
         q2_pass = bool(q2.get("found", False))
-        q3_pass = bool(q3.get("passes", False)) or str(q3.get("verdict", "")).lower() == "only_jesse"
+        # New Q3 semantics: passes iff the post has a real POV AND is not brand-stamped.
+        # Brand_stamped=true is disqualifying even if a take exists. product_mentioned
+        # is a soft flag — tracked in criteria_breakdown but doesn't auto-fail.
+        pov_summary = str(q3.get("pov_summary") or "").strip().lower()
+        has_real_pov = bool(pov_summary) and pov_summary not in ("none", "n/a", "no take")
+        brand_stamped = bool(q3.get("brand_stamped", False))
+        # Tolerate legacy "only_jesse" / "any_brand" verdict field — map to pass.
+        legacy_pass = str(q3.get("verdict", "")).lower() == "only_jesse"
+        q3_pass = bool(q3.get("passes", False)) or legacy_pass or (has_real_pov and not brand_stamped)
         q4_pass = bool(q4.get("found", False))
 
         # Length gate — still structural, still binding
@@ -170,8 +190,16 @@ Return STRICT JSON:
             w = q2.get("sentence", "")
             reasons.append(f"Q2 screenshot: no sentence qualified. Weakest line: \"{w}\" — {q2.get('why', '')}")
         if not q3_pass:
-            c = q3.get("change_needed", "")
-            reasons.append(f"Q3 specifically-Jesse: reads like any satirical brand. To fix: {c}")
+            if brand_stamped:
+                reasons.append(
+                    "Q3 POV: post is brand-stamped (memo/letterhead/namecheck opener). "
+                    "Rewrite so the voice carries the brand, not the subject line."
+                )
+            else:
+                reasons.append(
+                    "Q3 POV: no clear take on the story — reads as generic observation. "
+                    "Name the specific thing happening and state a sharp opinion about it."
+                )
         if not q4_pass:
             reasons.append("Q4 story-specific detail: post is floating — no detail ties it to the specific story.")
         if not length_ok:

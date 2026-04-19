@@ -350,6 +350,19 @@ Return JSON:
             content,
             flags=_re.IGNORECASE,
         )
+        # Strip brand-stamp openers — memo/dispatch/letterhead framings read as
+        # ad copy. Mirror of content_strategist._clean_content logic.
+        _brand_opener_patterns = [
+            r"^\s*INTERNAL\s+MEMO\b[^\n]*\n+",
+            r"^\s*(?:FROM|RE|SUBJECT|TO)\s*:\s*[^\n]*\n+",
+            r"^\s*Field\s+Report[^\n]*\n+",
+            r"^\s*Dispatch\s+from[^\n]*\n+",
+            r"^\s*From\s+the\s+desk\s+of\s+[^\n]*\n+",
+            r"^\s*Jesse\s+A\.?\s+Eisenbalm\s+(?:R&D|Research|Labs|Presents)[^\n]*\n+",
+            r"^\s*Official\s+Sponsor\s+of\s+[^\n]*\n+",
+        ]
+        for _pat in _brand_opener_patterns:
+            content = _re.sub(_pat, "", content, count=1, flags=_re.IGNORECASE)
         # Clean up orphaned punctuation + double spaces
         content = _re.sub(r"\s+([.,!?])", r"\1", content)
         content = _re.sub(r"[ \t]{2,}", " ", content).strip()

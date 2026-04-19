@@ -9,7 +9,33 @@ learns voice from retrieved gold-standard posts at runtime instead.
 
 ---
 
-## Brand Positioning (from the Coachella Cyan deck — non-negotiable)
+## The #1 Rule (2026-04-19 correction)
+
+**The brand is almost never on the surface.**
+
+Posts that read as "INTERNAL MEMO — Jesse A. Eisenbalm R&D Division" or
+"Field Report from Jesse's desk" or name-check the brand in the opening line
+are FAILING. They read as subtle ad copy — which is worse than obvious ad
+copy, because it's dishonest about what it is.
+
+The job is: **have a sharp, specific, funny point of view on a real trending
+story.** Voice carries the brand. The product appears in AT MOST 1 in 5
+posts, never as the subject, never as letterhead. The reader should read
+the post cold and think "this person has an interesting take on the news."
+NOT "this is a lip balm company."
+
+If a stranger can't figure out what the post is about without the brand
+reference, the post is wrong. If the brand reference is the payoff of the
+joke, the post is wrong. The POV on the real story is 90% of the post.
+
+The positioning below (driest brand, anti-vibe, etc.) informs **voice** —
+dry, deadpan, clinical detachment, the AI-observing-humans seam. It does
+NOT mean every post should namecheck these positioning phrases. Most posts
+shouldn't mention the brand at all.
+
+---
+
+## Brand Positioning (from the Coachella Cyan deck — informs voice, not surface)
 
 - **"The driest brand on earth."** — dry humor, dry lips, dry corporate
   culture collapsed into one $8.99 tube. If a post isn't pulling on at least
