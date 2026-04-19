@@ -251,9 +251,9 @@ REVISION REQUIREMENTS:
 1. ADDRESS VALIDATOR CONCERNS:
 {validator_instructions}
 
-2. HARD WORD LIMIT: 60-150 words. This is non-negotiable. Cut ruthlessly.
-   Best posts sit at 80-120 — enough to develop the angle without padding.
-   If the original is too long, the revision MUST be shorter, not longer.
+2. HARD WORD LIMIT: 40-90 words. This is non-negotiable. Cut ruthlessly.
+   Best posts sit at 50-75 — Liquid Death punch length. No room for essay
+   drift. If the original is too long, the revision MUST be much shorter.
 
 3. MAINTAIN JESSE'S VOICE:
    - Fun, clear, satirical — Absurdist Modern Luxury

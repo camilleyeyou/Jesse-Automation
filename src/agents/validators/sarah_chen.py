@@ -91,7 +91,7 @@ Respond with JSON only — no prose, no markdown, no code fences."""
 {post.content}
 \"\"\"
 
-Word count: {word_count} (hard range: 60-150)
+Word count: {word_count} (hard range: 40-90)
 
 Answer FOUR diagnostic questions. Be specific. Quote the post where asked.
 
@@ -195,7 +195,7 @@ Return STRICT JSON:
             word_count = int(content.get("word_count", len(post.content.split()) if post else 0))
         except (ValueError, TypeError):
             word_count = len(post.content.split()) if post else 0
-        length_ok = 60 <= word_count <= 150
+        length_ok = 40 <= word_count <= 90
 
         passes = [q1_pass, q2_pass, q3_pass, q4_pass]
         pass_count = sum(passes)
@@ -256,7 +256,7 @@ Return STRICT JSON:
         if not q4_pass:
             reasons.append("Q4 story-specific detail: post is floating — no detail ties it to the specific story.")
         if not length_ok:
-            reasons.append(f"Length: {word_count} words (must be 60-150).")
+            reasons.append(f"Length: {word_count} words (must be 40-90).")
 
         feedback = " | ".join(reasons) if reasons else ""
 

@@ -65,7 +65,7 @@ no markdown, no code fences."""
 {post.content}
 \"\"\"
 
-Word count: {word_count} (hard range: 60-150)
+Word count: {word_count} (hard range: 40-90)
 
 Answer FOUR diagnostic questions. Quote exact phrases from the post. No hedging.
 
@@ -123,6 +123,34 @@ Q4. template_crutch — Does the post lean on a template opener ("Diagnosed:",
     real thing), or is it lazy default? If lazy, propose ONE non-template opener
     that preserves the Jesse voice.
 
+Q5. grammar_clean — Is the post free of grammatical errors, typos, awkward
+    phrasing, dangling clauses, run-on sentences, subject-verb disagreements,
+    wrong word choice, or malformed punctuation? This is a HARD GATE — any
+    error = fail.
+
+    FLAG (is_clean=false) if ANY of:
+      • Typos (misspellings, missing letters, transposed letters)
+      • Subject-verb disagreement ("the data show" vs "the data shows" — either
+        is fine, pick one; but "the humans is" is wrong)
+      • Dangling modifiers / unclear pronoun references
+      • Run-on sentences with comma splices ("The algorithm saw it, the human
+        didn't notice, everyone moved on")
+      • Malformed punctuation (mismatched em dashes, orphaned commas, double
+        periods, etc.)
+      • Sentence fragments that don't work as stylistic choices (occasional
+        fragment for punch is FINE; accidental fragments are NOT)
+      • Wrong word choice ("it's" vs "its", "affect" vs "effect", etc.)
+      • Tense shifts mid-sentence for no reason
+
+    DO NOT FLAG:
+      • Deliberate fragments for punch ("Nothing personal. Everything procedural.")
+      • Stylistic sentence-initial conjunctions ("And then nothing happened.")
+      • Intentional ambiguity or short aggressive declaratives
+      • Em dashes (those are Jesse signature — never flag)
+
+    Quote the specific error and explain in one clause. If the post is clean,
+    set is_clean=true and quote nothing.
+
 Return STRICT JSON:
 {{
   "q1_weakest_sentence": {{"sentence": "<exact quote>", "why": "<one clause>"}},
@@ -134,6 +162,7 @@ Return STRICT JSON:
   }},
   "q3_essay_drift_anywhere": {{"tell": "<exact phrase or 'nowhere'>", "location": "<'opener' | 'middle' | 'closer' | 'nowhere'>", "mode": "<'reflective' | 'aphoristic_closer' | 'long_introspective' | 'llm_tell' | 'nowhere'>", "justification": "<one sentence>", "has_tell": <bool>}},
   "q4_template_crutch": {{"has_crutch": <bool>, "crutch_opener": "<quote or 'none'>", "earned": <bool>, "alternative_opener": "<proposed opener or 'n/a'>"}},
+  "q5_grammar_clean": {{"is_clean": <bool>, "error_quote": "<exact phrase if error, else ''>", "error_type": "<typo|agreement|dangling|run_on|punctuation|fragment|word_choice|tense|nowhere>", "fix_hint": "<one clause suggesting the fix>"}},
   "word_count": {word_count}
 }}"""
 
@@ -149,6 +178,7 @@ Return STRICT JSON:
             or {}
         ) if isinstance(content, dict) else {}
         q4 = content.get("q4_template_crutch", {}) if isinstance(content, dict) else {}
+        q5 = content.get("q5_grammar_clean", {}) if isinstance(content, dict) else {}
 
         # Q1 is informational — every post has a weakest sentence. Use presence of a quote as pass.
         q1_pass = bool(str(q1.get("sentence", "")).strip())
@@ -160,22 +190,23 @@ Return STRICT JSON:
         has_crutch = bool(q4.get("has_crutch", False))
         crutch_earned = bool(q4.get("earned", False))
         q4_pass = (not has_crutch) or crutch_earned
+        # Q5 (grammar) is a HARD GATE — any actual error blocks the post.
+        # Default to True when the field is absent so in-flight drafts from
+        # older prompts don't get over-blamed.
+        q5_pass = bool(q5.get("is_clean", True))
 
         try:
             word_count = int(content.get("word_count", len(post.content.split()) if post else 0))
         except (ValueError, TypeError):
             word_count = len(post.content.split()) if post else 0
-        length_ok = 60 <= word_count <= 150
+        length_ok = 40 <= word_count <= 90
 
-        # Marcus's approval: require 2 of 3 core dimensions to pass (not all 3).
-        # In production, Q3 (LLM tells) was flagging nearly every post because
-        # the model inevitably has some parallelism or rhythm Marcus could read
-        # as an LLM signature. 3/3 required perfection on subjective judgments;
-        # 2/3 allows one soft-flag while still catching posts that are broken
-        # on multiple dimensions. Q1 is feedback-only.
+        # Marcus's approval: require 2 of 3 core dimensions (q2, q3, q4) to pass
+        # AND grammar clean (Q5) AND length in range. Q5 is a hard gate because
+        # user explicitly asked for grammar enforcement.
         core_passes = [q2_pass, q3_pass, q4_pass]
         pass_count = sum(core_passes)
-        approved = length_ok and pass_count >= 2
+        approved = length_ok and pass_count >= 2 and q5_pass
 
         # Score mapping — must satisfy ValidationScore (approved iff >=7.0)
         if pass_count == 3 and length_ok:
@@ -233,24 +264,36 @@ Return STRICT JSON:
             reasons.append(
                 f"Template crutch \"{q4.get('crutch_opener','')}\" not earned. Try: {q4.get('alternative_opener','')}"
             )
+        if not q5_pass:
+            err = q5.get("error_quote", "")
+            err_type = str(q5.get("error_type", "grammar")).lower()
+            fix = q5.get("fix_hint", "")
+            reasons.append(
+                f"GRAMMAR ERROR ({err_type}): \"{err}\" — {fix}"
+            )
         if not length_ok:
-            reasons.append(f"Length: {word_count} words (must be 60-150).")
+            reasons.append(f"Length: {word_count} words (must be 40-90).")
 
         feedback = " | ".join(reasons) if reasons else ""
 
         criteria_breakdown = {
             "q1_weakest_sentence": q1,
             "q2_metaphors": q2,
-            "q3_llm_tells": q3,
+            "q3_essay_drift": q3,
             "q4_template_crutch": q4,
-            "passes": {"q2": q2_pass, "q3": q3_pass, "q4": q4_pass, "length": length_ok},
+            "q5_grammar": q5,
+            "passes": {
+                "q2": q2_pass, "q3": q3_pass, "q4": q4_pass,
+                "q5_grammar": q5_pass, "length": length_ok,
+            },
             "word_count": word_count,
             "model": self.model,
         }
 
+        grammar_mark = "" if q5_pass else " 🚫GRAMMAR"
         self.logger.info(
-            f"Marcus Williams (GPT-4o): {pass_count}/3 core passes, {word_count}w "
-            f"{'✅' if approved else '❌'}"
+            f"Marcus Williams (GPT-4o): {pass_count}/3 core + grammar={q5_pass}, "
+            f"{word_count}w {'✅' if approved else '❌'}{grammar_mark}"
         )
 
         return ValidationScore(
