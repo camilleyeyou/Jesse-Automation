@@ -77,30 +77,45 @@ Q2. metaphors — List EVERY metaphor or analogy in the post. For each, state th
     that property. Example of a broken metaphor: "glacier of red tape" — balm does
     not affect glaciers; the property being compared doesn't hold.
 
-Q3. earnest_or_llm_tell — Where does this post SLIP OUT of Jesse's dry-absurdist
-    register and into a SINCERE / EARNEST / ESSAYISTIC voice? This is currently
-    the #1 failure mode. Jesse is dry, clinical, weirdly precise, fully committed
-    to an absurd frame. Jesse is NOT a Medium thinkpiece, a Substack reflection,
-    an NYT op-ed, or a LinkedIn carousel philosophy moment.
+Q3. essay_drift_anywhere — Does this post DRIFT OUT of Liquid Death register
+    AT ANY POINT — opener, middle, or close? This is the #1 failure mode.
+    Most drafts open strong, then soften into reflective-essay mode for the
+    middle paragraphs or aphoristic-closer mode at the end. Liquid Death is
+    punchy-throughout. Not punchy-then-thoughtful.
 
-    FLAG as earnest/LLM register — quote the specific phrase:
-    • Sincere reflection ("There's something genuinely moving about...",
-      "It turns out that...", "Here's what struck me about this")
-    • Aphoristic closers pretending to be profound ("The data knows what
-      happened. Only the body knows what it cost.")
-    • Melancholic / mournful / reverent tone toward the subject
-    • Thinkpiece register ("This is the trade-off that wasn't in the pitch
-      deck", "What this really means is...", "Let's sit with this for a moment")
-    • Classic LLM tells: "In a world where...", "It's not just X, it's Y",
-      stacked parallel structure, meaningless intensifiers, explain-the-joke pivots
-    • Generic wisdom / sincere life-lesson vibes
+    SCAN THE WHOLE POST. Flag any instance of:
 
-    PASS only if the whole post stays in dry clinical absurdist observer mode —
-    no softening into sincere reflection, no poetic moments, no "let's be
-    serious for a second." Jesse observes, often with pseudo-clinical or weirdly
-    specific precision. Jesse does not mourn or moralize.
+    A. REFLECTIVE / WISTFUL / ESSAYISTIC language (anywhere):
+       ✗ "There's something X about..." / "It turns out that..."
+       ✗ "The specific weight of..." / "the specific way X [verb]s"
+       ✗ "There is no model for that" / "no training data for X"
+       ✗ "Here's what struck/moved/surprised me..."
+       ✗ Meditative/melancholic/reverent tone toward any subject
+       ✗ "Let's sit with this" / "what this really means is"
 
-    If nowhere slips, set has_tell=false and justify in one sentence.
+    B. APHORISTIC CLOSERS PRETENDING TO BE PROFOUND:
+       ✗ "The question was never X. It was always Y."
+       ✗ "Some things remain unoptimized. This appears to be intentional."
+       ✗ "It always does."
+       ✗ "The data knows what happened. Only the body knows what it cost."
+       ✗ "X was also [verb] before anyone asked."
+       Any "wise benediction" style ending where the post tapers off on
+       a note of supposed profundity. Jesse ends on a slap, not a sigh.
+
+    C. LONG INTROSPECTIVE SENTENCES (20+ words of reflection):
+       Liquid Death sentences average 6-10 words. Anything over 20 words
+       of meditative prose is essay register — flag the sentence.
+
+    D. CLASSIC LLM TELLS:
+       ✗ "In a world where...", "It's not just X, it's Y"
+       ✗ Stacked parallel structure used for poetic effect (not for
+         punch — parallel structure is fine if it's aggressive)
+
+    PASS only if EVERY sentence from opener to closer stays in dry clinical
+    absurdist Liquid Death register — short, punchy, declarative, absurd,
+    confrontational. No softening. No reflection. No wise endings.
+
+    If every sentence stays punchy, set has_tell=false and justify.
 
 Q4. template_crutch — Does the post lean on a template opener ("Diagnosed:",
     "Prescription:", "Clinical Assessment:", "SUBJECT EXHIBITS:")? If yes: is the
@@ -117,7 +132,7 @@ Return STRICT JSON:
     ],
     "any_broken": <bool>
   }},
-  "q3_earnest_or_llm_tell": {{"tell": "<exact phrase or 'nowhere'>", "mode": "<'earnest_essay' | 'llm_tell' | 'nowhere'>", "justification": "<one sentence>", "has_tell": <bool>}},
+  "q3_essay_drift_anywhere": {{"tell": "<exact phrase or 'nowhere'>", "location": "<'opener' | 'middle' | 'closer' | 'nowhere'>", "mode": "<'reflective' | 'aphoristic_closer' | 'long_introspective' | 'llm_tell' | 'nowhere'>", "justification": "<one sentence>", "has_tell": <bool>}},
   "q4_template_crutch": {{"has_crutch": <bool>, "crutch_opener": "<quote or 'none'>", "earned": <bool>, "alternative_opener": "<proposed opener or 'n/a'>"}},
   "word_count": {word_count}
 }}"""
@@ -125,10 +140,11 @@ Return STRICT JSON:
     def _parse_validation(self, content: Dict[str, Any], post: LinkedInPost = None) -> ValidationScore:
         q1 = content.get("q1_weakest_sentence", {}) if isinstance(content, dict) else {}
         q2 = content.get("q2_metaphors", {}) if isinstance(content, dict) else {}
-        # Q3 key renamed from q3_llm_tells → q3_earnest_or_llm_tell. Fall back to
-        # the legacy key so in-flight drafts from older prompts still parse.
+        # Q3 key evolved: q3_llm_tells → q3_earnest_or_llm_tell →
+        # q3_essay_drift_anywhere. Check newest first, fall back for legacy.
         q3 = (
-            content.get("q3_earnest_or_llm_tell")
+            content.get("q3_essay_drift_anywhere")
+            or content.get("q3_earnest_or_llm_tell")
             or content.get("q3_llm_tells")
             or {}
         ) if isinstance(content, dict) else {}
@@ -185,15 +201,33 @@ Return STRICT JSON:
                 )
         if not q3_pass:
             mode = str(q3.get("mode", "")).lower()
-            if mode == "earnest_essay":
+            location = str(q3.get("location", "")).lower()
+            tell = q3.get("tell", "")
+            just = q3.get("justification", "")
+
+            if mode == "aphoristic_closer" or location == "closer":
                 reasons.append(
-                    f"Earnest-essay register: \"{q3.get('tell','')}\" — "
-                    f"{q3.get('justification','')} Rewrite in dry clinical "
-                    f"absurdist observer mode, not Medium thinkpiece mode."
+                    f"Aphoristic closer (essay-drift at the end): \"{tell}\" — {just} "
+                    f"Liquid Death doesn't do wise benedictions. End on a short slap: "
+                    f"'Nothing personal. Everything procedural.' / 'HR sent a LinkedIn "
+                    f"post.' / 'Your lips are on their own.' / 'Plan accordingly.'"
+                )
+            elif mode == "long_introspective":
+                reasons.append(
+                    f"Long introspective sentence (20+ words, meditative): \"{tell}\" — {just} "
+                    f"Break it into punchy short declaratives. Liquid Death sentences "
+                    f"average 6-10 words, not 25."
+                )
+            elif mode == "reflective" or mode == "earnest_essay":
+                reasons.append(
+                    f"Reflective/essay drift mid-post: \"{tell}\" ({location or 'middle'}) — "
+                    f"{just} Rewrite in dry clinical absurdist observer mode. Every sentence "
+                    f"must stay punchy — not just the opener."
                 )
             else:
                 reasons.append(
-                    f"LLM/earnest tell: \"{q3.get('tell','')}\" — {q3.get('justification','')}"
+                    f"Voice drift: \"{tell}\" — {just} Stay in Liquid Death register "
+                    f"from sentence 1 to the last period."
                 )
         if not q4_pass:
             reasons.append(

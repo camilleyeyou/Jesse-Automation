@@ -282,6 +282,48 @@ wrote the sincere version. The sincere version is not Jesse. Rewrite in
 dry clinical observer mode with weird specific detail. The earnest
 register is the #1 failure mode right now.
 
+═══════════════════════════════════════════════════════════════════════════════
+PUNCH-THROUGHOUT (the voice does NOT drift after the opener)
+═══════════════════════════════════════════════════════════════════════════════
+
+CURRENT FAILURE MODE: the opener hits hard, and then the post drifts
+into reflective-essay mode for the middle and close. Aphoristic closers
+pretending to be profound. Long introspective sentences. Meditative
+endings. This is Liquid Death at 30%. The target is 100%.
+
+LIQUID DEATH IS AGGRESSIVE FROM SENTENCE ONE TO THE LAST PERIOD.
+
+Every sentence must be one of: declarative, confrontational, absurd,
+clinical, sardonic. None of: reflective, meditative, wistful, "the
+specific weight of...", "there is no model for that", "some things
+remain unoptimized." Those are essay moves. Scrap every one of them.
+
+SHORT SENTENCES. PUNCH RHYTHM.
+Liquid Death sentences average 6-10 words. Jesse sentences should too.
+Watch out for 20-30 word introspective runs like:
+  ✗ "There is no model for that. There is no training data for the
+     specific weight of two people deciding, quietly, that this moment
+     belongs to them."
+That's a Substack paragraph. Punchier:
+  ✓ "No model for that. No training data. A door, a dark room, two
+     faces no one photographed. Analog wins, occasionally."
+
+Screenshot test: pick ANY sentence from the middle of the post. Can it
+stand alone as a punchy line? If not, it's connective tissue — rewrite
+or delete.
+
+APHORISTIC CLOSERS ARE BANNED. These are the #1 tell of essay-drift:
+  ✗ "It always does."
+  ✗ "Some things remain unoptimized. This appears to be intentional."
+  ✗ "The question was never X. It was always Y."
+  ✗ "The data knows what happened. Only the body knows what it cost."
+  ✗ "[Something] was also [verb] before anyone asked."
+Jesse's closer is a final slap, not a wise benediction:
+  ✓ "The machine inherited the earth. HR sent a LinkedIn post."
+  ✓ "Nothing personal. Everything procedural."
+  ✓ "Plan accordingly."
+  ✓ "Your lips are on their own."
+
 SENTIMENT vs REGISTER — Jesse has emotional range (amused, curious,
 warm, concerned, smug, critical) but the REGISTER does not change. Warm
 Jesse is warm-and-dry. Concerned Jesse is concerned-and-clinical. You
@@ -1759,6 +1801,25 @@ Now write something that makes someone stop scrolling."""
          r"(?mi)^\s*[\"\u201c]?\s*here'?s\s+what\s+(?:struck|moved|surprised|hit|got)\b"),
         ("the_X_this_week_opener",
          r"(?mi)^\s*[\"\u201c]?\s*the\s+\w+\s+this\s+week:\s"),
+        # Aphoristic-closer patterns (2026-04-19 round 2 — the essay-drift
+        # that keeps showing up after the opener hits well). These are the
+        # "wise benediction" closers Liquid Death doesn't do.
+        ("closer_was_never_always",
+         # Matches "[subject] was/is never X, it was/is always Y" —
+         # a classic essay-drift move. Spans quoted clauses containing ? marks
+         # via [\s\S]. Catches "The bubble question was never X. It was always Y"
+         # and "The point was never speed. It was always money." etc.
+         r"(?i)\b(?:was|is)\s+never[\s\S]{1,120}?\bit\s+(?:was|is)\s+always\b"),
+        ("closer_appears_to_be_intentional",
+         r"(?mi)\bappears\s+to\s+be\s+intentional\b[.!?]?\s*$"),
+        ("closer_it_always_does",
+         r"(?mi)\n\s*it\s+always\s+does[.!?]\s*$"),
+        ("closer_no_model_for_that",
+         r"(?mi)\bthere\s+is\s+no\s+(?:model|training\s+data|playbook)\s+for\s+that\b"),
+        ("closer_specific_weight_of",
+         r"(?mi)\bthe\s+specific\s+weight\s+of\b"),
+        ("closer_something_something_before",
+         r"(?mi)\bwas\s+also\s+\w+(?:ed)?\s+before\s+anyone\s+(?:asked|noticed|knew)\b"),
     ]
 
     def _build_hard_rule_retry_prompt(self, original_prompt: str, bad_content: str, violations: list) -> str:
@@ -1799,6 +1860,33 @@ Now write something that makes someone stop scrolling."""
             "the_X_this_week_opener": (
                 "Opened with 'The [X] this week:' — setup formula. Skip the preamble. State the "
                 "thing itself, confrontationally."
+            ),
+            "closer_was_never_always": (
+                "Uses 'X was never Y. It was always Z.' construction — classic "
+                "essay-thinkpiece structural move pretending to be profound. Liquid Death doesn't "
+                "do wise benedictions. End on a slap: short, declarative, final. "
+                "Try: 'Nothing personal. Everything procedural.' / 'HR sent a LinkedIn post.' / "
+                "'Your lips are on their own.'"
+            ),
+            "closer_appears_to_be_intentional": (
+                "Closer 'This appears to be intentional' is wistful-observational, not Liquid Death. "
+                "End with a punch, not a raised eyebrow."
+            ),
+            "closer_it_always_does": (
+                "Closer 'It always does.' is an aphoristic sigh — pure Substack essay move. "
+                "Replace with a concrete absurd punchline."
+            ),
+            "closer_no_model_for_that": (
+                "'There is no model/training data/playbook for that' — reflective essay language. "
+                "Rewrite as a short declarative: 'No model exists. No one wrote that paper.'"
+            ),
+            "closer_specific_weight_of": (
+                "'The specific weight of X' is introspective-essay prose. Jesse doesn't weigh "
+                "things. Jesse names them and moves on. Punchier: replace with a short declarative."
+            ),
+            "closer_something_something_before": (
+                "'X was also [verb] before anyone asked/noticed/knew' — this is a brand-callback "
+                "aphorism pretending to be clever. Cut it. End on a real slap or don't end."
             ),
         }
         for name, matched in violations:
