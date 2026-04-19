@@ -163,6 +163,14 @@ class TrendService:
         # Track topics used in current batch
         self.batch_used_headlines: Set[str] = set()
 
+        # In-memory session picks — same purpose as batch_used_headlines
+        # but stores full dict (headline/category) so the curator's
+        # get_recent_topics() view is complete even within rapid successive
+        # generations where DB commits haven't propagated yet. Fixes the
+        # 2026-04-19 post-2-and-3 Cerebras duplicate case where iteration 2
+        # didn't see iteration 1's pick in time.
+        self._session_picks: List[Dict[str, Any]] = []
+
         # Initialize Brave Search
         self.brave_api_key = os.getenv("BRAVE_API_KEY")
         if self.brave_api_key and HTTPX_AVAILABLE:
@@ -326,6 +334,20 @@ class TrendService:
                 conn.commit()
 
             self.batch_used_headlines.add(trend.fingerprint)
+
+            # In-memory session pick — immediately visible to subsequent
+            # curator evaluations in the same process, before DB visibility.
+            # Capped at 20 entries; older entries drop off so the list
+            # doesn't grow unbounded across a long-running server.
+            self._session_picks.insert(0, {
+                "headline": trend.headline,
+                "category": trend.category,
+                "source": trend.source,
+                "used_at": datetime.now().isoformat(),
+                "post_id": post_id,
+            })
+            if len(self._session_picks) > 20:
+                self._session_picks = self._session_picks[:20]
 
             # Log with theme info if available
             theme_info = f" [{theme}/{sub_theme}]" if theme else ""
@@ -896,7 +918,15 @@ class TrendService:
         self.reset_batch_tracking()
 
     def get_recent_topics(self, limit: int = 20) -> List[Dict]:
-        """Get recently used topics for debugging/display"""
+        """Get recently used topics (session picks + DB) for curator + debugging.
+
+        Merges in-memory _session_picks (immediately visible) with DB
+        used_topics. Session picks take precedence — this ensures the
+        curator in iteration N sees iteration N-1's pick even if the DB
+        commit hasn't propagated yet (SQLite can have this race on rapid
+        successive writes via a single process).
+        """
+        db_topics: List[Dict] = []
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.row_factory = sqlite3.Row
@@ -907,11 +937,22 @@ class TrendService:
                     ORDER BY used_at DESC
                     LIMIT ?
                 """, (limit,))
-
-                return [dict(row) for row in cursor.fetchall()]
+                db_topics = [dict(row) for row in cursor.fetchall()]
         except Exception as e:
-            self.logger.error(f"Error getting recent topics: {e}")
-            return []
+            self.logger.error(f"Error getting recent topics from DB: {e}")
+
+        # Merge session picks in front, dedupe by normalized headline
+        seen = set()
+        merged: List[Dict] = []
+        for t in list(self._session_picks) + db_topics:
+            headline_norm = (t.get("headline") or "").strip().lower()
+            if not headline_norm or headline_norm in seen:
+                continue
+            seen.add(headline_norm)
+            merged.append(t)
+            if len(merged) >= limit:
+                break
+        return merged
 
     def cleanup_old_topics(self, days: int = 30):
         """Remove topics older than specified days"""

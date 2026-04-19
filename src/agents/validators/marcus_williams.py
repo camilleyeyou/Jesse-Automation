@@ -201,12 +201,29 @@ Return STRICT JSON:
             word_count = len(post.content.split()) if post else 0
         length_ok = 40 <= word_count <= 90
 
+        # Deterministic sentence-length hard gate (2026-04-19 polish).
+        # Marcus Q3 flags "long introspective sentences" as a soft signal
+        # but the LLM keeps deciding that 25+ word declaratives are fine.
+        # User explicitly wants Liquid Death punch — any sentence over 25
+        # words blocks approval regardless of Marcus's other judgments.
+        long_sentence_blocker = None
+        if post and post.content:
+            import re as _re
+            # Split on sentence-ending punctuation; collapse newlines first
+            flat = _re.sub(r"\s+", " ", post.content).strip()
+            sentences = [s.strip() for s in _re.split(r"(?<=[.!?])\s+", flat) if s.strip()]
+            for s in sentences:
+                wc = len(s.split())
+                if wc > 25:
+                    long_sentence_blocker = (s[:120], wc)
+                    break
+        sentence_length_ok = long_sentence_blocker is None
+
         # Marcus's approval: require 2 of 3 core dimensions (q2, q3, q4) to pass
-        # AND grammar clean (Q5) AND length in range. Q5 is a hard gate because
-        # user explicitly asked for grammar enforcement.
+        # AND grammar clean (Q5) AND length in range AND no 25+ word sentences.
         core_passes = [q2_pass, q3_pass, q4_pass]
         pass_count = sum(core_passes)
-        approved = length_ok and pass_count >= 2 and q5_pass
+        approved = length_ok and pass_count >= 2 and q5_pass and sentence_length_ok
 
         # Score mapping — must satisfy ValidationScore (approved iff >=7.0)
         if pass_count == 3 and length_ok:
@@ -219,6 +236,12 @@ Return STRICT JSON:
             score = 4.0
         else:
             score = 2.0
+
+        # Hard gates cap the score at <7 (below approval threshold) so a
+        # grammar-clean, length-ok post with a 29-word run-on still gets
+        # blocked at aggregation time even if approved=True somehow slips.
+        if not q5_pass or not sentence_length_ok:
+            score = min(score, 5.0)
 
         reasons = []
         # Always quote Q1 weakest sentence — useful for revision even on approvals
@@ -273,6 +296,13 @@ Return STRICT JSON:
             )
         if not length_ok:
             reasons.append(f"Length: {word_count} words (must be 40-90).")
+        if not sentence_length_ok and long_sentence_blocker:
+            offender, offender_wc = long_sentence_blocker
+            reasons.append(
+                f"HARD GATE — sentence over 25 words ({offender_wc}w): "
+                f'"{offender}..." Break into 2-3 short declaratives. '
+                f"Liquid Death sentences average 6-10 words — never over 25."
+            )
 
         feedback = " | ".join(reasons) if reasons else ""
 
@@ -282,18 +312,27 @@ Return STRICT JSON:
             "q3_essay_drift": q3,
             "q4_template_crutch": q4,
             "q5_grammar": q5,
+            "sentence_length_ok": sentence_length_ok,
+            "long_sentence": (
+                {"text": long_sentence_blocker[0], "word_count": long_sentence_blocker[1]}
+                if long_sentence_blocker else None
+            ),
             "passes": {
                 "q2": q2_pass, "q3": q3_pass, "q4": q4_pass,
                 "q5_grammar": q5_pass, "length": length_ok,
+                "sentence_length": sentence_length_ok,
             },
             "word_count": word_count,
             "model": self.model,
         }
 
         grammar_mark = "" if q5_pass else " 🚫GRAMMAR"
+        long_mark = (
+            f" 🚫SENTENCE-{long_sentence_blocker[1]}w" if long_sentence_blocker else ""
+        )
         self.logger.info(
             f"Marcus Williams (GPT-4o): {pass_count}/3 core + grammar={q5_pass}, "
-            f"{word_count}w {'✅' if approved else '❌'}{grammar_mark}"
+            f"{word_count}w {'✅' if approved else '❌'}{grammar_mark}{long_mark}"
         )
 
         return ValidationScore(

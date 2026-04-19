@@ -1840,6 +1840,15 @@ Now write something that makes someone stop scrolling."""
          r"(?mi)\bthe\s+specific\s+weight\s+of\b"),
         ("closer_something_something_before",
          r"(?mi)\bwas\s+also\s+\w+(?:ed)?\s+before\s+anyone\s+(?:asked|noticed|knew)\b"),
+        # Brand-callback closers — the "a tube of lip balm sits quietly on a
+        # desk, more than most of us manage" move. These are the lazy
+        # sentimental brand beats that the 1-in-5 product-mention allowance
+        # keeps getting cashed in on. User 2026-04-19 post-queue-review:
+        # wants brand mentions cut at the close, too.
+        ("closer_a_tube_of_balm",
+         r"(?mi)\b(?:somewhere,?\s+)?a\s+tube\s+(?:of\s+(?:lip\s+)?balm|of\s+balm)\b"),
+        ("closer_lip_balm_anthropomorphic",
+         r"(?mi)\b(?:a\s+tube|the\s+tube|the\s+balm|the\s+lip\s+balm)\s+(?:sits|waits|exists|remains|stays|rests|lies|watches|knows|doesn'?t|is\s+not|has\s+no)\b"),
     ]
 
     def _build_hard_rule_retry_prompt(self, original_prompt: str, bad_content: str, violations: list) -> str:
@@ -1907,6 +1916,16 @@ Now write something that makes someone stop scrolling."""
             "closer_something_something_before": (
                 "'X was also [verb] before anyone asked/noticed/knew' — this is a brand-callback "
                 "aphorism pretending to be clever. Cut it. End on a real slap or don't end."
+            ),
+            "closer_a_tube_of_balm": (
+                "Uses 'a tube of lip balm' / 'a tube of balm' in the body of the post — this is "
+                "the sentimental brand-callback move. Cut ANY reference to the product. The post "
+                "should work completely without it. The voice carries the brand, not the tube."
+            ),
+            "closer_lip_balm_anthropomorphic": (
+                "Anthropomorphic brand reference ('a tube of lip balm sits quietly / waits / "
+                "exists'). This is lazy sentimental brand stamping. Remove the product reference "
+                "entirely. End on a non-product slap."
             ),
         }
         for name, matched in violations:
