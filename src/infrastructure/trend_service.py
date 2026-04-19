@@ -126,24 +126,28 @@ class TrendService:
     # the AI angle is the voice, not the subject. A sports story, election
     # moment, or cultural panic is fair game; the curator reframes it through
     # Jesse's eyes. Split: ~40% AI-adjacent, ~60% general US cultural heat.
+    # 2026-04-19 rewrite: old queries were essay-bait ("philosophy meaning
+    # connection grief joy") which surfaced thoughtful niche content. User
+    # feedback: posts must react to RECOGNIZABLE trending topics — things a
+    # typical US reader would say "oh yeah I've heard about that" to.
+    # New queries target BUZZY events with named entities: specific companies,
+    # specific people, specific events. "Trending today", "viral", "breaking"
+    # are Brave Search magic words that boost news-cycle-heat results.
     CATEGORY_QUERIES = {
-        # ─── AI-adjacent (the original spine) ────────────────────────────
-        "ai_slop": "AI generated content creative viral deepfake synthetic media",
-        "ai_safety": "AI alignment safety research regulation guardrails",
-        "ai_economy": "AI investment earnings capex valuation bubble funding",
-        "ai_labor": "AI hiring layoffs workforce automation jobs impact",
+        # ─── Buzz-seeking (new spine — what's actually hot right now) ────
+        "top_us_news": "top news today United States breaking story trending",
+        "trending_viral": "viral story everyone talking about today trending",
+        "breaking_tech": "big tech news today Meta OpenAI Google Amazon Microsoft Apple Nvidia",
+        "politics_hot": "political news today major scandal breaking Trump Biden Congress",
+        "celebrity_moment": "celebrity news trending today Taylor Swift Elon Musk viral moment",
+        "sports_moment": "sports news today big game playoff championship viral moment",
+        "internet_discourse": "viral tweet twitter TikTok moment broke containment trending",
+        "economic_pulse": "stock market news today layoffs earnings big company",
 
-        # ─── Top US cultural heat (what people actually talk about) ──────
-        "top_us_news": "top news story today United States breaking",
-        "politics_culture": "politics election congress scandal protest controversy",
-        "workplace_reality": "layoffs return to office corporate culture burnout remote work",
-        "celebrity_moment": "celebrity viral moment pop culture entertainment music film",
-        "sports_moment": "sports game winner upset championship rivalry athlete",
-        "internet_moment": "viral tweet meme internet discourse trending conversation",
-        "economic_pulse": "stock market earnings recession inflation housing tech layoffs",
-        "weather_disaster": "weather storm hurricane disaster climate extreme emergency",
-        "cultural_ritual": "wellness burnout mental health digital detox slow living ritual",
-        "humanity_moment": "philosophy meaning connection grief joy community awe flourishing",
+        # ─── AI-adjacent (kept but narrower — only when it's news, not
+        # research) ──────────────────────────────────────────────────────
+        "ai_news": "OpenAI Anthropic Meta Google AI announcement news product launch",
+        "ai_labor": "AI layoffs hiring workforce replacement news story",
     }
 
     def __init__(self, db_path: str = "data/automation/queue.db"):

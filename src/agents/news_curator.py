@@ -354,6 +354,13 @@ NO viable {preferred_theme.replace('_', ' ')} trends exist among the candidates.
             chosen_index = content_data.get("chosen_index", 0)
             relevance_score = content_data.get("relevance_score", 5)
             content_potential = content_data.get("content_potential", 5)
+            recognizability_score = content_data.get("recognizability_score", 0)
+            recognizability_reasoning = str(
+                content_data.get("recognizability_reasoning", "")
+            ).strip()
+            low_recognizability_batch = bool(
+                content_data.get("low_recognizability_batch", False)
+            )
             reasoning = content_data.get("reasoning", "")
 
             # Extract structured angle fields
@@ -395,10 +402,14 @@ NO viable {preferred_theme.replace('_', ' ')} trends exist among the candidates.
                     "tension": tension,
                 }
 
+            reco_warn = " ⚠ LOW-RECOGNIZABILITY" if low_recognizability_batch or recognizability_score < 7 else ""
             self.logger.info(
-                f"✅ Curator selected [{chosen_index}] (relevance={relevance_score}, "
-                f"potential={content_potential}): {chosen.headline[:60]}..."
+                f"✅ Curator selected [{chosen_index}] (recognizability={recognizability_score}, "
+                f"relevance={relevance_score}, potential={content_potential}){reco_warn}: "
+                f"{chosen.headline[:60]}..."
             )
+            if recognizability_reasoning:
+                self.logger.info(f"   Recognizability: {recognizability_reasoning[:140]}")
             if reasoning:
                 self.logger.info(f"   Reasoning: {reasoning[:100]}...")
             if observation:
@@ -455,7 +466,7 @@ prefer trends matching this theme. Only choose a different theme if NO viable
 
 """
 
-        return f"""Here are {len(candidates)} trending topics right now. Pick the ONE that would make the best LinkedIn post for Jesse A. Eisenbalm's audience of working professionals.
+        return f"""Here are {len(candidates)} candidate topics. Pick the ONE that would make the best Jesse A. Eisenbalm LinkedIn post — using the criteria below HARD.
 {theme_priority}
 ═══════════════════════════════════════════════════════════════════════════════
 CANDIDATE TRENDS
@@ -464,13 +475,55 @@ CANDIDATE TRENDS
 {trends_text}
 
 ═══════════════════════════════════════════════════════════════════════════════
+SELECTION CRITERIA (read this carefully — we are failing on #1 right now)
+═══════════════════════════════════════════════════════════════════════════════
 
-Evaluate each trend for:
-1. Audience relevance — Will working professionals care about this?
-2. Content potential — Can Jesse make this funny, insightful, or surprising?
-3. Conversation potential — Will people comment, share, or tag someone?
+THE #1 CRITERION — RECOGNIZABILITY:
+The reader, scrolling their LinkedIn feed, must recognize what the post is
+about in the first sentence. They should think "oh yeah, I've heard about
+that." If the trend is niche, academic, regional, or buried, they WILL
+scroll past regardless of how well Jesse writes about it.
 
-Pick the BEST one. If none are great, pick the least bad and note why.
+Score each candidate 0-10 on recognizability:
+  • 10 — headline-of-the-day level. Everyone in the US has seen it. (Meta
+        layoffs hitting 8k people, a major SCOTUS ruling, Super Bowl moment,
+        OpenAI ships major product, election news, a Taylor Swift thing.)
+  •  8 — saturating tech/political/culture news for the week. (Specific AI
+        company did a specific thing; named senator did a thing; viral
+        TikTok; major earnings miss.)
+  •  5 — you'd have to be following the beat to know it. (Industry-
+        specific news with some signal; a policy proposal; a mid-tier
+        celeb.)
+  •  2 — niche / academic / regional / thinkpiece territory. (Research
+        paper, Substack essay, local news, policy brief, philosophy piece.)
+  •  0 — nobody has heard of this and nobody will care.
+
+HARD RULE: if the best candidate scores under 7, PICK IT ANYWAY (we have to
+return something) but note "low_recognizability_batch=true" in the reasoning
+so downstream knows this batch is weak.
+
+HARD REJECT categories (score these 0-3, pick anything else if possible):
+  ✗ Academic papers / research summaries / arXiv preprints
+  ✗ Alignment Forum posts, AI Now Institute reports, CSET briefs
+  ✗ Substack essays / Medium thinkpieces / philosophy (Aeon, Marginalian)
+  ✗ Niche wellness / mindfulness content
+  ✗ Regional news specific to a US state or country that isn't the story
+  ✗ "Physician burnout", "empathy regulation", "slow living" — nobody's
+    talking about these in the news cycle today.
+
+HARD PREFER categories (score these 7-10):
+  ✓ Big-name tech companies doing specific things (Meta, OpenAI, Google,
+    Amazon, Microsoft, Apple, Nvidia, Tesla, Anthropic, Meta, X/Twitter)
+  ✓ Named political figures + specific events (not general "politics")
+  ✓ Named celebrities / cultural figures + specific recent moment
+  ✓ Sports moments with proper nouns (team, player, game)
+  ✓ Viral social media moments / internet discourse that broke containment
+  ✓ Economic events with named numbers (layoffs, stock moves, earnings)
+  ✓ Legal/regulatory events naming specific parties
+
+SECONDARY CRITERIA (apply ONLY to candidates scoring 7+ on recognizability):
+1. Content potential — Can Jesse make this funny, absurdist, Liquid-Death-shaped?
+2. Conversation potential — Will readers comment, share, tag someone?
 
 ═══════════════════════════════════════════════════════════════════════════════
 BUILD THE STRUCTURED ANGLE FOR THE CHOSEN TREND
@@ -487,8 +540,10 @@ to collapse into template filler. Ground every field in the actual source.
   could comment" — the one-line POV Jesse holds. Must contain a claim.
 
 - concrete_details: ARRAY of 3+ strings pulled verbatim/near-verbatim from the
-  source: names, numbers, places, dates, quotes. Never invented. If you can't
-  find 3 real details, pick a different trend.
+  source: names, numbers, places, dates, quotes. Never invented. The FIRST
+  item in this array MUST be the recognizable proper noun the reader will
+  see in sentence one (the company, person, event, or thing that makes the
+  trend obvious). If you can't find 3 real details, pick a different trend.
 
 - tension: one sentence. The gap between the claim and reality. Where does the
   headline mislead? What does the announcement promise that the evidence
@@ -497,13 +552,16 @@ to collapse into template filler. Ground every field in the actual source.
 Return your evaluation as STRICT JSON:
 {{
   "chosen_index": <int>,
+  "recognizability_score": <0-10 — the #1 criterion above>,
+  "recognizability_reasoning": "<one sentence — would an average US reader say 'oh yeah' to this?>",
   "relevance_score": <1-10>,
   "content_potential": <1-10>,
   "observation": "<one sentence>",
   "take": "<one sentence>",
-  "concrete_details": ["<string>", "<string>", "<string>"],
+  "concrete_details": ["<recognizable proper noun>", "<string>", "<string>"],
   "tension": "<one sentence>",
-  "reasoning": "<why this trend beats the others>"
+  "reasoning": "<why this trend beats the others — lead with the recognizability call>",
+  "low_recognizability_batch": <true if chosen trend scored < 7, false otherwise>
 }}"""
 
     def _fallback_selection(self, candidates: list, post_id: str = None):

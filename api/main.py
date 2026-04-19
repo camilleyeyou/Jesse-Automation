@@ -690,6 +690,95 @@ async def health_check():
     }
 
 
+@app.get("/api/system-health")
+async def system_health():
+    """Deeper system introspection — registered trend sources, last-curated
+    trend, and the config that's actually loaded. Added 2026-04-19 to
+    diagnose why newly-added sources weren't appearing in prod logs."""
+    from pathlib import Path as _Path
+    import yaml as _yaml
+
+    info = {
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+    # Config snapshot — what tiers/sources does the deployed config.yaml define?
+    try:
+        config_path = _Path(__file__).resolve().parent.parent / "config" / "config.yaml"
+        if config_path.exists():
+            with open(config_path) as f:
+                raw_cfg = _yaml.safe_load(f)
+            tiers = (raw_cfg.get("content_strategy") or {}).get("sourcing_tiers") or {}
+            config_snapshot = {}
+            for tier_key, tier_data in tiers.items():
+                sources = tier_data.get("sources", []) if isinstance(tier_data, dict) else []
+                config_snapshot[tier_key] = {
+                    "weight": tier_data.get("weight") if isinstance(tier_data, dict) else None,
+                    "source_count": len(sources),
+                    "enabled_count": sum(1 for s in sources if s.get("enabled")),
+                    "sources": [
+                        {"name": s.get("name"), "type": s.get("type"), "enabled": s.get("enabled")}
+                        for s in sources
+                    ],
+                }
+            info["config_yaml"] = {
+                "path": str(config_path),
+                "exists": True,
+                "tiers": config_snapshot,
+            }
+        else:
+            info["config_yaml"] = {"path": str(config_path), "exists": False}
+    except Exception as e:
+        info["config_yaml"] = {"error": str(e)}
+
+    # Live source registry — what did _init_sources actually register?
+    try:
+        svc = getattr(orchestrator, "trend_service", None) if orchestrator else None
+        registry = getattr(svc, "_source_registry", None) if svc else None
+        if registry is not None:
+            info["registered_sources"] = {
+                "count": len(registry),
+                "sources": [
+                    {
+                        "name": name,
+                        "tier": src.get_tier() if hasattr(src, "get_tier") else None,
+                        "source_type": getattr(src, "source_type", None),
+                        "enabled": getattr(src, "enabled", None),
+                        "class": src.__class__.__name__,
+                    }
+                    for name, src in registry.items()
+                ],
+            }
+        else:
+            info["registered_sources"] = {"error": "trend_service has no _source_registry"}
+    except Exception as e:
+        info["registered_sources"] = {"error": str(e)}
+
+    # Seed corpus status — how many gold-standard rows are loaded?
+    try:
+        memory = get_memory()
+        info["gold_standard_corpus"] = {
+            "total_rows": memory.count_gold_standard_posts() if memory else None,
+        }
+    except Exception as e:
+        info["gold_standard_corpus"] = {"error": str(e)}
+
+    # Git info if available — confirms which commit is deployed
+    try:
+        import subprocess
+        head = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(_Path(__file__).resolve().parent.parent),
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+        ).decode().strip()
+        info["git_head"] = head[:12]
+    except Exception:
+        info["git_head"] = "unavailable"
+
+    return info
+
+
 # ============== Automation Endpoints ==============
 
 @app.get("/api/automation/status")

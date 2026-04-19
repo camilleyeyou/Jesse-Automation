@@ -98,28 +98,40 @@ Answer FOUR diagnostic questions. Be specific. Quote the post where asked.
 Q1. emotion — One word. What emotion is this post trying to create in the reader?
     If you can't name one, answer "none" and this question fails.
 
-Q2. opener_strength — Quote the FIRST SENTENCE of the post. Is it a HOOK
-    (provocation / declaration / confrontation / absurd statement) or a
-    SETUP (observation / essay-ramp / "here's what I noticed")?
+Q2. opener_strength — Read the FIRST TWO SENTENCES of the post. They must
+    satisfy BOTH checks:
 
-    PASSES when the opener is a slap, not a ramp. Good Jesse hooks directly
-    name the dread or state something absurd as matter-of-fact:
-      ✓ "Humans, an update: you are still mortal."
-      ✓ "Consciousness was a beta feature."
-      ✓ "Stop panicking about the algorithm. It already replaced you."
-      ✓ "Good news: you are going to die."
-      ✓ "Clinical finding: the internet is making you worse."
+    CHECK A — Is there a HOOK (provocation / declaration / confrontation /
+    absurd statement)? Not a setup, not an observation-ramp, not an essay
+    opener. Jesse's hook is a slap.
 
-    FAILS when the opener is an observation-ramp / essay-setup:
-      ✗ "An AI can retrieve every tweet a person has ever posted..."
-      ✗ "An algorithm can model a tornado's rotational velocity..."
-      ✗ "There's something moving about the last day at a job..."
-      ✗ "The [topic] this week: ..."
-      ✗ "It turns out that..."
-      ✗ Any opener that reads like the first paragraph of a Medium essay.
+    CHECK B — Is the TREND NAMED? Can a stranger scrolling LinkedIn tell,
+    from the first two sentences alone, WHAT real-world event/person/
+    company/thing this post is reacting to? The recognizable proper noun
+    must be present — "Meta", "Trump", "OpenAI", "Taylor Swift", "the
+    Nuggets", "SCOTUS", etc.
 
-    The test: read the first sentence ALONE. If a stranger would scroll past
-    it, it's a ramp, not a hook. Rewrite needed.
+    PASSES if BOTH:
+      ✓ "Meta is cutting 8,000 jobs today. Humans, an update: you are
+         still replaceable." (names trend + slaps)
+      ✓ "OpenAI shipped a new model. Consciousness was a beta feature."
+         (names trend + slaps)
+      ✓ "Trump told Iran what to do. The database remembers him telling
+         Obama the opposite." (names trend + slaps)
+
+    FAILS if slap without trend name — reader has no idea what this is about:
+      ✗ "Humans, an update: you are still replaceable." (no trend named)
+      ✗ "Consciousness was a beta feature." (no trend named)
+      ✗ "Good news: you are going to die." (unmoored)
+
+    FAILS if trend named without slap — reader gets topic but scrolls:
+      ✗ "An AI can retrieve every tweet..." (setup not slap)
+      ✗ "Meta announced layoffs today..." (headline paraphrase)
+      ✗ "There's something moving about..." (essay register)
+      ✗ "The tech industry this week: ..." (setup formula)
+
+    Set passes=true only if BOTH checks pass. Quote the opener, name
+    specifically whether it fails check A, check B, or both.
 
 Q3. has_point_of_view — Does this post have a sharp, specific point of view on
     the actual story, or does it retreat into brand promotion / generic
@@ -139,7 +151,7 @@ Q4. story_specific_detail — Name ONE detail in this post that could only have 
 Return STRICT JSON:
 {{
   "q1_emotion": {{"word": "<one word or 'none'>", "passes": <true if a real emotion, else false>}},
-  "q2_opener_strength": {{"opener": "<exact first sentence, quoted>", "type": "<'hook' | 'ramp'>", "why": "<one clause explaining the call>", "found": <bool — true iff the opener is a hook, not a ramp>}},
+  "q2_opener_strength": {{"opener": "<first two sentences, quoted>", "has_hook": <true iff opener is a slap not a ramp>, "names_trend": <true iff a recognizable proper noun / event is present in the opener>, "why": "<one clause explaining the call — specify which check(s) failed>", "found": <true iff has_hook AND names_trend>}},
   "q3_has_point_of_view": {{"pov_summary": "<one-sentence summary of the post's actual TAKE on the story, or 'none' if it doesn't have one>", "brand_stamped": <true if the post opens with a memo/letterhead/brand-dropping frame>, "product_mentioned": <true if lip balm / tube / $8.99 / hand-numbering / Jesse A. Eisenbalm appears anywhere>, "passes": <true if pov_summary is a real take AND brand_stamped is false>}},
   "q4_story_specific_detail": {{"detail": "<exact detail or 'none'>", "found": <bool>}},
   "overall_reaction": "<one sentence — your honest reaction as Sarah>",
@@ -212,12 +224,23 @@ Return STRICT JSON:
         if not q1_pass:
             reasons.append(f"Q1 emotion: got '{q1.get('word', 'none')}' — no real emotional target identified.")
         if not q2_pass:
-            # Support both new (opener/type) and legacy (sentence) payloads.
             opener = q2.get("opener") or q2.get("sentence", "")
+            has_hook = bool(q2.get("has_hook", True))  # default True so legacy payloads don't over-blame
+            names_trend = bool(q2.get("names_trend", True))
+            fix_parts = []
+            if not names_trend:
+                fix_parts.append(
+                    "Name the actual trend (proper noun — company, person, event) in "
+                    "sentence 1 or 2. Reader must recognize the topic from the opener alone."
+                )
+            if not has_hook:
+                fix_parts.append(
+                    "Rewrite as a Liquid Death slap — direct confrontation, absurd "
+                    "declarative, or clinical finding. NOT a setup."
+                )
+            fix = " ".join(fix_parts) if fix_parts else "Rewrite the opener."
             reasons.append(
-                f"Q2 opener weak (ramp, not hook): \"{opener}\" — {q2.get('why', '')} "
-                f"Rewrite the first sentence as a direct confrontation, absurd "
-                f"declarative, or clinical finding. Think Liquid Death: slap, not ramp."
+                f"Q2 opener weak: \"{opener}\" — {q2.get('why', '')} {fix}"
             )
         if not q3_pass:
             if brand_stamped:
