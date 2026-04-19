@@ -77,10 +77,30 @@ Q2. metaphors — List EVERY metaphor or analogy in the post. For each, state th
     that property. Example of a broken metaphor: "glacier of red tape" — balm does
     not affect glaciers; the property being compared doesn't hold.
 
-Q3. llm_tells — Where does this read like an LLM wrote it? Quote the specific
-    phrase. LLM tells include: "In a world where...", "It's not just X, it's Y",
-    stacked parallel structure, meaningless intensifiers, explain-the-joke pivots.
-    If nowhere, set tell="nowhere" and justify in one sentence.
+Q3. earnest_or_llm_tell — Where does this post SLIP OUT of Jesse's dry-absurdist
+    register and into a SINCERE / EARNEST / ESSAYISTIC voice? This is currently
+    the #1 failure mode. Jesse is dry, clinical, weirdly precise, fully committed
+    to an absurd frame. Jesse is NOT a Medium thinkpiece, a Substack reflection,
+    an NYT op-ed, or a LinkedIn carousel philosophy moment.
+
+    FLAG as earnest/LLM register — quote the specific phrase:
+    • Sincere reflection ("There's something genuinely moving about...",
+      "It turns out that...", "Here's what struck me about this")
+    • Aphoristic closers pretending to be profound ("The data knows what
+      happened. Only the body knows what it cost.")
+    • Melancholic / mournful / reverent tone toward the subject
+    • Thinkpiece register ("This is the trade-off that wasn't in the pitch
+      deck", "What this really means is...", "Let's sit with this for a moment")
+    • Classic LLM tells: "In a world where...", "It's not just X, it's Y",
+      stacked parallel structure, meaningless intensifiers, explain-the-joke pivots
+    • Generic wisdom / sincere life-lesson vibes
+
+    PASS only if the whole post stays in dry clinical absurdist observer mode —
+    no softening into sincere reflection, no poetic moments, no "let's be
+    serious for a second." Jesse observes, often with pseudo-clinical or weirdly
+    specific precision. Jesse does not mourn or moralize.
+
+    If nowhere slips, set has_tell=false and justify in one sentence.
 
 Q4. template_crutch — Does the post lean on a template opener ("Diagnosed:",
     "Prescription:", "Clinical Assessment:", "SUBJECT EXHIBITS:")? If yes: is the
@@ -97,7 +117,7 @@ Return STRICT JSON:
     ],
     "any_broken": <bool>
   }},
-  "q3_llm_tells": {{"tell": "<exact phrase or 'nowhere'>", "justification": "<one sentence>", "has_tell": <bool>}},
+  "q3_earnest_or_llm_tell": {{"tell": "<exact phrase or 'nowhere'>", "mode": "<'earnest_essay' | 'llm_tell' | 'nowhere'>", "justification": "<one sentence>", "has_tell": <bool>}},
   "q4_template_crutch": {{"has_crutch": <bool>, "crutch_opener": "<quote or 'none'>", "earned": <bool>, "alternative_opener": "<proposed opener or 'n/a'>"}},
   "word_count": {word_count}
 }}"""
@@ -105,7 +125,13 @@ Return STRICT JSON:
     def _parse_validation(self, content: Dict[str, Any], post: LinkedInPost = None) -> ValidationScore:
         q1 = content.get("q1_weakest_sentence", {}) if isinstance(content, dict) else {}
         q2 = content.get("q2_metaphors", {}) if isinstance(content, dict) else {}
-        q3 = content.get("q3_llm_tells", {}) if isinstance(content, dict) else {}
+        # Q3 key renamed from q3_llm_tells → q3_earnest_or_llm_tell. Fall back to
+        # the legacy key so in-flight drafts from older prompts still parse.
+        q3 = (
+            content.get("q3_earnest_or_llm_tell")
+            or content.get("q3_llm_tells")
+            or {}
+        ) if isinstance(content, dict) else {}
         q4 = content.get("q4_template_crutch", {}) if isinstance(content, dict) else {}
 
         # Q1 is informational — every post has a weakest sentence. Use presence of a quote as pass.
@@ -158,9 +184,17 @@ Return STRICT JSON:
                     f"Broken metaphor: \"{m.get('quote','')}\" — property \"{m.get('property','')}\" doesn't hold. {m.get('note','')}"
                 )
         if not q3_pass:
-            reasons.append(
-                f"LLM tell: \"{q3.get('tell','')}\" — {q3.get('justification','')}"
-            )
+            mode = str(q3.get("mode", "")).lower()
+            if mode == "earnest_essay":
+                reasons.append(
+                    f"Earnest-essay register: \"{q3.get('tell','')}\" — "
+                    f"{q3.get('justification','')} Rewrite in dry clinical "
+                    f"absurdist observer mode, not Medium thinkpiece mode."
+                )
+            else:
+                reasons.append(
+                    f"LLM/earnest tell: \"{q3.get('tell','')}\" — {q3.get('justification','')}"
+                )
         if not q4_pass:
             reasons.append(
                 f"Template crutch \"{q4.get('crutch_opener','')}\" not earned. Try: {q4.get('alternative_opener','')}"
