@@ -204,11 +204,18 @@ content_strategy:
 
   # Four sourcing tiers with different time horizons and sources
   sourcing_tiers:
+    # 2026-04-19 rebalance: the pipeline was too AI-dev-biased (HF papers, arXiv,
+    # Alignment Forum) which gave the generator almost nothing to react to beyond
+    # technical AI nerdery. Added general news (NYT, NPR, BBC, Guardian, Politico,
+    # The Verge, Atlantic, New Yorker, Hacker News, ProPublica) and social pulse
+    # (Reddit r/popular, r/news, r/technology). Shifted weight from Tier 1 (AI
+    # research) toward Tier 3 (cultural pickup) so what people actually talk
+    # about gets a bigger slice of the candidate pool.
     tier_1:
       name: "Early Detection (0-24 hours)"
       description: "Where stories originate - scanning for velocity"
       refresh_minutes: 60
-      weight: 0.4  # 40% of candidate trends
+      weight: 0.3  # was 0.4 — trimmed to make room for cultural breadth
       sources:
         # AI Slop + AI Economy
         - name: "HuggingFace Daily Papers"
@@ -237,12 +244,22 @@ content_strategy:
           type: "rss"
           url: "https://aeon.co/feed.rss"
           enabled: true
+        # General early signal — Hacker News moves fast and breaks stories
+        # before mainstream news. The Verge tracks tech culture broadly.
+        - name: "Hacker News Frontpage"
+          type: "rss"
+          url: "https://hnrss.org/frontpage"
+          enabled: true
+        - name: "The Verge"
+          type: "rss"
+          url: "https://www.theverge.com/rss/index.xml"
+          enabled: true
 
     tier_2:
       name: "Editorial Filter (24-72 hours)"
       description: "Where raw stories get framed into takes"
       refresh_minutes: 360  # 6 hours
-      weight: 0.3  # 30% of candidate trends
+      weight: 0.25  # was 0.3 — small trim for Tier 3 rebalance
       sources:
         # AI Slop + Economy
         - name: "Simon Willison Blog"
@@ -268,29 +285,101 @@ content_strategy:
           type: "rss"
           url: "https://www.themarginalian.org/feed/"
           enabled: true
+        # General editorial — takes, commentary, political/cultural framing
+        - name: "Politico"
+          type: "rss"
+          url: "https://rss.politico.com/politics-news.xml"
+          enabled: true
+        - name: "The Atlantic"
+          type: "rss"
+          url: "https://www.theatlantic.com/feed/all/"
+          enabled: true
+        - name: "The New Yorker"
+          type: "rss"
+          url: "https://www.newyorker.com/feed/everything/rss"
+          enabled: true
 
     tier_3:
       name: "Cultural Pickup (3-7 days)"
-      description: "Where stories cross into mainstream"
+      description: "Where stories cross into mainstream — biggest slice now"
       refresh_minutes: 720  # 12 hours
-      weight: 0.2  # 20% of candidate trends
+      weight: 0.35  # was 0.2 — biggest rebalance; this is where culture lives
       sources:
+        # Search/trend APIs (existing)
         - name: "Brave Search"
           type: "api"
-          enabled: true  # Already implemented
+          enabled: true
         - name: "Google Trends"
           type: "api"
-          enabled: true  # Already implemented
+          enabled: true
+        # Mainstream US news — "what's on the front page"
+        - name: "NYT Home Page"
+          type: "rss"
+          url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+          enabled: true
+        - name: "NYT US News"
+          type: "rss"
+          url: "https://rss.nytimes.com/services/xml/rss/nyt/US.xml"
+          enabled: true
+        - name: "NPR Top Stories"
+          type: "rss"
+          url: "https://feeds.npr.org/1001/rss.xml"
+          enabled: true
+        - name: "BBC US & Canada"
+          type: "rss"
+          url: "https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml"
+          enabled: true
+        - name: "The Guardian US"
+          type: "rss"
+          url: "https://www.theguardian.com/us/rss"
+          enabled: true
+        - name: "ProPublica"
+          type: "rss"
+          url: "https://feeds.propublica.org/propublica/main"
+          enabled: true
+        # Social pulse — Reddit as the "what's going viral on US social media
+        # right now" proxy. Free public .json endpoints, no OAuth required.
+        # Covers the mainstream cross-subreddit pulse plus news + tech.
+        - name: "Reddit r/popular"
+          type: "reddit"
+          subreddit: "popular"
+          listing: "hot"
+          min_score: 5000
+          enabled: true
+        - name: "Reddit r/news (top today)"
+          type: "reddit"
+          subreddit: "news"
+          listing: "top"
+          timeframe: "day"
+          min_score: 2000
+          enabled: true
+        - name: "Reddit r/technology (top today)"
+          type: "reddit"
+          subreddit: "technology"
+          listing: "top"
+          timeframe: "day"
+          min_score: 1500
+          enabled: true
+        # Scrapers (disabled — placeholder)
         - name: "Techmeme"
           type: "scrape"
           url: "https://www.techmeme.com/"
           enabled: false
+        # NOT IMPLEMENTED — TikTok + Instagram trending.
+        # These platforms have no free public API for trending content. Options:
+        #   - RapidAPI TikTok scrapers — starts ~$10–30/month, fragile
+        #   - Apify actors (TikTok/IG hashtag/trending) — pay-as-you-go, ~$50–200/mo
+        #   - Meta Graph API (Instagram) — requires Business account + app review
+        # If/when budget is approved, add a new source_type handler (e.g. 'rapidapi'
+        # or 'apify') and populate the API key via env var. Reddit serves as a
+        # reasonable social-pulse proxy for now since viral TikToks typically
+        # surface in r/popular or r/TikTokCringe within hours.
 
     tier_4:
       name: "Policy & Institutional (weekly)"
       description: "Slower but essential for depth and credibility"
       refresh_minutes: 10080  # 1 week
-      weight: 0.1  # 10% of candidate trends
+      weight: 0.1  # unchanged
       sources:
         # AI Safety + Policy
         - name: "CSET Georgetown"

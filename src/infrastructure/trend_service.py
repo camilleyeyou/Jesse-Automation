@@ -1012,6 +1012,7 @@ class MultiTierTrendService(TrendService):
     def _init_sources(self):
         """Initialize all source integrations from config"""
         from .source_integrations.rss_source import RSSSource, HuggingFaceSource, ArxivSource
+        from .source_integrations.reddit_source import RedditSource
 
         for tier_key, tier_data in self.config.content_strategy.sourcing_tiers.items():
             tier_num = int(tier_key.split('_')[1])
@@ -1039,7 +1040,11 @@ class MultiTierTrendService(TrendService):
                         self._source_registry[source_name] = source
                         self.logger.info(f"Registered {source_type} source: {source_name} (tier {tier_num})")
 
-                    # TODO: Add Reddit, Techmeme, etc. when implemented
+                    elif source_type == 'reddit':
+                        source = RedditSource(source_config, tier=tier_num)
+                        self._source_registry[source_name] = source
+                        self.logger.info(f"Registered reddit source: {source_name} (tier {tier_num})")
+
                     elif source_type == 'api':
                         self.logger.debug(f"API source {source_name} not yet implemented")
                     elif source_type == 'scrape':
