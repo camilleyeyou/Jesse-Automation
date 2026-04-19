@@ -332,31 +332,31 @@ class AgentMemory:
 
         logger.debug("Memory tables initialized")
 
-        # Auto-seed gold-standard corpus from the JSON that ships with the repo
-        # if the table is empty. This matters on fresh deploys where the SQLite
-        # DB lives on a Railway volume — the image-embedded JSON is the only
-        # way the canonical voice specimens reach production.
-        self._autoseed_gold_standard_if_empty()
+        # Auto-seed gold-standard corpus from the JSON files that ship with the
+        # repo. Per-file idempotent: each seed file is identified by the curator
+        # tag 'seed:{filename}', so a new seed file dropped into data/seeds/
+        # gets loaded even when the table already has content from earlier
+        # seeds. Matters on Railway where the DB sits on a persistent volume.
+        self._autoseed_new_gold_standard_files()
 
-    def _autoseed_gold_standard_if_empty(self):
-        """Load data/seeds/gold_standard_*.json into the gold-standard table when empty.
+    def _autoseed_new_gold_standard_files(self):
+        """Load any data/seeds/gold_standard_*.json files that haven't been loaded yet.
 
-        Idempotent: skipped entirely when the table already has rows, so normal
-        runs pay nothing. File format expected:
+        Per-file idempotence: for each seed file, we check if there's at least
+        one gold_standard_posts row with curator = 'seed:{filename}'. If yes,
+        we skip the whole file. If no, we load every specimen in it.
+
+        This replaces the previous "if table is empty" short-circuit, which
+        prevented new seed files from loading once ANY specimens existed —
+        meaning the 2026-04-19 Liquid Death specimens would never have
+        reached production on top of the existing Coachella corpus.
+
+        File format expected:
             {"version": 1, "specimens": [
                 {"content": ..., "pillar": ..., "format": ..., "notes": ...,
                  "curator": ..., "embedding": [float, ...]}, ...
             ]}
         """
-        try:
-            if self.count_gold_standard_posts() > 0:
-                return
-        except Exception as e:
-            logger.debug(f"Skipping autoseed (count failed): {e}")
-            return
-
-        # Look for seed files shipped in the repo. Resolve relative to this file
-        # so it works regardless of where the process CWD is at startup.
         seeds_dir = Path(__file__).resolve().parent.parent.parent.parent / "data" / "seeds"
         if not seeds_dir.exists():
             return
@@ -368,12 +368,33 @@ class AgentMemory:
         import json as _json
         total_loaded = 0
         for seed_file in seed_files:
+            curator_tag = f"seed:{seed_file.name}"
+
+            # Check if this specific seed file has already been loaded
+            try:
+                with sqlite3.connect(self.db_path) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM gold_standard_posts WHERE curator = ?",
+                        (curator_tag,),
+                    )
+                    already_loaded = cursor.fetchone()[0]
+                if already_loaded > 0:
+                    logger.debug(
+                        f"Seed {seed_file.name} already loaded ({already_loaded} rows), skipping"
+                    )
+                    continue
+            except Exception as e:
+                logger.debug(f"Skipping autoseed check for {seed_file.name}: {e}")
+                continue
+
             try:
                 with open(seed_file) as f:
                     payload = _json.load(f)
                 specimens = payload.get("specimens", [])
                 if not isinstance(specimens, list):
                     continue
+                file_loaded = 0
                 for spec in specimens:
                     embedding = spec.get("embedding")
                     if not embedding or not isinstance(embedding, list):
@@ -385,16 +406,19 @@ class AgentMemory:
                             format=spec.get("format"),
                             embedding=embedding,
                             notes=spec.get("notes"),
-                            curator=spec.get("curator") or f"seed:{seed_file.name}",
+                            curator=spec.get("curator") or curator_tag,
                         )
-                        total_loaded += 1
+                        file_loaded += 1
                     except Exception as inner:
                         logger.warning(f"Failed to load specimen from {seed_file.name}: {inner}")
+                if file_loaded:
+                    logger.info(f"Autoseed: loaded {file_loaded} specimen(s) from {seed_file.name}")
+                total_loaded += file_loaded
             except Exception as outer:
                 logger.warning(f"Failed to read seed file {seed_file}: {outer}")
 
         if total_loaded:
-            logger.info(f"✅ Autoseeded {total_loaded} gold-standard specimen(s) from data/seeds/")
+            logger.info(f"✅ Autoseeded {total_loaded} new gold-standard specimen(s) total")
 
     # ═══════════════════════════════════════════════════════════════════════════
     # GOLD STANDARD POSTS (Fix #4 — retrieval-augmented voice grounding)

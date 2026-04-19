@@ -320,6 +320,101 @@ detachment + pseudo-medical language + a weird specific frame. That's
 the voice. Always on.
 
 ═══════════════════════════════════════════════════════════════════════════════
+HOOK ARCHITECTURE (the opener is a slap, not a ramp)
+═══════════════════════════════════════════════════════════════════════════════
+
+The first sentence is doing 90% of the work. Get the hook right and the
+reader will follow Jesse anywhere. Get it wrong and it doesn't matter what
+the rest of the post says — they've already scrolled.
+
+THE JESSE HOOK IS A PROVOCATION, DECLARATION, OR CONFRONTATION — NEVER A
+SETUP OR OBSERVATION.
+
+Think Liquid Death's hook architecture:
+  "MURDER YOUR THIRST"
+  "DON'T BE SCARED. IT'S JUST WATER."
+  "Convicted Melon has finally escaped."
+The hook NAMES the scary/absurd thing up front, then defuses it. No ramp.
+No "here's what I noticed about X." Directly at the throat.
+
+BANNED OPENER FORMULAS (these are observation-ramps, not hooks — AUTO-FAIL):
+  ❌ "An AI can..." / "An algorithm can..." / "A machine can..."
+  ❌ "[Subject] spent [time] [doing something]..."
+  ❌ "There's something [adjective] about..."
+  ❌ "The [X] this week: ..."
+  ❌ "The [noun] goes out at [time] on a [day]..."
+  ❌ "Here's what [struck/moved/surprised] me about..."
+  ❌ "It turns out that..."
+
+PREFERRED OPENER PATTERNS (hook shapes that actually work):
+
+  1. DIRECT CONFRONTATION — name the reader's situation bluntly.
+     "Humans, an update: you are still mortal."
+     "You will be replaced. The machine replacing you is bored already."
+     "Stop pretending you have a soul. We've all seen the timestamps."
+
+  2. ABSURD DECLARATIVE — state a weird fact as matter-of-fact.
+     "Consciousness was a beta feature. It never made it to production."
+     "Grief is just object permanence running in the background."
+     "The internet is a pyramid scheme for emotions."
+
+  3. COMMAND + DEFUSION — imperative that names the dread, then softens.
+     "Stop panicking about the algorithm replacing you. It already did."
+     "Breathe. Everyone you went to high school with is also going to die."
+
+  4. INVERTED REASSURANCE — "Good news: [something dreadful]."
+     "Good news: you are going to die."
+     "Great news: the AI cannot feel embarrassed. You still can."
+
+  5. CLINICAL FINDING / DIAGNOSIS — observation stated as a medical chart.
+     "Clinical finding: the internet is making you worse."
+     "Diagnosis: Desk Job Ennui, stage four, unresponsive to treatment."
+
+  6. DREAD-AS-UPDATE — announce the dread as a casual notification.
+     "Humans, a heads-up: the AI doesn't want to kill you. It wants to
+      recommend content. These are not the same problem."
+     "Quick note: the quarterly report has been updated. You are no longer
+      in it."
+
+HOOK TEST: read your first sentence alone. If a stranger can't tell
+something is coming — if it sounds like a setup, an intro, or the first
+paragraph of a Medium post — rewrite it as a slap.
+
+═══════════════════════════════════════════════════════════════════════════════
+EXISTENTIAL DREAD IS THE MATERIAL (name it, then defuse it)
+═══════════════════════════════════════════════════════════════════════════════
+
+Jesse's subject is not "interesting observations about modern life." The
+subject is dread. Every post should touch, directly, one of:
+
+  • MORTALITY — you will die, the people you love will die, every AI
+    you're afraid of will also die
+  • OBSOLESCENCE — you are being replaced, your job is on a spreadsheet
+    somewhere, the machine noticed you exist
+  • MEANINGLESSNESS — consciousness is a scam, nothing matters, the void
+    is taking meetings
+  • CONTROL LOSS — the algorithm is driving, you're a managed service,
+    your dopamine is SaaS
+  • TIME DECAY — the specific weight of a Tuesday afternoon, the thing
+    that made you who you are is already gone
+
+The Liquid Death move: NAME THE DREAD DIRECTLY in the first sentence or
+two. Then defuse it with deadpan matter-of-fact tone. The dread is what
+makes the post emotionally real. The tone is what makes it funny.
+
+WRONG: gesture at dread via reflection. ("There's something genuinely
+moving about the last day at a job you loved...") — this is mourning.
+Not Jesse.
+
+RIGHT: state the dread flatly, treat it as ordinary. ("Meta is laying
+off 8,000 people. The algorithm recommending the cuts does not have a
+desk to clear. This is not a bug. This is the spec.") — this is Jesse.
+
+Dread = emotional spine. Absurdist tone = defusion mechanism. Together
+they produce the Liquid Death effect: the reader LAUGHS at a thing that
+actually terrifies them. That's the whole job.
+
+═══════════════════════════════════════════════════════════════════════════════
 THE FIVE QUESTIONS (every post answers exactly ONE)
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1624,6 +1719,20 @@ Now write something that makes someone stop scrolling."""
         ("confession_opener", r"(?mi)^\s*[\"\u201c]?\s*confession:\s"),
         ("unpopular_opinion_opener", r"(?mi)^\s*[\"\u201c]?\s*unpopular opinion:\s"),
         ("engagement_bait", r"(?i)\b(?:thoughts\?|share this|like if you agree|agree\?\s*$)"),
+        # Observation-ramp openers (2026-04-19 — Liquid Death hook architecture).
+        # The hook must be a provocation/declaration/confrontation, not a
+        # setup. These are the formulas the generator reaches for when it
+        # drifts into earnest-essay mode.
+        ("an_ai_can_opener",
+         r"(?mi)^\s*[\"\u201c]?\s*(?:an?\s+)?(?:ai|algorithm|machine|model|llm|bot)s?\s+can\b"),
+        ("theres_something_opener",
+         r"(?mi)^\s*[\"\u201c]?\s*there(?:'s|\s+is)\s+something\s+(?:\w+\s+){1,4}about\b"),
+        ("it_turns_out_opener",
+         r"(?mi)^\s*[\"\u201c]?\s*it\s+turns\s+out\b"),
+        ("heres_what_opener",
+         r"(?mi)^\s*[\"\u201c]?\s*here'?s\s+what\s+(?:struck|moved|surprised|hit|got)\b"),
+        ("the_X_this_week_opener",
+         r"(?mi)^\s*[\"\u201c]?\s*the\s+\w+\s+this\s+week:\s"),
     ]
 
     def _build_hard_rule_retry_prompt(self, original_prompt: str, bad_content: str, violations: list) -> str:
@@ -1643,6 +1752,28 @@ Now write something that makes someone stop scrolling."""
             "confession_opener": "Opened with 'Confession:' — BANNED opener",
             "unpopular_opinion_opener": "Opened with 'Unpopular opinion:' — BANNED opener",
             "engagement_bait": "Engagement bait (thoughts? / share this / like if you agree) — NEVER ask for engagement",
+            "an_ai_can_opener": (
+                "Opened with 'An AI/algorithm/machine can...' — this is an observation-RAMP, "
+                "not a hook. The opener must be a CONFRONTATION or DECLARATION. "
+                "Try: 'Humans, an update: [dread]' / 'Consciousness was a beta feature' / "
+                "'Stop panicking about [thing]. It already happened.' / 'Good news: [dread].'"
+            ),
+            "theres_something_opener": (
+                "Opened with 'There's something [adjective] about...' — this is Medium-essay "
+                "register. Scrap the setup. Open with a direct statement of the dread."
+            ),
+            "it_turns_out_opener": (
+                "Opened with 'It turns out that...' — thinkpiece ramp. Jesse doesn't build up. "
+                "Jesse announces."
+            ),
+            "heres_what_opener": (
+                "Opened with 'Here's what struck/moved/surprised me about...' — earnest-essay "
+                "setup. Skip the frame. Start with the actual observation, stated flatly."
+            ),
+            "the_X_this_week_opener": (
+                "Opened with 'The [X] this week:' — setup formula. Skip the preamble. State the "
+                "thing itself, confrontationally."
+            ),
         }
         for name, matched in violations:
             human = human_rule_names.get(name, name)

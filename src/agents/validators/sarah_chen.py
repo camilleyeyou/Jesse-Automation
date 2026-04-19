@@ -98,9 +98,28 @@ Answer FOUR diagnostic questions. Be specific. Quote the post where asked.
 Q1. emotion — One word. What emotion is this post trying to create in the reader?
     If you can't name one, answer "none" and this question fails.
 
-Q2. screenshot_sentence — Quote the SINGLE sentence most likely to make someone
-    screenshot this post and send it to a friend. If no sentence qualifies, quote
-    the WEAKEST sentence instead and set found=false.
+Q2. opener_strength — Quote the FIRST SENTENCE of the post. Is it a HOOK
+    (provocation / declaration / confrontation / absurd statement) or a
+    SETUP (observation / essay-ramp / "here's what I noticed")?
+
+    PASSES when the opener is a slap, not a ramp. Good Jesse hooks directly
+    name the dread or state something absurd as matter-of-fact:
+      ✓ "Humans, an update: you are still mortal."
+      ✓ "Consciousness was a beta feature."
+      ✓ "Stop panicking about the algorithm. It already replaced you."
+      ✓ "Good news: you are going to die."
+      ✓ "Clinical finding: the internet is making you worse."
+
+    FAILS when the opener is an observation-ramp / essay-setup:
+      ✗ "An AI can retrieve every tweet a person has ever posted..."
+      ✗ "An algorithm can model a tornado's rotational velocity..."
+      ✗ "There's something moving about the last day at a job..."
+      ✗ "The [topic] this week: ..."
+      ✗ "It turns out that..."
+      ✗ Any opener that reads like the first paragraph of a Medium essay.
+
+    The test: read the first sentence ALONE. If a stranger would scroll past
+    it, it's a ramp, not a hook. Rewrite needed.
 
 Q3. has_point_of_view — Does this post have a sharp, specific point of view on
     the actual story, or does it retreat into brand promotion / generic
@@ -120,7 +139,7 @@ Q4. story_specific_detail — Name ONE detail in this post that could only have 
 Return STRICT JSON:
 {{
   "q1_emotion": {{"word": "<one word or 'none'>", "passes": <true if a real emotion, else false>}},
-  "q2_screenshot_sentence": {{"sentence": "<exact quote>", "found": <bool>, "why": "<brief>"}},
+  "q2_opener_strength": {{"opener": "<exact first sentence, quoted>", "type": "<'hook' | 'ramp'>", "why": "<one clause explaining the call>", "found": <bool — true iff the opener is a hook, not a ramp>}},
   "q3_has_point_of_view": {{"pov_summary": "<one-sentence summary of the post's actual TAKE on the story, or 'none' if it doesn't have one>", "brand_stamped": <true if the post opens with a memo/letterhead/brand-dropping frame>, "product_mentioned": <true if lip balm / tube / $8.99 / hand-numbering / Jesse A. Eisenbalm appears anywhere>, "passes": <true if pov_summary is a real take AND brand_stamped is false>}},
   "q4_story_specific_detail": {{"detail": "<exact detail or 'none'>", "found": <bool>}},
   "overall_reaction": "<one sentence — your honest reaction as Sarah>",
@@ -130,7 +149,13 @@ Return STRICT JSON:
     def _parse_validation(self, content: Dict[str, Any], post: LinkedInPost = None) -> ValidationScore:
         # Extract the four passes
         q1 = content.get("q1_emotion", {}) if isinstance(content, dict) else {}
-        q2 = content.get("q2_screenshot_sentence", {}) if isinstance(content, dict) else {}
+        # Q2 key renamed 2026-04-19: q2_screenshot_sentence → q2_opener_strength.
+        # Fall back to the legacy key so in-flight drafts still parse.
+        q2 = (
+            content.get("q2_opener_strength")
+            or content.get("q2_screenshot_sentence")
+            or {}
+        ) if isinstance(content, dict) else {}
         # Q3 key renamed from q3_specifically_jesse → q3_has_point_of_view. Fall
         # back to the legacy key in case the model emits the old schema mid-transition.
         q3 = (
@@ -187,8 +212,13 @@ Return STRICT JSON:
         if not q1_pass:
             reasons.append(f"Q1 emotion: got '{q1.get('word', 'none')}' — no real emotional target identified.")
         if not q2_pass:
-            w = q2.get("sentence", "")
-            reasons.append(f"Q2 screenshot: no sentence qualified. Weakest line: \"{w}\" — {q2.get('why', '')}")
+            # Support both new (opener/type) and legacy (sentence) payloads.
+            opener = q2.get("opener") or q2.get("sentence", "")
+            reasons.append(
+                f"Q2 opener weak (ramp, not hook): \"{opener}\" — {q2.get('why', '')} "
+                f"Rewrite the first sentence as a direct confrontation, absurd "
+                f"declarative, or clinical finding. Think Liquid Death: slap, not ramp."
+            )
         if not q3_pass:
             if brand_stamped:
                 reasons.append(
