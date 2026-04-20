@@ -1665,6 +1665,22 @@ post using the angle and trend above.
             + avoid_lines
         ) if avoid_lines else ""
 
+        # Phase C (2026-04-20): length + structure directives.
+        length_target = (blueprint.get("length_target") or "medium").lower()
+        structure_shape = (blueprint.get("structure_shape") or "standard_4para").lower()
+        length_meta = {
+            "short": ("40-55 words", "Compressed punch. 3-5 sentences. No setup, just impact."),
+            "medium": ("55-75 words", "Standard length. 5-8 sentences. Setup → escalation → punch."),
+            "long": ("75-95 words", "Breathing room. 8-12 sentences. Every line must earn the length."),
+        }.get(length_target, ("55-75 words", "Standard length."))
+        structure_meta = {
+            "tight_3para": "3 paragraphs. Setup / escalation / punchline.",
+            "standard_4para": "4 paragraphs.",
+            "long_5para": "5 paragraphs. More texture and development.",
+            "single_block": "ONE paragraph. NO line breaks. Single dense block.",
+            "list_form": "Setup line, then declarative sentences each on a new line (ledger-style, NOT bulleted), close with a punchline.",
+        }.get(structure_shape, "4 paragraphs.")
+
         return f"""
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -1709,6 +1725,18 @@ the architect got it wrong OR you didn't execute. Check before you finish.
 
 The architect proposed this opening fragment. If the feed truncates at 49
 chars, this alone should make someone click. Start roughly like this.
+
+── LENGTH TARGET: {length_target} ({length_meta[0]}) ──
+{length_meta[1]}
+This is a HARD ceiling — the cleanup pass will truncate if you exceed it.
+DO NOT default to medium length out of habit. The architect picked this
+target deliberately for rotation variety.
+
+── STRUCTURE SHAPE: {structure_shape} ──
+{structure_meta}
+Render the post in EXACTLY this paragraph shape. Single-block means no
+line breaks at all. List_form means each declarative on its own line.
+Standard_4para is NOT the default — only use it when the architect picked it.
 {avoid_section}
 ═══════════════════════════════════════════════════════════════════════════════"""
 

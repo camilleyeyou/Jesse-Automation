@@ -229,11 +229,23 @@ class ContentOrchestrator:
 
         # Pull recent register history from memory so architect can rotate
         recent_registers: list = []
+        recent_length_targets: list = []
+        recent_structure_shapes: list = []
         if self.memory:
             try:
                 recent_registers = self.memory.get_recent_registers(days=7, limit=10)
             except Exception as e:
                 logger.debug(f"Could not fetch recent_registers: {e}")
+            try:
+                # Phase C (2026-04-20): length + structure rotation state
+                bp_fields = self.memory.get_recent_blueprint_fields(
+                    fields=["length_target", "structure_shape"],
+                    days=7, limit=10,
+                )
+                recent_length_targets = bp_fields.get("length_target", [])
+                recent_structure_shapes = bp_fields.get("structure_shape", [])
+            except Exception as e:
+                logger.debug(f"Could not fetch recent blueprint fields: {e}")
 
         try:
             blueprint = await self.angle_architect.execute(
@@ -243,6 +255,8 @@ class ContentOrchestrator:
                 recent_registers=recent_registers,
                 pillar=pillar,
                 post_id=post_id,
+                recent_length_targets=recent_length_targets,
+                recent_structure_shapes=recent_structure_shapes,
             )
             # Attach to trend so it flows with the post through generation
             trend.blueprint = blueprint

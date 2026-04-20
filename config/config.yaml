@@ -337,6 +337,22 @@ content_strategy:
           type: "rss"
           url: "https://feeds.propublica.org/propublica/main"
           enabled: true
+        # Phase C (2026-04-20): added 3 fast-cycle viral-news sources after
+        # client review flagged that we kept missing breaking political/legal
+        # stories ("FBI suing Atlantic"-class). These three publish 5-30
+        # times/day with clear named-entity headlines.
+        - name: "Semafor Flagship"
+          type: "rss"
+          url: "https://www.semafor.com/feed/category/all-feeds.rss"
+          enabled: true
+        - name: "Axios Top Stories"
+          type: "rss"
+          url: "https://api.axios.com/feed/"
+          enabled: true
+        - name: "The Hill"
+          type: "rss"
+          url: "https://thehill.com/homenews/feed/"
+          enabled: true
         # Social pulse — Reddit as the "what's going viral on US social media
         # right now" proxy. Free public .json endpoints, no OAuth required.
         # Covers the mainstream cross-subreddit pulse plus news + tech.

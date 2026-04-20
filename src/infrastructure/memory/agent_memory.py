@@ -1163,6 +1163,61 @@ class AgentMemory:
             )
             return [row[0] for row in cursor.fetchall() if row[0]]
 
+    def get_recent_blueprint_fields(
+        self, fields: List[str], days: int = 7, limit: int = 10,
+    ) -> Dict[str, List[str]]:
+        """Extract specific fields from recent blueprints as parallel lists.
+
+        Phase C (2026-04-20): length_target and structure_shape are stored
+        inside the blueprint JSON blob (not separate columns). This helper
+        parses recent blueprints and returns requested fields as lists
+        suitable for rotation-based constraint (same shape as
+        get_recent_registers).
+
+        Args:
+            fields: blueprint keys to extract (e.g. ['length_target',
+                'structure_shape'])
+            days: look-back window
+            limit: max posts to scan
+
+        Returns:
+            Dict keyed by field name → list of values (newest first,
+            skipping posts where the blueprint was missing / fallback /
+            field absent).
+        """
+        result: Dict[str, List[str]] = {f: [] for f in fields}
+
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT blueprint FROM content_memory
+                    WHERE blueprint IS NOT NULL
+                      AND created_at >= datetime('now', ?)
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (f"-{days} days", limit),
+                )
+                for row in cursor.fetchall():
+                    raw = row[0]
+                    if not raw:
+                        continue
+                    try:
+                        bp = json.loads(raw)
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+                    if not isinstance(bp, dict) or bp.get("fallback"):
+                        continue
+                    for field in fields:
+                        val = bp.get(field)
+                        if val and isinstance(val, str):
+                            result[field].append(val)
+        except Exception as e:
+            logger.warning(f"get_recent_blueprint_fields failed: {e}")
+        return result
+
     def get_recent_topics(self, days: int = 7, limit: int = 20) -> List[str]:
         """Get topics used recently (to avoid repetition)"""
 

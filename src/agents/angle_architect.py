@@ -216,6 +216,48 @@ STEPPS_FACTORS = {
 # factors. At least ONE of the narrative factors must appear.
 NARRATIVE_FACTORS = {"trigger", "practical", "stories"}
 
+# Phase C (2026-04-20): length + structure variation to break "all posts
+# look the same." Client queue review showed 10 of 10 posts at 65-76 words
+# and exactly 4 paragraphs. Architect now picks a target for each.
+LENGTH_TARGETS = {
+    "short": {
+        "word_range": "40-55",
+        "min": 40,
+        "max": 55,
+        "guidance": "Compressed punch. 3-5 sentences. No setup, just impact. Think a brutal tweet with em dashes.",
+    },
+    "medium": {
+        "word_range": "55-75",
+        "min": 55,
+        "max": 75,
+        "guidance": "Standard Jesse length. 5-8 sentences. Room for setup → escalation → punch but no padding.",
+    },
+    "long": {
+        "word_range": "75-95",
+        "min": 75,
+        "max": 95,
+        "guidance": "Breathing room for a story or a longer argument. 8-12 sentences. Must EARN the length — every sentence still pulls its weight.",
+    },
+}
+
+STRUCTURE_SHAPES = {
+    "tight_3para": {
+        "description": "3 paragraphs. Setup / escalation / punchline. Tight, fast.",
+    },
+    "standard_4para": {
+        "description": "4 paragraphs. The default Jesse shape. Use less than 2 of the last 5 posts.",
+    },
+    "long_5para": {
+        "description": "5 paragraphs. More texture, more development. For longer posts.",
+    },
+    "single_block": {
+        "description": "ONE paragraph. No line breaks. A single dense block that hits hard. Rare — save for pointed attacks or confessions.",
+    },
+    "list_form": {
+        "description": "Opens with a setup line, then a list-like structure (not actual bullets — declarative sentences each on a line, like a ledger or a receipt). Closes with a punchline.",
+    },
+}
+
 
 class AngleArchitectAgent(BaseAgent):
     """Decides HOW to write a post — register, opinion, shape, taboo beat, STEPPS targets."""
@@ -251,6 +293,8 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         recent_registers: List[str] = None,
         pillar: Optional[str] = None,
         post_id: Optional[str] = None,
+        recent_length_targets: List[str] = None,
+        recent_structure_shapes: List[str] = None,
     ) -> Dict[str, Any]:
         """Produce a blueprint for a post.
 
@@ -262,16 +306,20 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
             recent_registers: list of the last N registers (for rotation avoidance)
             pillar: optional Five Questions pillar ('the_what', 'the_why_it_matters', etc.)
             post_id: optional post tracking ID
+            recent_length_targets: last N length targets (short/medium/long) — Phase C
+            recent_structure_shapes: last N structure shapes — Phase C
 
         Returns:
             Blueprint dict with keys: register, opinion, ski_jump_setup,
             ski_jump_punchline, brutal_honesty_beat, stepps_targets,
-            first_49_chars_hook, plus reasoning + metadata. On failure
-            returns {"error": ..., "fallback": True} and caller should
-            degrade gracefully to current behavior.
+            first_49_chars_hook, length_target, structure_shape, plus
+            reasoning + metadata. On failure returns {"error": ...,
+            "fallback": True} and caller should degrade gracefully.
         """
         self.set_context(None, None)
         recent_registers = recent_registers or []
+        recent_length_targets = recent_length_targets or []
+        recent_structure_shapes = recent_structure_shapes or []
 
         prompt = self._build_prompt(
             trend_headline=trend_headline,
@@ -279,6 +327,8 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
             curator_angle=curator_angle,
             recent_registers=recent_registers,
             pillar=pillar,
+            recent_length_targets=recent_length_targets,
+            recent_structure_shapes=recent_structure_shapes,
         )
 
         try:
@@ -300,11 +350,18 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
             if not isinstance(content, dict):
                 return self._fallback_blueprint(curator_angle, reason="non_dict_response")
 
-            blueprint = self._validate_and_normalize(content, recent_registers)
+            blueprint = self._validate_and_normalize(
+                content,
+                recent_registers,
+                recent_length_targets=recent_length_targets,
+                recent_structure_shapes=recent_structure_shapes,
+            )
 
             self.logger.info(
                 f"🏛️  Architect: register={blueprint.get('register')} "
                 f"opinion={blueprint.get('opinion', {}).get('type','?')} "
+                f"length={blueprint.get('length_target','?')} "
+                f"shape={blueprint.get('structure_shape','?')} "
                 f"stepps={','.join(blueprint.get('stepps_targets', []))}"
             )
             return blueprint
@@ -320,7 +377,11 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         curator_angle: Dict[str, Any],
         recent_registers: List[str],
         pillar: Optional[str],
+        recent_length_targets: List[str] = None,
+        recent_structure_shapes: List[str] = None,
     ) -> str:
+        recent_length_targets = recent_length_targets or []
+        recent_structure_shapes = recent_structure_shapes or []
         # Render REGISTERS spec block once — kept in-prompt so the model
         # sees all five options every time, WITH the mandatory_signals /
         # must_not fields (2026-04-20 sharpening — prevents register
@@ -415,6 +476,52 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
 
         pillar_block = f"\nFIVE QUESTIONS PILLAR: {pillar}" if pillar else ""
 
+        # Phase C (2026-04-20): length + structure rotation blocks. Client
+        # queue review flagged that ALL 10 posts were 65-76 words and
+        # exactly 4 paragraphs. Same logic as register rotation: ban
+        # whatever dominates last 5.
+        length_block = ""
+        banned_lengths: List[str] = []
+        if recent_length_targets:
+            length_counts5: Dict[str, int] = {}
+            for l in recent_length_targets[:5]:
+                length_counts5[l] = length_counts5.get(l, 0) + 1
+            banned_lengths = [l for l, c in length_counts5.items() if c >= 3]
+            lines = [f"  - {k}: {c}" for k, c in sorted(length_counts5.items(), key=lambda x: -x[1])]
+            banned_suffix = ""
+            if banned_lengths:
+                banned_suffix = (
+                    f"\n  ⛔ BANNED (3+ in last 5): {', '.join(banned_lengths)} — "
+                    "MUST pick a different length target."
+                )
+            length_block = "\n\nRECENT LENGTH ROTATION (last 5):\n" + "\n".join(lines) + banned_suffix
+
+        length_options = "\n".join(
+            f"  - **{k}** ({v['word_range']} words): {v['guidance']}"
+            for k, v in LENGTH_TARGETS.items()
+        )
+
+        structure_block = ""
+        banned_structures: List[str] = []
+        if recent_structure_shapes:
+            struct_counts5: Dict[str, int] = {}
+            for s in recent_structure_shapes[:5]:
+                struct_counts5[s] = struct_counts5.get(s, 0) + 1
+            banned_structures = [s for s, c in struct_counts5.items() if c >= 3]
+            lines = [f"  - {k}: {c}" for k, c in sorted(struct_counts5.items(), key=lambda x: -x[1])]
+            banned_suffix = ""
+            if banned_structures:
+                banned_suffix = (
+                    f"\n  ⛔ BANNED (3+ in last 5): {', '.join(banned_structures)} — "
+                    "MUST pick a different structure shape."
+                )
+            structure_block = "\n\nRECENT STRUCTURE ROTATION (last 5):\n" + "\n".join(lines) + banned_suffix
+
+        structure_options = "\n".join(
+            f"  - **{k}**: {v['description']}"
+            for k, v in STRUCTURE_SHAPES.items()
+        )
+
         return f"""TREND TO ARCHITECT:
 
 Headline: {trend_headline}
@@ -485,6 +592,29 @@ Write the proposed first 49 characters of the post. If the feed truncates
 here, does this fragment ALONE pull someone in? Count characters mentally.
 
 ═══════════════════════════════════════════════════════════════════════════════
+LENGTH TARGET (pick ONE — rotation-aware)
+═══════════════════════════════════════════════════════════════════════════════
+
+The generator will obey whichever target you pick. DO NOT pick a banned
+target (if any). Match the target to the register + topic — some work
+best short (confession, clinical), some benefit from long (prophet, roast
+with setup-escalation-payoff).
+
+{length_options}
+{length_block}
+
+═══════════════════════════════════════════════════════════════════════════════
+STRUCTURE SHAPE (pick ONE — rotation-aware)
+═══════════════════════════════════════════════════════════════════════════════
+
+DO NOT pick a banned shape. Client feedback 2026-04-20: 10 of 10 posts
+were exactly 4 paragraphs. We need variety. Pick a different shape than
+what's been saturating the last 5 posts.
+
+{structure_options}
+{structure_block}
+
+═══════════════════════════════════════════════════════════════════════════════
 
 Return STRICT JSON — no prose, no code fences:
 {{
@@ -501,16 +631,24 @@ Return STRICT JSON — no prose, no code fences:
   "stepps_targets": ["<factor_1>", "<factor_2>"],
   "stepps_justifications": {{"<factor_1>": "<short reason>", "<factor_2>": "<short reason>"}},
   "first_49_chars_hook": "<proposed first 49 characters, exactly>",
+  "length_target": "<one of: short | medium | long>",
+  "structure_shape": "<one of: tight_3para | standard_4para | long_5para | single_block | list_form>",
   "avoid": ["<voice crutches this post should NOT use — e.g. 'AI can X but cant Y', 'the specific weight of'>"]
 }}"""
 
     def _validate_and_normalize(
-        self, content: Dict[str, Any], recent_registers: List[str]
+        self,
+        content: Dict[str, Any],
+        recent_registers: List[str],
+        recent_length_targets: List[str] = None,
+        recent_structure_shapes: List[str] = None,
     ) -> Dict[str, Any]:
         """Coerce the model's output into a safe, normalized blueprint. Never
         raises — bad fields get replaced with sane defaults. The generator
         should be able to read a blueprint whether or not every field is perfect.
         """
+        recent_length_targets = recent_length_targets or []
+        recent_structure_shapes = recent_structure_shapes or []
         register = str(content.get("register", "")).strip().lower()
         if register not in REGISTERS:
             self.logger.warning(f"Architect returned unknown register '{register}'; defaulting to clinical_diagnostician")
@@ -592,6 +730,56 @@ Return STRICT JSON — no prose, no code fences:
         if len(first_49) > 100:  # allow some slack — we'll truncate in display
             first_49 = first_49[:100]
 
+        # Phase C: length_target validation + rotation enforcement
+        length_target = str(content.get("length_target", "")).strip().lower()
+        if length_target not in LENGTH_TARGETS:
+            length_target = "medium"  # safe default
+        if recent_length_targets:
+            last5_l = recent_length_targets[:5]
+            l_counts: Dict[str, int] = {}
+            for l in last5_l:
+                l_counts[l] = l_counts.get(l, 0) + 1
+            banned_l = {l for l, c in l_counts.items() if c >= 3}
+            if length_target in banned_l:
+                non_banned_l = {
+                    k: l_counts.get(k, 0)
+                    for k in LENGTH_TARGETS.keys()
+                    if k not in banned_l
+                }
+                if non_banned_l:
+                    least_used_l = min(non_banned_l.items(), key=lambda x: x[1])
+                    original_l = length_target
+                    length_target = least_used_l[0]
+                    self.logger.warning(
+                        f"📏 Length rotation: architect picked '{original_l}' "
+                        f"(3+ of last 5) — forced to '{length_target}'"
+                    )
+
+        # Phase C: structure_shape validation + rotation enforcement
+        structure_shape = str(content.get("structure_shape", "")).strip().lower()
+        if structure_shape not in STRUCTURE_SHAPES:
+            structure_shape = "standard_4para"  # legacy default
+        if recent_structure_shapes:
+            last5_s = recent_structure_shapes[:5]
+            s_counts: Dict[str, int] = {}
+            for s in last5_s:
+                s_counts[s] = s_counts.get(s, 0) + 1
+            banned_s = {s for s, c in s_counts.items() if c >= 3}
+            if structure_shape in banned_s:
+                non_banned_s = {
+                    k: s_counts.get(k, 0)
+                    for k in STRUCTURE_SHAPES.keys()
+                    if k not in banned_s
+                }
+                if non_banned_s:
+                    least_used_s = min(non_banned_s.items(), key=lambda x: x[1])
+                    original_s = structure_shape
+                    structure_shape = least_used_s[0]
+                    self.logger.warning(
+                        f"🎨 Structure rotation: architect picked '{original_s}' "
+                        f"(3+ of last 5) — forced to '{structure_shape}'"
+                    )
+
         avoid_raw = content.get("avoid") or []
         if not isinstance(avoid_raw, list):
             avoid_raw = []
@@ -611,6 +799,8 @@ Return STRICT JSON — no prose, no code fences:
                 if isinstance(v, str)
             },
             "first_49_chars_hook": first_49,
+            "length_target": length_target,
+            "structure_shape": structure_shape,
             "avoid": avoid,
             "fallback": False,
         }
@@ -645,9 +835,11 @@ Return STRICT JSON — no prose, no code fences:
             "ski_jump_setup": "",
             "ski_jump_punchline": "",
             "brutal_honesty_beat": "",
-            "stepps_targets": ["emotion", "social_currency"],
+            "stepps_targets": ["emotion", "trigger"],  # includes a narrative factor
             "stepps_justifications": {},
             "first_49_chars_hook": "",
+            "length_target": "medium",
+            "structure_shape": "standard_4para",
             "avoid": [],
             "fallback": True,
             "fallback_reason": reason,
