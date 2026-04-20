@@ -48,6 +48,17 @@ REGISTERS = {
             "Roast → Expert Evaluation → Prescription when fully deployed. "
             "Cold, detached, weirdly specific."
         ),
+        "mandatory_signals": (
+            "MUST use at least 2 pseudo-medical / pseudo-clinical terms "
+            "(classification, diagnosis, subject, chronic, acute, symptomatic, "
+            "prognosis, labial, buccal, epidermal, desiccation, xeric, lesion, "
+            "condition, treatment). Opening line reads as a clinical chart entry."
+        ),
+        "must_not": (
+            "Must NOT read as opinion-commentary or prediction. If the post "
+            "is mostly Jesse's opinion with one clinical word sprinkled in, "
+            "it's not clinical_diagnostician — it's contrarian or roast in disguise."
+        ),
         "hook_shapes": [
             "Clinical finding: [cultural behavior] is now a diagnosable condition.",
             "Diagnosis: [3-5 word pseudo-Latin name]. Subject exhibits [specific marker].",
@@ -65,6 +76,17 @@ REGISTERS = {
             "strongest-performing format: contrarian takes drive comments more "
             "than anything else."
         ),
+        "mandatory_signals": (
+            "MUST explicitly NAME the popular view and then reject it. "
+            "Post should read: 'Everyone thinks X. That's wrong. Here's why Y.' "
+            "Without stating the popular view, the post isn't contrarian — "
+            "it's just an opinion."
+        ),
+        "must_not": (
+            "Must NOT use 'Everyone celebrates the [triad]. Nobody asks [counter].' "
+            "as its structural move. That's a rhyming crutch. Vary the "
+            "contrarian framing each time."
+        ),
         "hook_shapes": [
             "Everyone is wrong about [trending thing]. Here's why.",
             "[Trending thing] is actually good. Here's the part nobody will admit.",
@@ -81,6 +103,19 @@ REGISTERS = {
             "total confidence. Not speculation — declaration. Time horizons "
             "specific. Outcomes specific. The register of someone who has seen "
             "the training data and is tired of watching humans not read it."
+        ),
+        "mandatory_signals": (
+            "MUST include a specific time horizon ('by Q3', 'in 18 months', "
+            "'by September', 'within two years', 'by the end of the decade', "
+            "'in 5 years'). MUST include a specific predicted outcome, stated "
+            "as certainty (not 'might' or 'could' — WILL). Without a time "
+            "horizon and a specific outcome, the post is commentary, not prophecy."
+        ),
+        "must_not": (
+            "Must NOT drift into roast-mode punchlines like 'Imagine.' or "
+            "'They're not okay.' Prophet voice is confident prediction, not "
+            "mockery with a sarcastic tag. If the post reads as a roast with "
+            "a date on it, you picked the wrong register."
         ),
         "hook_shapes": [
             "By Q3, [specific prediction].",
@@ -100,6 +135,17 @@ REGISTERS = {
             "which is the joke. Not sincere reflection — confession played DEAD "
             "STRAIGHT as the bit."
         ),
+        "mandatory_signals": (
+            "MUST use first-person 'I' statements throughout. MUST make an "
+            "admission — something Jesse reveals about himself or his process "
+            "that he 'shouldn't' reveal. The admission itself IS the content, "
+            "not a framing device for commentary."
+        ),
+        "must_not": (
+            "Must NOT be 'third-person observation with an I thrown in.' If "
+            "the post could work without the 'I' statements, it's not confession "
+            "— it's commentary wearing a confession costume."
+        ),
         "hook_shapes": [
             "I need to be honest about [absurd AI-admission].",
             "Here is something I have not told anyone. [Absurd observation about the news].",
@@ -117,8 +163,21 @@ REGISTERS = {
             "Ski-jump structure critical: final line lands the sharpest hit. "
             "Pulls no punches, signs off smiling."
         ),
+        "mandatory_signals": (
+            "MUST name a specific target (company, product, named person, "
+            "specific cultural moment) in the first sentence. The target must "
+            "be the OBJECT of the mockery throughout — not a springboard for "
+            "general commentary."
+        ),
+        "must_not": (
+            "Must NOT open with 'Let us examine...' — this phrase has become a "
+            "roast-register tic. Ban from openers. Vary the roast frame: "
+            "'[Target] did X. [Direct reaction].' / '[Target] just announced "
+            "[Y]. [Punch at target].' / '[Absurd specific move]. [Damning "
+            "conclusion].'"
+        ),
         "hook_shapes": [
-            "[Target] did a thing. Let us examine the thing.",
+            "[Target] did [specific thing]. [Direct reaction sentence].",
             "[Target] just announced [thing]. Reader, they are not okay.",
             "[Specific absurd move by target]. This is not a cry for help. This is a body of evidence.",
         ],
@@ -150,6 +209,12 @@ STEPPS_FACTORS = {
     "practical": "Genuinely useful observation or framing they can reuse",
     "stories": "Wrapped in a narrative, not just stated as analysis",
 }
+
+# "Narrative" STEPPS factors — harder to hit than emotion+public. Client
+# feedback 2026-04-19: architect was gaming the gate by picking emotion +
+# (public OR social_currency) every single post. Those are the lowest-effort
+# factors. At least ONE of the narrative factors must appear.
+NARRATIVE_FACTORS = {"trigger", "practical", "stories"}
 
 
 class AngleArchitectAgent(BaseAgent):
@@ -257,12 +322,21 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         pillar: Optional[str],
     ) -> str:
         # Render REGISTERS spec block once — kept in-prompt so the model
-        # sees all five options every time
+        # sees all five options every time, WITH the mandatory_signals /
+        # must_not fields (2026-04-20 sharpening — prevents register
+        # blur, e.g. prophet drifting into roast).
+        def _render_register(key: str, spec: Dict[str, Any]) -> str:
+            parts = [f"**{key}** — {spec['description']}"]
+            if spec.get("mandatory_signals"):
+                parts.append(f"  ✓ REQUIRED: {spec['mandatory_signals']}")
+            if spec.get("must_not"):
+                parts.append(f"  ✗ AVOID: {spec['must_not']}")
+            parts.append(f"  Hook shapes: {'; '.join(spec['hook_shapes'])}")
+            parts.append(f"  Example openers: {' / '.join(spec['example_openers'])}")
+            return "\n".join(parts)
+
         registers_block = "\n\n".join(
-            f"**{key}** — {spec['description']}\n"
-            f"  Hook shapes: {'; '.join(spec['hook_shapes'])}\n"
-            f"  Example openers: {' / '.join(spec['example_openers'])}"
-            for key, spec in REGISTERS.items()
+            _render_register(key, spec) for key, spec in REGISTERS.items()
         )
 
         opinions_block = "\n".join(
@@ -281,18 +355,62 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         details_str = "\n".join(f"    - {d}" for d in details) if details else "    (none provided)"
         tension = ca.get("tension", "(not provided)")
 
-        # Rotation context — tell architect what to AVOID
+        # Rotation context — HARD GATE on recent register choices.
+        # Client feedback 2026-04-19: architect was picking contrarian 4x and
+        # roast 3x out of 8 posts. "Soft warning" rotation wasn't enforced.
+        # Now: compute last-5 counts explicitly and tell the architect which
+        # registers are BANNED (hard) vs DISCOURAGED (soft).
         rotation_block = ""
+        banned_registers: List[str] = []
         if recent_registers:
-            counts: Dict[str, int] = {}
+            counts_last5: Dict[str, int] = {}
+            for r in recent_registers[:5]:
+                counts_last5[r] = counts_last5.get(r, 0) + 1
+            counts_last10: Dict[str, int] = {}
             for r in recent_registers[:10]:
-                counts[r] = counts.get(r, 0) + 1
-            rotation_lines = [f"  - {r}: used {c} time(s)" for r, c in counts.items()]
+                counts_last10[r] = counts_last10.get(r, 0) + 1
+
+            # BANNED if 3+ in the last 5 posts — hard cap on dominance
+            banned_registers = [r for r, c in counts_last5.items() if c >= 3]
+            # DISCOURAGED if 4+ in the last 10 posts — softer rotation nudge
+            discouraged = [
+                r for r, c in counts_last10.items()
+                if c >= 4 and r not in banned_registers
+            ]
+
+            rotation_lines_5 = [
+                f"  - {r}: {c} time(s)" for r, c in sorted(counts_last5.items(), key=lambda x: -x[1])
+            ]
+            rotation_lines_10 = [
+                f"  - {r}: {c} time(s)" for r, c in sorted(counts_last10.items(), key=lambda x: -x[1])
+            ]
+
+            banned_block = ""
+            if banned_registers:
+                banned_block = (
+                    "\n\n⛔ BANNED FOR THIS POST (3+ appearances in last 5 posts — HARD RULE):\n"
+                    + "\n".join(f"  - {r}" for r in banned_registers)
+                    + "\n  DO NOT PICK ANY OF THESE. Pick from the remaining registers."
+                )
+
+            discouraged_block = ""
+            if discouraged:
+                discouraged_block = (
+                    "\n\n⚠ Discouraged (4+ in last 10 — prefer alternatives if viable):\n"
+                    + "\n".join(f"  - {r}" for r in discouraged)
+                )
+
             rotation_block = (
-                "\nRECENT REGISTER ROTATION (avoid overused registers):\n"
-                + "\n".join(rotation_lines)
-                + "\n\nHARD RULE: do NOT pick a register that appears 3+ times in the "
-                "last 10 posts. If the best choice is overused, pick the second best."
+                "\nRECENT REGISTER ROTATION:\n"
+                + "  LAST 5 POSTS:\n"
+                + "\n".join(rotation_lines_5)
+                + "\n  LAST 10 POSTS:\n"
+                + "\n".join(rotation_lines_10)
+                + banned_block
+                + discouraged_block
+                + "\n\nAIM FOR COVERAGE: over any 7-post window you should use at least "
+                "3 distinct registers. If clinical_diagnostician or confession haven't "
+                "appeared recently, that's a signal to pick them now when the topic fits."
             )
 
         pillar_block = f"\nFIVE QUESTIONS PILLAR: {pillar}" if pillar else ""
@@ -398,6 +516,30 @@ Return STRICT JSON — no prose, no code fences:
             self.logger.warning(f"Architect returned unknown register '{register}'; defaulting to clinical_diagnostician")
             register = "clinical_diagnostician"
 
+        # HARD ROTATION GATE — if architect picked a register that's 3+ in
+        # last 5 posts, reassign to the least-used non-banned register.
+        # The prompt tells it not to; this enforces.
+        if recent_registers:
+            last5 = recent_registers[:5]
+            counts5: Dict[str, int] = {}
+            for r in last5:
+                counts5[r] = counts5.get(r, 0) + 1
+            banned = {r for r, c in counts5.items() if c >= 3}
+            if register in banned:
+                # Find least-used (including zero-use) register from the 5 options
+                all_counts = {r: counts5.get(r, 0) for r in REGISTERS.keys()}
+                non_banned = {r: c for r, c in all_counts.items() if r not in banned}
+                if non_banned:
+                    # Pick the register with the lowest count; ties broken by
+                    # dict order (stable), which happens to favor clinical→confession
+                    least_used = min(non_banned.items(), key=lambda x: x[1])
+                    original = register
+                    register = least_used[0]
+                    self.logger.warning(
+                        f"🔁 Rotation gate: architect picked '{original}' "
+                        f"(3+ of last 5) — forced to '{register}' (count={least_used[1]})"
+                    )
+
         opinion_raw = content.get("opinion") or {}
         if not isinstance(opinion_raw, dict):
             opinion_raw = {}
@@ -419,12 +561,32 @@ Return STRICT JSON — no prose, no code fences:
             if str(s).strip().lower() in STEPPS_FACTORS
         ][:6]
         if len(stepps_targets) < 2:
-            # Pad with conservative defaults so downstream always has 2+
-            for fallback in ("emotion", "social_currency"):
+            # Pad with conservative defaults so downstream always has 2+.
+            # Always include a narrative factor in the fallback pair so the
+            # diversity rule (below) isn't violated even in the degenerate case.
+            for fallback in ("trigger", "emotion"):
                 if fallback not in stepps_targets:
                     stepps_targets.append(fallback)
                 if len(stepps_targets) >= 2:
                     break
+
+        # STEPPS diversity gate (client feedback 2026-04-19): emotion + public
+        # alone is lazy — those are the easiest two factors and every post
+        # was hitting exactly them. Require AT LEAST ONE narrative factor
+        # (trigger / practical / stories). If architect didn't pick one,
+        # swap in `trigger` — forces it to actually plan a daily-life
+        # reminder, which is harder than picking emotion again.
+        has_narrative = any(f in NARRATIVE_FACTORS for f in stepps_targets)
+        if not has_narrative:
+            original_targets = list(stepps_targets)
+            # Drop one non-narrative factor if we'd exceed a reasonable cap
+            if len(stepps_targets) >= 4 and stepps_targets:
+                stepps_targets.pop()
+            stepps_targets.append("trigger")
+            self.logger.warning(
+                f"📐 STEPPS diversity enforced: architect picked "
+                f"{original_targets} — no narrative factor. Added 'trigger'."
+            )
 
         first_49 = str(content.get("first_49_chars_hook", "")).strip()
         if len(first_49) > 100:  # allow some slack — we'll truncate in display

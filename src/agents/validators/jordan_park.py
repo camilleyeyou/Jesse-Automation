@@ -354,8 +354,27 @@ Return STRICT JSON:
             bool(q2.get("has_real_opinion", False)) and bool(q2.get("contestable", False))
         )
 
-        # Q3 — ski-jump structure
+        # Q3 — ski-jump structure. Client feedback 2026-04-20: Jordan's LLM
+        # judgment was too generous — would call a post "ski-jump" even when
+        # the strongest line was buried mid-post. Now adds a deterministic
+        # check: the final sentence must be SHORT (<=15 words). A long final
+        # sentence is a trailing explanation, not a punchline.
         q3_pass = bool(q3.get("passes", False)) or bool(q3.get("punchline_at_back", False))
+        if q3_pass and post and post.content:
+            import re as _re
+            flat = _re.sub(r"\s+", " ", post.content).strip()
+            sentences = [s.strip() for s in _re.split(r"(?<=[.!?])\s+", flat) if s.strip()]
+            if sentences:
+                final_sentence = sentences[-1]
+                final_word_count = len(final_sentence.split())
+                # A punchline is short. 15+ words of closing sentence means
+                # the post tapered off into explanation, not punch.
+                if final_word_count > 15:
+                    q3_pass = False
+                    self.logger.debug(
+                        f"Ski-jump override: final sentence is {final_word_count} words "
+                        f"(ceiling 15). LLM passed Q3 but deterministic check fails."
+                    )
 
         # Q4 — first-49-char hook
         q4_pass = bool(q4.get("passes", False)) or bool(q4.get("pulls_reader_in", False))
@@ -417,8 +436,10 @@ Return STRICT JSON:
             strongest = q3.get("strongest_sentence", "")
             final = q3.get("final_sentence", "")
             reasons.append(
-                f"Q3 ski-jump: punchline buried in middle. Strongest line: \"{strongest}\" — "
-                f"ended on: \"{final}\". Move the sharpest line to the final period."
+                f"Q3 ski-jump: punchline buried / final sentence too long. "
+                f"Strongest line: \"{strongest}\" — ended on: \"{final}\". "
+                f"Final sentence must be SHORT (<=15 words) AND the sharpest line. "
+                f"Trim the closer. Trailing explanations kill the Onion shape."
             )
         if not q4_pass:
             frag = q4.get("opening_fragment", "")

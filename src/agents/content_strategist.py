@@ -2022,6 +2022,18 @@ Now write something that makes someone stop scrolling."""
          r"(?mi)\b(?:somewhere,?\s+)?a\s+tube\s+(?:of\s+(?:lip\s+)?balm|of\s+balm)\b"),
         ("closer_lip_balm_anthropomorphic",
          r"(?mi)\b(?:a\s+tube|the\s+tube|the\s+balm|the\s+lip\s+balm)\s+(?:sits|waits|exists|remains|stays|rests|lies|watches|knows|doesn'?t|is\s+not|has\s+no)\b"),
+        # Client review 2026-04-20 — "the whole thing" essay closer still
+        # slipping through despite prior bans. Both forms: "It is the whole
+        # thing" (declarative benediction) and "That's the whole thing"
+        # (casual version). Both land as profound wisdom — both fail.
+        ("closer_is_the_whole_thing",
+         r"(?mi)\b(?:it\s+is|that(?:'s|\s+is))\s+the\s+whole\s+thing\b"),
+        # "Let us examine [X]" — roast opener that became a tic. Fine in
+        # small doses; flagged when used as a post opener so the generator
+        # varies the roast voice. Client flag: appeared as opener in 2 of
+        # 8 posts in the same batch.
+        ("opener_let_us_examine",
+         r"(?mi)^\s*[\"\u201c]?\s*let\s+us\s+examine\b"),
     ]
 
     def _build_hard_rule_retry_prompt(self, original_prompt: str, bad_content: str, violations: list) -> str:
@@ -2099,6 +2111,20 @@ Now write something that makes someone stop scrolling."""
                 "Anthropomorphic brand reference ('a tube of lip balm sits quietly / waits / "
                 "exists'). This is lazy sentimental brand stamping. Remove the product reference "
                 "entirely. End on a non-product slap."
+            ),
+            "closer_is_the_whole_thing": (
+                "Closer 'It is the whole thing' / 'That's the whole thing' — aphoristic "
+                "benediction pretending to be profound. Liquid Death doesn't do wise "
+                "closing sentences. End on a short concrete slap: "
+                "'Plan accordingly.' / 'Your lips are on their own.' / 'Nothing personal. "
+                "Everything procedural.'"
+            ),
+            "opener_let_us_examine": (
+                "Opener 'Let us examine [X]' — roast-voice tic. Fine occasionally but "
+                "has become a reliable template opener. Pick a different roast hook: "
+                "'[Target] did a thing. The thing speaks for itself.' / "
+                "'[Target] just announced [thing]. They are not okay.' / "
+                "Start by naming the target action directly — no 'let us examine' framing."
             ),
         }
         for name, matched in violations:
