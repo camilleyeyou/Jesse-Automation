@@ -9,13 +9,15 @@ Uses Claude Sonnet tool-calling via the unified generate_with_tools facade
 (provider-routed). Observe-and-report only — does NOT auto-modify prompts,
 block posts, or touch the generation hot path.
 
-Tools exposed to the agent (6 reads + 1 terminal write):
+Tools exposed to the agent (7 reads + 2 writes):
   - get_recent_posts            — content + validator scores + fallback flag
   - count_phrase_in_posts       — pattern recycling detection
   - get_validator_scorecard     — per-validator approval rates + pillar bias
+  - get_register_rotation       — 5-register rotation balance (Phase 5, 2026-04-19)
   - get_pillar_distribution     — 5-pillar rotation balance
   - get_fallback_shipping_rate  — how often 'best version' fallback shipped
   - get_recent_findings         — what drift was already flagged (avoid dupes)
+  - add_to_generator_avoid_list — actionable: writes to generator's avoid list
   - write_quality_finding       — terminal; persists to strategy_insights
 """
 
@@ -93,6 +95,27 @@ QUALITY_DRIFT_TOOLS = [
                 "type": "object",
                 "properties": {
                     "days": {"type": "integer", "description": "Look-back window (default 14)", "default": 14},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_register_rotation",
+            "description": (
+                "How many posts landed in each of the 5 voice registers "
+                "(clinical_diagnostician / contrarian / prophet / confession / roast) "
+                "over the window. The AngleArchitect picks the register per post; "
+                "monotony (one register dominating) means the architect isn't "
+                "rotating. Flags when a single register exceeds 60% of posts or "
+                "when fewer than 3 distinct registers appear in 7+ posts."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "days": {"type": "integer", "description": "Look-back window (default 7)", "default": 7},
                 },
                 "required": [],
             },
@@ -216,7 +239,7 @@ QUALITY_DRIFT_TOOLS = [
                         "description": (
                             "Finding category. Use one of: pattern_recycling, voice_drift, "
                             "validator_bias, pillar_imbalance, fallback_overuse, template_overuse, "
-                            "rule_violation, other"
+                            "register_monotony, rule_violation, other"
                         ),
                     },
                     "observation": {
@@ -423,6 +446,13 @@ WHAT TO LOOK FOR (the window is the last {window_days} days):
    bait. There are regex strips for these, but if any survive into shipped
    posts, report them.
 
+8. REGISTER MONOTONY (Phase 5, 2026-04-19) — the AngleArchitect agent picks
+   a voice register (clinical_diagnostician / contrarian / prophet / confession
+   / roast) for each post. Healthy rotation uses 4+ registers over a week.
+   Call get_register_rotation to see the distribution. If one register is
+   >60% of posts, flag insight_type='register_monotony' — the architect is
+   not rotating and posts will feel same-y regardless of trend diversity.
+
 HOW TO WORK:
 
 - Start by calling get_recent_posts to see the window. Scan for red flags.
@@ -430,7 +460,7 @@ HOW TO WORK:
   the same issue persists, escalate the severity rather than duplicate the
   finding.
 - Use count_phrase_in_posts, get_validator_scorecard, get_pillar_distribution,
-  get_fallback_shipping_rate to investigate hypotheses.
+  get_register_rotation, get_fallback_shipping_rate to investigate hypotheses.
 - For each confirmed drift pattern:
     (a) Call write_quality_finding ONCE with the narrative description.
     (b) If it's a literal recycled phrase/detail/opener — call
@@ -478,6 +508,8 @@ typically 2-4 read calls to understand the state, then the write calls.
             )
         if fn_name == "get_validator_scorecard":
             return self.memory.get_validator_scorecard(days=int(fn_args.get("days", 14)))
+        if fn_name == "get_register_rotation":
+            return self._tool_register_rotation(days=int(fn_args.get("days", 7)))
         if fn_name == "get_pillar_distribution":
             return self.memory.get_pillar_distribution(days=int(fn_args.get("days", 14)))
         if fn_name == "get_fallback_shipping_rate":
@@ -505,6 +537,77 @@ typically 2-4 read calls to understand the state, then the write calls.
                 if v.get("feedback"):
                     v["feedback"] = v["feedback"][:200]
         return {"days": days, "count": len(posts), "posts": posts}
+
+    def _tool_register_rotation(self, days: int) -> Dict[str, Any]:
+        """Report the distribution of voice registers (clinical_diagnostician /
+        contrarian / prophet / confession / roast) over the window. Phase 5
+        (2026-04-19) — lets the drift supervisor catch register monotony the
+        way it already catches pillar imbalance.
+        """
+        from collections import Counter
+        try:
+            registers = self.memory.get_recent_registers(days=days, limit=100)
+        except Exception as e:
+            return {"days": days, "error": str(e), "registers": []}
+
+        if not registers:
+            return {
+                "days": days,
+                "total_with_register": 0,
+                "note": (
+                    "No posts in the window have a register tag yet. Either "
+                    "the AngleArchitect agent is not live, or all posts "
+                    "pre-date Phase 1."
+                ),
+            }
+
+        counts = Counter(registers)
+        total = len(registers)
+        dominant, dominant_count = counts.most_common(1)[0]
+        dominant_share = dominant_count / total
+
+        # All 5 known registers — so we can report which are missing
+        known = {"clinical_diagnostician", "contrarian", "prophet", "confession", "roast"}
+        used = set(counts.keys())
+        missing = sorted(known - used)
+
+        flags = []
+        if dominant_share >= 0.6 and total >= 5:
+            flags.append({
+                "type": "register_domination",
+                "severity": "high" if dominant_share >= 0.8 else "medium",
+                "detail": (
+                    f"{dominant} is {dominant_share:.0%} of last {total} "
+                    f"posts — architect rotation not working"
+                ),
+            })
+        if len(used) < 3 and total >= 7:
+            flags.append({
+                "type": "register_narrow",
+                "severity": "medium",
+                "detail": (
+                    f"Only {len(used)} distinct register(s) in last {total} "
+                    f"posts — missing: {', '.join(missing)}"
+                ),
+            })
+        if len(used) >= 4:
+            # Good rotation — note it so the supervisor doesn't over-flag
+            flags.append({
+                "type": "rotation_healthy",
+                "severity": "info",
+                "detail": f"Architect using {len(used)} of 5 registers — healthy rotation",
+            })
+
+        return {
+            "days": days,
+            "total_with_register": total,
+            "by_register": dict(counts),
+            "distinct_registers_used": len(used),
+            "missing_registers": missing,
+            "dominant_register": dominant,
+            "dominant_share": round(dominant_share, 2),
+            "flags": flags,
+        }
 
     def _tool_recent_findings(self, days: int) -> Dict[str, Any]:
         findings = self.memory.get_recent_drift_findings(days=days, limit=20)
