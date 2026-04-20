@@ -493,10 +493,24 @@ NO viable {preferred_theme.replace('_', ' ')} trends exist among the candidates.
                 parts.append(f"    🔥 Cluster score: {cluster_score}{peer_str}")
             named_entity = getattr(trend, 'named_entity_present', None)
             if named_entity is not None:
-                parts.append(f"    Named entity present: {named_entity}")
+                # Explicit ⚠ DQ marker when named entity is missing — signals
+                # the curator to score this candidate 0-2 per the Phase B rule.
+                flag = "✓" if named_entity else "⚠ NO NAMED ENTITY"
+                parts.append(f"    Named entity present: {flag}")
             viral_entities = getattr(trend, 'viral_entities', None)
             if viral_entities:
                 parts.append(f"    Entities: {', '.join(viral_entities[:5])}")
+            # Phase B (2026-04-20): velocity signal from social sources
+            # (Reddit upvotes, HN score). High velocity = objectively spreading.
+            social_score = getattr(trend, 'social_velocity_score', None)
+            if social_score is not None:
+                social_src = getattr(trend, 'social_velocity_source', 'social')
+                velocity_mark = ""
+                if social_score >= 10000:
+                    velocity_mark = "  📈 VIRAL-CLASS"
+                elif social_score >= 5000:
+                    velocity_mark = "  📈 STRONG"
+                parts.append(f"    Social velocity ({social_src}): {social_score:,} upvotes{velocity_mark}")
             trend_list.append("\n".join(parts))
 
         trends_text = "\n\n".join(trend_list)
@@ -585,8 +599,17 @@ recognizability judgment:
      noun (company / person / place)? If False, the story is abstract and
      will scroll past regardless of how well it's written.
 
-     HARD RULE: named_entity_present=False → score 0-2 unless you can
-     argue the story has implicit viral weight anyway.
+     HARD DQ RULE (2026-04-20): named_entity_present=False → score 0-2,
+     and you MUST NOT pick this candidate unless EVERY other candidate
+     has the same flag. There's no such thing as a viral post about an
+     unnamed abstract event. "An algorithm" is not a proper noun. "The
+     tech industry" is not a proper noun. Your pick must have a proper
+     noun the reader recognizes on sight.
+
+  📈 SOCIAL VELOCITY: upvote count from Reddit sources. Stories marked
+     VIRAL-CLASS (10k+ upvotes) or STRONG (5k+) are objectively spreading
+     on social right now. Boost their hotness by 1-2 points when scoring,
+     UNLESS recognizability is weak on its own.
 
   📝 SOURCE TIER: tier 1 (early detection) and tier 3 (cultural pickup)
      beat tier 2 (editorial filters) and tier 4 (policy institutional) for

@@ -138,7 +138,7 @@ class RedditSource(BaseSourceIntegration):
         if post.get("upvote_ratio", 1.0) < 0.7:
             viral_indicators.append("reddit_controversial")
 
-        return TrendingNews(
+        trend = TrendingNews(
             headline=title,
             summary=summary[:500],
             source=f"reddit/{subreddit}",
@@ -159,6 +159,16 @@ class RedditSource(BaseSourceIntegration):
             detected_at=datetime.utcnow().isoformat(),
             viral_indicators=viral_indicators,
         )
+        # Phase B (2026-04-20): attach raw Reddit upvote score as a
+        # numeric social-velocity signal for the curator. 1000+ is
+        # moderate social lift; 10000+ is viral-class.
+        try:
+            setattr(trend, "social_velocity_score", score)
+            setattr(trend, "social_velocity_source", "reddit")
+            setattr(trend, "social_comment_count", num_comments)
+        except Exception:
+            pass
+        return trend
 
     async def health_check(self) -> bool:
         try:
