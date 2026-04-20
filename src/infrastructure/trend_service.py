@@ -1185,6 +1185,29 @@ class MultiTierTrendService(TrendService):
                 f"🧹 Filtered {dropped_used} already-used trend(s) from candidate pool"
             )
 
+        # Phase A (2026-04-20): annotate candidates with cross-source
+        # convergence signals. Each candidate gets .cluster_score (how many
+        # peers in the pool covered the same entity cluster),
+        # .cluster_peers (indices of clustered candidates), and
+        # .named_entity_present (bool: has a recognizable proper noun).
+        # The curator uses these as objective features alongside its
+        # recognizability LLM judgment — so a niche story from 1 source
+        # (cluster_score=1) can't fake being viral.
+        try:
+            from .viral_signals import annotate_candidates_with_viral_signals
+            annotate_candidates_with_viral_signals(filtered)
+            # Surface the hottest cluster for logging
+            if filtered:
+                top = max(filtered, key=lambda c: getattr(c, "cluster_score", 0))
+                top_score = getattr(top, "cluster_score", 0)
+                if top_score >= 2:
+                    self.logger.info(
+                        f"🔥 Hot cluster: cluster_score={top_score} "
+                        f"({getattr(top, 'headline', '')[:60]}...)"
+                    )
+        except Exception as e:
+            self.logger.warning(f"Viral-signal annotation failed (non-blocking): {e}")
+
         return filtered[:count]
 
     async def get_candidate_trends_by_tier(

@@ -483,6 +483,20 @@ NO viable {preferred_theme.replace('_', ' ')} trends exist among the candidates.
             if hasattr(trend, 'tier') and trend.tier:
                 tier_labels = {1: "Early Detection", 2: "Editorial Filter", 3: "Cultural Pickup", 4: "Policy/Institutional"}
                 parts.append(f"    Source tier: {tier_labels.get(trend.tier, 'Unknown')}")
+            # Phase A (2026-04-20): objective viral signals attached by
+            # annotate_candidates_with_viral_signals(). Surface them to the
+            # curator so its recognizability judgment has external grounding.
+            cluster_score = getattr(trend, 'cluster_score', None)
+            if cluster_score is not None:
+                cluster_peers = getattr(trend, 'cluster_peers', []) or []
+                peer_str = f" (peers: {cluster_peers})" if cluster_peers else ""
+                parts.append(f"    🔥 Cluster score: {cluster_score}{peer_str}")
+            named_entity = getattr(trend, 'named_entity_present', None)
+            if named_entity is not None:
+                parts.append(f"    Named entity present: {named_entity}")
+            viral_entities = getattr(trend, 'viral_entities', None)
+            if viral_entities:
+                parts.append(f"    Entities: {', '.join(viral_entities[:5])}")
             trend_list.append("\n".join(parts))
 
         trends_text = "\n\n".join(trend_list)
@@ -547,50 +561,80 @@ CANDIDATE TRENDS
 SELECTION CRITERIA (read this carefully — we are failing on #1 right now)
 ═══════════════════════════════════════════════════════════════════════════════
 
-THE #1 CRITERION — RECOGNIZABILITY:
+THE #1 CRITERION — OBJECTIVE HOTNESS (2026-04-20 rewrite):
 The reader, scrolling their LinkedIn feed, must recognize what the post is
-about in the first sentence. They should think "oh yeah, I've heard about
-that." If the trend is niche, academic, regional, or buried, they WILL
-scroll past regardless of how well Jesse writes about it.
+about in the first sentence. This is the viral gate — not a nice-to-have.
 
-Score each candidate 0-10 on recognizability:
-  • 10 — headline-of-the-day level. Everyone in the US has seen it. (Meta
-        layoffs hitting 8k people, a major SCOTUS ruling, Super Bowl moment,
-        OpenAI ships major product, election news, a Taylor Swift thing.)
-  •  8 — saturating tech/political/culture news for the week. (Specific AI
-        company did a specific thing; named senator did a thing; viral
-        TikTok; major earnings miss.)
-  •  5 — you'd have to be following the beat to know it. (Industry-
-        specific news with some signal; a policy proposal; a mid-tier
-        celeb.)
-  •  2 — niche / academic / regional / thinkpiece territory. (Research
-        paper, Substack essay, local news, policy brief, philosophy piece.)
-  •  0 — nobody has heard of this and nobody will care.
+We now have THREE objective signals attached to each candidate (not self-
+scored by you — computed from the data). Weight them BEFORE your own
+recognizability judgment:
 
-HARD RULE: if the best candidate scores under 7, PICK IT ANYWAY (we have to
-return something) but note "low_recognizability_batch=true" in the reasoning
-so downstream knows this batch is weak.
+  🔥 CLUSTER SCORE: how many other candidates in this pool covered the
+     same entity cluster. cluster_score=5 means 5 independent sources
+     wrote about this story — it's objectively hot. cluster_score=1
+     means ONE source surfaced it — probably niche.
 
-HARD REJECT categories (score these 0-3, pick anything else if possible):
+     Pick priority:
+       cluster_score >= 4  →  this is THE story. Pick it.
+       cluster_score = 3   →  likely top story; pick unless a higher-cluster candidate exists.
+       cluster_score = 2   →  moderately hot; OK if recognizability is also high.
+       cluster_score = 1   →  singleton source. VIRAL ALERT: only pick if recognizability is 9+
+                              on its own (e.g. a major breaking news wire exclusive).
+
+  🏷️  NAMED ENTITY PRESENT: does the headline contain a recognizable proper
+     noun (company / person / place)? If False, the story is abstract and
+     will scroll past regardless of how well it's written.
+
+     HARD RULE: named_entity_present=False → score 0-2 unless you can
+     argue the story has implicit viral weight anyway.
+
+  📝 SOURCE TIER: tier 1 (early detection) and tier 3 (cultural pickup)
+     beat tier 2 (editorial filters) and tier 4 (policy institutional) for
+     viral selection. Tier 4 institutional content should basically never
+     be your pick unless it's news of the actual institution (e.g. SCOTUS
+     ruling, not a CSET policy paper).
+
+Score each candidate 0-10 on overall hotness, WEIGHTED by the objective signals:
+  • 10 — cluster_score >= 4, named entity present, passes the "Morning Joe
+        test" (would this lead a major morning show's first segment?)
+  •  8 — cluster_score = 3, named entity present, saturating tech/politics
+        news this week
+  •  6 — cluster_score = 2, named entity present — moderately hot
+  •  4 — cluster_score = 1 but recognizable story independently (major
+        wire exclusive, specific big-name event)
+  •  2 — cluster_score = 1, niche or no named entity
+  •  0 — no named entity, no cluster peers, clearly niche
+
+THE FRONT-PAGE TEST (ask yourself before picking):
+Would this story RIGHT NOW lead:
+  - The NYT homepage, OR
+  - Morning Joe's first segment, OR
+  - The top 5 of r/news, OR
+  - Techmeme's top story
+If NO to all four → score ≤5 regardless of your recognizability hunch.
+
+HARD REJECT categories (score these 0-3 no matter what):
   ✗ Academic papers / research summaries / arXiv preprints
   ✗ Alignment Forum posts, AI Now Institute reports, CSET briefs
+  ✗ Import AI newsletter, AI Snake Oil, Simon Willison blog (tier-2
+     niche AI sources — never viral enough for selection)
   ✗ Substack essays / Medium thinkpieces / philosophy (Aeon, Marginalian)
   ✗ Niche wellness / mindfulness content
   ✗ Regional news specific to a US state or country that isn't the story
-  ✗ "Physician burnout", "empathy regulation", "slow living" — nobody's
-    talking about these in the news cycle today.
+  ✗ "Physician burnout", "empathy regulation", "slow living" territory
 
-HARD PREFER categories (score these 7-10):
-  ✓ Big-name tech companies doing specific things (Meta, OpenAI, Google,
-    Amazon, Microsoft, Apple, Nvidia, Tesla, Anthropic, Meta, X/Twitter)
-  ✓ Named political figures + specific events (not general "politics")
-  ✓ Named celebrities / cultural figures + specific recent moment
+HARD PREFER categories (cluster_score + recognizability both amplify):
+  ✓ Big-name tech companies × specific events (Meta, OpenAI, Google,
+    Amazon, Microsoft, Apple, Nvidia, Tesla, Anthropic, X/Twitter)
+  ✓ Named political figures × specific actions (Trump signs X, Senator
+    Y says Z, SCOTUS rules on W)
+  ✓ Named celebrities × specific recent moment
   ✓ Sports moments with proper nouns (team, player, game)
-  ✓ Viral social media moments / internet discourse that broke containment
+  ✓ Viral social media moments that broke containment
   ✓ Economic events with named numbers (layoffs, stock moves, earnings)
-  ✓ Legal/regulatory events naming specific parties
+  ✓ Legal/regulatory events naming specific parties (DOJ, FBI, SEC)
 
-SECONDARY CRITERIA (apply ONLY to candidates scoring 7+ on recognizability):
+SECONDARY CRITERIA (apply ONLY to candidates scoring 7+ hotness):
 1. Content potential — Can Jesse make this funny, absurdist, Liquid-Death-shaped?
 2. Conversation potential — Will readers comment, share, tag someone?
 
