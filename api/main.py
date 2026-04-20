@@ -1161,13 +1161,52 @@ async def trigger_drift_scan(background_tasks: BackgroundTasks):
     return {"status": "started", "message": "Quality drift scan running in background"}
 
 
+def _parse_json_field(raw):
+    """Safely parse a JSON-blob field from a DB row. Returns None on any failure."""
+    if not raw:
+        return None
+    try:
+        import json as _json
+        return _json.loads(raw)
+    except Exception:
+        return None
+
+
+def _enrich_post_row(p: dict, validator_rows: list) -> dict:
+    """Transform a raw content_memory row + its validator rows into the
+    diagnostic shape the client reads. Phase 0 (2026-04-19) expands this to
+    surface curator_angle, blueprint, register, and each validator's full
+    criteria_breakdown (the diagnostic-question answers).
+    """
+    # Parse blobs stored as JSON on the content_memory row
+    p["metadata"] = _parse_json_field(p.get("metadata"))
+    p["blueprint"] = _parse_json_field(p.get("blueprint"))
+    p["curator_angle"] = _parse_json_field(p.get("curator_angle"))
+
+    # Parse each validator's criteria_breakdown (the per-question diagnostic
+    # answers) and strengths/weaknesses (legacy lists). Produces a rich
+    # per-validator view for the dashboard.
+    validators = []
+    for v in validator_rows:
+        v = dict(v)
+        v["criteria_breakdown"] = _parse_json_field(v.get("criteria_breakdown"))
+        v["strengths"] = _parse_json_field(v.get("strengths"))
+        v["weaknesses"] = _parse_json_field(v.get("weaknesses"))
+        validators.append(v)
+    p["validators"] = validators
+    return p
+
+
 @app.get("/api/automation/post-diagnostics")
 async def get_post_diagnostics(limit: int = 5, approved_only: bool = False):
-    """Return recent posts with FULL validator diagnostic feedback.
+    """Return recent posts with FULL diagnostic context.
 
-    Used for grading individual posts: see the exact content that shipped plus
-    what each of Sarah/Marcus/Jordan quoted as their feedback. Joins
-    content_memory (the post) with validator_memory (per-validator verdicts).
+    Phase 0 observability upgrade (2026-04-19): returns per-post:
+      - curator_angle: full structured angle the NewsCurator produced
+      - blueprint: the AngleArchitect's 7-field plan (null on legacy posts)
+      - register: which of the 5 registers was picked
+      - validators[*].criteria_breakdown: the diagnostic-question answers
+        from Sarah/Marcus/Jordan (what specifically they judged)
     """
     import sqlite3 as _sq
     memory = get_memory(DB_PATH)
@@ -1182,7 +1221,8 @@ async def get_post_diagnostics(limit: int = 5, approved_only: bool = False):
 
         cursor.execute(
             f"""SELECT post_id, batch_id, content, pillar, format, theme, sub_theme,
-                       trending_topic, was_approved, average_score, created_at
+                       trending_topic, was_approved, average_score, created_at,
+                       register, blueprint, curator_angle, metadata, hook, ending
                 FROM content_memory
                 {where}
                 ORDER BY created_at DESC
@@ -1193,13 +1233,15 @@ async def get_post_diagnostics(limit: int = 5, approved_only: bool = False):
 
         for p in rows:
             cursor.execute(
-                """SELECT validator_name, score, approved, feedback, strengths, weaknesses
+                """SELECT validator_name, score, approved, feedback,
+                          strengths, weaknesses, criteria_breakdown
                    FROM validator_memory
                    WHERE post_id = ?
                    ORDER BY validator_name""",
                 (p["post_id"],),
             )
-            p["validators"] = [dict(r) for r in cursor.fetchall()]
+            validator_rows = cursor.fetchall()
+            _enrich_post_row(p, validator_rows)
 
     return {
         "count": len(rows),
@@ -1212,6 +1254,7 @@ async def get_single_post_diagnostics(post_id: str):
     """Return one post by content_memory post_id with full validator detail.
 
     post_id format is typically '<batch_id_prefix>_<post_number>' (e.g. c3f6297f_1).
+    Returns the same enriched shape as the list endpoint (Phase 0 upgrade).
     """
     import sqlite3 as _sq
     memory = get_memory(DB_PATH)
@@ -1220,7 +1263,8 @@ async def get_single_post_diagnostics(post_id: str):
         cursor = conn.cursor()
         cursor.execute(
             """SELECT post_id, batch_id, content, pillar, format, theme, sub_theme,
-                      trending_topic, was_approved, average_score, created_at
+                      trending_topic, was_approved, average_score, created_at,
+                      register, blueprint, curator_angle, metadata, hook, ending
                FROM content_memory WHERE post_id = ? LIMIT 1""",
             (post_id,),
         )
@@ -1230,13 +1274,15 @@ async def get_single_post_diagnostics(post_id: str):
         post = dict(row)
 
         cursor.execute(
-            """SELECT validator_name, score, approved, feedback, strengths, weaknesses
+            """SELECT validator_name, score, approved, feedback,
+                      strengths, weaknesses, criteria_breakdown
                FROM validator_memory
                WHERE post_id = ?
                ORDER BY validator_name""",
             (post_id,),
         )
-        post["validators"] = [dict(r) for r in cursor.fetchall()]
+        validator_rows = cursor.fetchall()
+        _enrich_post_row(post, validator_rows)
 
     return post
 

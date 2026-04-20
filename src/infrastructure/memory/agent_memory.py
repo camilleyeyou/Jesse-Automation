@@ -328,6 +328,34 @@ class AgentMemory:
                 "ON generator_avoid_list(active, expires_at)"
             )
 
+            # Phase 0 schema additions (2026-04-19) — observability for the new
+            # AngleArchitect + register system. Idempotent: ALTER TABLE fails
+            # silently when the column already exists, which is what we want on
+            # subsequent startups. Each one wrapped in its own try/except.
+            phase0_migrations = [
+                # content_memory — richer per-post metadata
+                "ALTER TABLE content_memory ADD COLUMN register TEXT",
+                "ALTER TABLE content_memory ADD COLUMN blueprint TEXT",  # JSON blob
+                "ALTER TABLE content_memory ADD COLUMN curator_angle TEXT",  # JSON blob
+                # validator_memory — criteria_breakdown exposes which specific
+                # diagnostic questions each validator actually ran, not just
+                # the score
+                "ALTER TABLE validator_memory ADD COLUMN criteria_breakdown TEXT",  # JSON
+            ]
+            for sql in phase0_migrations:
+                try:
+                    cursor.execute(sql)
+                except sqlite3.OperationalError as migration_err:
+                    # Column already exists — expected on re-runs
+                    if "duplicate column" not in str(migration_err).lower():
+                        logger.warning(f"Migration skipped ({sql}): {migration_err}")
+
+            # Index so register-rotation queries are fast
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_content_register "
+                "ON content_memory(register)"
+            )
+
             conn.commit()
 
         logger.debug("Memory tables initialized")
@@ -598,9 +626,17 @@ class AgentMemory:
         was_approved: bool = False,
         average_score: float = 0,
         validation_scores: List[Dict] = None,
-        metadata: Dict = None
+        metadata: Dict = None,
+        register: str = None,
+        blueprint: Dict = None,
+        curator_angle: Dict = None,
     ):
-        """Store a generated post in memory"""
+        """Store a generated post in memory.
+
+        Phase 0 (2026-04-19) adds register/blueprint/curator_angle as first-class
+        fields so the diagnostics endpoint can return them per post and the
+        Quality Drift supervisor can reason about register rotation.
+        """
 
         # Extract hook (first line) if not provided
         if not hook and content:
@@ -619,12 +655,16 @@ class AgentMemory:
                 cursor.execute("""
                     INSERT OR REPLACE INTO content_memory
                     (post_id, batch_id, content, hook, ending, pillar, format, voice,
-                     topic, trending_topic, was_approved, average_score, metadata)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     topic, trending_topic, was_approved, average_score, metadata,
+                     register, blueprint, curator_angle)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     post_id, batch_id, content, hook, ending, pillar, format, voice,
                     topic, trending_topic, was_approved, average_score,
-                    json.dumps(metadata) if metadata else None
+                    json.dumps(metadata) if metadata else None,
+                    register,
+                    json.dumps(blueprint, default=str) if blueprint else None,
+                    json.dumps(curator_angle, default=str) if curator_angle else None,
                 ))
 
                 # Store validator feedback if provided
@@ -1304,6 +1344,7 @@ class AgentMemory:
             feedback = validation_score.feedback
             strengths = getattr(validation_score, 'strengths', [])
             weaknesses = getattr(validation_score, 'weaknesses', [])
+            criteria_breakdown = getattr(validation_score, 'criteria_breakdown', None)
         else:
             # It's a dict
             name = validation_score.get('agent_name', validation_score.get('validator_name', 'Unknown'))
@@ -1312,16 +1353,19 @@ class AgentMemory:
             feedback = validation_score.get('feedback', '')
             strengths = validation_score.get('strengths', [])
             weaknesses = validation_score.get('weaknesses', [])
+            criteria_breakdown = validation_score.get('criteria_breakdown')
 
         cursor.execute("""
             INSERT INTO validator_memory
-            (post_id, validator_name, score, approved, feedback, strengths, weaknesses, pillar, format)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (post_id, validator_name, score, approved, feedback, strengths, weaknesses,
+             pillar, format, criteria_breakdown)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             post_id, name, score, approved, feedback,
             json.dumps(strengths) if strengths else None,
             json.dumps(weaknesses) if weaknesses else None,
-            pillar, format
+            pillar, format,
+            json.dumps(criteria_breakdown, default=str) if criteria_breakdown else None
         ))
 
     def get_validator_preferences(self, validator_name: str, days: int = 30) -> ValidatorPattern:
