@@ -801,7 +801,14 @@ phrasing — write a new post in the same voice register."""
 
         # Step 1b: Retrieve voice-matching gold-standard examples (Fix #4).
         # Anchors voice by example instead of by a 400-line system prompt.
-        gold_examples = await self._retrieve_gold_standard_examples(strategy)
+        # Phase 2: if the architect picked a register, bias retrieval toward
+        # specimens in that register. Reinforces the voice decision.
+        blueprint_register = None
+        if blueprint and isinstance(blueprint, dict) and not blueprint.get("fallback"):
+            blueprint_register = blueprint.get("register")
+        gold_examples = await self._retrieve_gold_standard_examples(
+            strategy, register=blueprint_register
+        )
 
         # Step 2: Build the creative prompt (with memory context + gold-standard examples)
         # Phase 1: blueprint from AngleArchitect rides along — injected into
@@ -1040,13 +1047,17 @@ phrasing — write a new post in the same voice register."""
         )
 
     async def _retrieve_gold_standard_examples(
-        self, strategy: ContentStrategy, top_k: int = 5
+        self, strategy: ContentStrategy, top_k: int = 5, register: str = None,
     ) -> List[Dict[str, Any]]:
         """Retrieve top-K gold-standard posts similar to the current angle (Fix #4).
 
         Voice-matching by example beats describing voice in 400 lines of prose.
         When the corpus is empty (fresh install, curation not yet done), returns
         [] and the prompt falls back to voice-description-only behavior.
+
+        Phase 2 (2026-04-19): `register` biases retrieval toward specimens
+        in the architect-picked register. Falls back to pillar then
+        broad-corpus if register-scoped returns empty.
         """
         if not self.memory:
             return []
@@ -1086,14 +1097,16 @@ phrasing — write a new post in the same voice register."""
                 query_embedding=query_embedding,
                 pillar=strategy.pillar.value,
                 top_k=top_k,
+                register=register,
             )
         except Exception as e:
             self.logger.warning(f"Gold-standard retrieval failed: {e}")
             return []
 
         if examples:
+            reg_label = f" register={register}" if register else ""
             self.logger.info(
-                f"Retrieved {len(examples)} gold-standard examples "
+                f"Retrieved {len(examples)} gold-standard examples{reg_label} "
                 f"(top similarity: {examples[0].get('similarity', 0):.3f})"
             )
         return examples

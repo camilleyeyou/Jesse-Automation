@@ -341,6 +341,10 @@ class AgentMemory:
                 # diagnostic questions each validator actually ran, not just
                 # the score
                 "ALTER TABLE validator_memory ADD COLUMN criteria_breakdown TEXT",  # JSON
+                # Phase 2 (2026-04-19): register-aware retrieval.
+                # gold_standard_posts gains a register tag so retrieval can
+                # bias toward the currently-picked register's specimens.
+                "ALTER TABLE gold_standard_posts ADD COLUMN register TEXT",
             ]
             for sql in phase0_migrations:
                 try:
@@ -435,6 +439,7 @@ class AgentMemory:
                             embedding=embedding,
                             notes=spec.get("notes"),
                             curator=spec.get("curator") or curator_tag,
+                            register=spec.get("register"),  # Phase 2
                         )
                         file_loaded += 1
                     except Exception as inner:
@@ -496,20 +501,25 @@ class AgentMemory:
         notes: str = None,
         curator: str = "manual",
         source_post_id: str = None,
+        register: str = None,
     ) -> int:
         """Insert a gold-standard post (for retrieval-augmented voice grounding).
 
         Embedding should be a list of floats. If None, the row is stored without
         an embedding — search will skip it.
+
+        Phase 2 (2026-04-19): `register` tags the specimen with its voice
+        register (clinical_diagnostician / contrarian / prophet / confession
+        / roast) so retrieval can bias toward the currently-picked register.
         """
         blob = self._encode_embedding(embedding) if embedding else None
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """INSERT INTO gold_standard_posts
-                   (content, pillar, format, embedding, notes, curator, source_post_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (content, pillar, format, blob, notes, curator, source_post_id),
+                   (content, pillar, format, embedding, notes, curator, source_post_id, register)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (content, pillar, format, blob, notes, curator, source_post_id, register),
             )
             conn.commit()
             return cursor.lastrowid
@@ -532,12 +542,19 @@ class AgentMemory:
         query_embedding,
         pillar: str = None,
         top_k: int = 5,
+        register: str = None,
     ) -> List[Dict]:
         """Return top-K most similar gold-standard posts by cosine similarity.
 
-        If pillar is set, filter to that pillar first; if the pillar-scoped result
-        would be empty, silently broaden to all pillars (voice still matters when
-        the exact pillar has no examples yet).
+        Scope priority (Phase 2, 2026-04-19):
+          1. If register is set, try register-scoped first (voice is the
+             #1 anchor — matching register > matching pillar).
+          2. Fall back to pillar-scoped if register returns empty.
+          3. Broaden to all specimens if both scoped queries return empty.
+
+        This biases retrieval toward specimens in the register the architect
+        picked, which reinforces the voice decision instead of pulling the
+        generator toward a different register's examples.
         """
         if not query_embedding:
             return []
@@ -547,20 +564,30 @@ class AgentMemory:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
-            # Try pillar-scoped first
-            if pillar:
+            # Try register-scoped first — voice takes precedence over pillar
+            if register:
                 cursor.execute(
-                    """SELECT id, content, pillar, format, embedding, notes
+                    """SELECT id, content, pillar, format, embedding, notes, register
+                       FROM gold_standard_posts
+                       WHERE register = ? AND embedding IS NOT NULL""",
+                    (register,),
+                )
+                rows = cursor.fetchall()
+
+            # Fall back to pillar-scoped if register found nothing
+            if not rows and pillar:
+                cursor.execute(
+                    """SELECT id, content, pillar, format, embedding, notes, register
                        FROM gold_standard_posts
                        WHERE pillar = ? AND embedding IS NOT NULL""",
                     (pillar,),
                 )
                 rows = cursor.fetchall()
 
-            # Broaden if pillar-scoped was empty
+            # Broaden if both scoped queries were empty
             if not rows:
                 cursor.execute(
-                    """SELECT id, content, pillar, format, embedding, notes
+                    """SELECT id, content, pillar, format, embedding, notes, register
                        FROM gold_standard_posts
                        WHERE embedding IS NOT NULL"""
                 )
@@ -576,6 +603,7 @@ class AgentMemory:
                     "content": r["content"],
                     "pillar": r["pillar"],
                     "format": r["format"],
+                    "register": r["register"] if "register" in r.keys() else None,
                     "notes": r["notes"],
                     "similarity": sim,
                 }
