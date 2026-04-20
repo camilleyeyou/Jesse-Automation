@@ -1111,6 +1111,30 @@ class AgentMemory:
 
             return [dict(row) for row in cursor.fetchall()]
 
+    def get_recent_registers(self, days: int = 7, limit: int = 10) -> List[str]:
+        """Get the sequence of registers used in recent posts (newest first).
+
+        Used by AngleArchitectAgent to rotate — the architect avoids picking
+        a register that dominates the recent window. Phase 1 addition
+        (2026-04-19).
+
+        Returns the raw list INCLUDING duplicates so callers can count
+        frequency, not just distinct registers.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT register FROM content_memory
+                WHERE register IS NOT NULL
+                  AND created_at >= datetime('now', ?)
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (f"-{days} days", limit),
+            )
+            return [row[0] for row in cursor.fetchall() if row[0]]
+
     def get_recent_topics(self, days: int = 7, limit: int = 20) -> List[str]:
         """Get topics used recently (to avoid repetition)"""
 

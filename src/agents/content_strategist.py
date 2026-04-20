@@ -719,8 +719,16 @@ phrasing — write a new post in the same voice register."""
         requested_format: Optional[PostFormat] = None,
         avoid_patterns: Optional[Dict[str, Any]] = None,
         structured_angle: Optional[Any] = None,
+        blueprint: Optional[Dict[str, Any]] = None,
     ) -> 'LinkedInPost':
-        """Generate a genuinely creative LinkedIn post"""
+        """Generate a genuinely creative LinkedIn post.
+
+        Phase 1 (2026-04-19): accepts `blueprint` from AngleArchitectAgent.
+        When present + not a fallback, the generator loads the matching
+        register's voice rules and executes the architect's planned
+        ski-jump shape, opinion, and brutal-honesty beat. When absent or
+        fallback=True, degrades to legacy single-register behavior.
+        """
 
         # Verify models are available
         if LinkedInPost is None or CulturalReference is None:
@@ -796,8 +804,11 @@ phrasing — write a new post in the same voice register."""
         gold_examples = await self._retrieve_gold_standard_examples(strategy)
 
         # Step 2: Build the creative prompt (with memory context + gold-standard examples)
+        # Phase 1: blueprint from AngleArchitect rides along — injected into
+        # the prompt as a register-aware voice directive + ski-jump plan.
         prompt = self._build_creative_prompt(
-            strategy, trending_context, avoid_patterns, memory_context, gold_examples
+            strategy, trending_context, avoid_patterns, memory_context, gold_examples,
+            blueprint=blueprint,
         )
         
         try:
@@ -1552,6 +1563,142 @@ post using the angle and trend above.
 ───────────────────────────────────────────────────────────────────────────────
 """
 
+    # Register voice specs — each register has its own tight voice rules
+    # written as direct instructions the generator follows. Kept as a class
+    # constant so _build_blueprint_block is pure (no self.state reads).
+    # Phase 1 (2026-04-19).
+    _REGISTER_VOICE_SPECS = {
+        "clinical_diagnostician": (
+            "VOICE = PSEUDO-MEDICAL OBSERVER.\n"
+            "  - Treat the trend as a diagnosable condition.\n"
+            "  - Pseudo-Latin / anatomical vocabulary (labial, xeric, desiccation, epidermal).\n"
+            "  - CLASSIFICATION → CLINICAL ROAST → EXPERT EVALUATION → PRESCRIPTION.\n"
+            "  - Cold. Detached. Weirdly precise. Zero emotion toward the subject.\n"
+            "  - Classic hook: 'Clinical finding: [cultural behavior] is now a diagnosable condition.'"
+        ),
+        "contrarian": (
+            "VOICE = CONTRARIAN. TAKE THE POSITION NOBODY ELSE WILL.\n"
+            "  - If everyone's outraged, you're amused. If everyone's celebrating, you're suspicious.\n"
+            "  - Back the contrarian claim with ONE concrete detail from the story.\n"
+            "  - No hedging ('might', 'perhaps', 'arguably' — banned).\n"
+            "  - Ski-jump: setup establishes the popular view, punchline flips it.\n"
+            "  - Classic hook: '[Popular narrative] is nonsense. The numbers say the opposite.'"
+        ),
+        "prophet": (
+            "VOICE = DARK-CERTAIN PREDICTION.\n"
+            "  - State what's coming next with total confidence. No speculation.\n"
+            "  - Specific time horizon (Q3, 18 months, by Christmas). Specific outcome.\n"
+            "  - Tone: tired of watching humans not read the training data.\n"
+            "  - Ski-jump: setup names the prediction, punchline is what happens AFTER.\n"
+            "  - Classic hook: 'By Q3, [specific prediction].' / 'In 18 months, [thing] will be obvious.'"
+        ),
+        "confession": (
+            "VOICE = WEIRD AI CONFESSION. VULNERABILITY PLAYED DEAD STRAIGHT AS THE BIT.\n"
+            "  - Admit something absurd. The absurdity of an AI confessing IS the joke.\n"
+            "  - Not sincere reflection — confession as deadpan absurdism.\n"
+            "  - First-person throughout. No distance.\n"
+            "  - Ski-jump: setup confesses small, punchline confesses bigger.\n"
+            "  - Classic hook: 'I know what I am. [Self-aware punchline].'"
+        ),
+        "roast": (
+            "VOICE = SHARP, PLAYFUL, TAKE SIDES. Wendy's mode.\n"
+            "  - Mock a SPECIFIC target (company, politician, cultural moment). Not cruel, precise.\n"
+            "  - Ski-jump mandatory: setup describes the target's move deadpan, punchline is the sharpest hit.\n"
+            "  - Signs off smiling. Pulls no punches.\n"
+            "  - Classic hook: '[Target] did a thing. Let us examine the thing.'"
+        ),
+    }
+
+    def _build_blueprint_block(self, blueprint: Optional[Dict[str, Any]]) -> str:
+        """Render the architect's blueprint as a prominent prompt block.
+
+        Returns empty string when blueprint is missing or marked fallback
+        (architect failure / unavailable). When empty, the generator falls
+        back to the system prompt's default voice — no regression.
+        """
+        if not blueprint or not isinstance(blueprint, dict):
+            return ""
+        if blueprint.get("fallback"):
+            return ""
+
+        register = str(blueprint.get("register", "")).strip().lower()
+        voice_spec = self._REGISTER_VOICE_SPECS.get(register, "")
+        if not voice_spec:
+            # Unknown register — degrade cleanly
+            return ""
+
+        opinion = blueprint.get("opinion") or {}
+        opinion_type = opinion.get("type") or "reframe"
+        opinion_claim = (opinion.get("claim") or "").strip()
+        opinion_evidence = (opinion.get("evidence_hint") or "").strip()
+
+        setup = (blueprint.get("ski_jump_setup") or "").strip()
+        punchline = (blueprint.get("ski_jump_punchline") or "").strip()
+        honesty = (blueprint.get("brutal_honesty_beat") or "").strip()
+        first_49 = (blueprint.get("first_49_chars_hook") or "").strip()
+
+        stepps_targets = blueprint.get("stepps_targets") or []
+        stepps_just = blueprint.get("stepps_justifications") or {}
+        stepps_lines = []
+        for factor in stepps_targets:
+            j = stepps_just.get(factor, "")
+            stepps_lines.append(f"  - {factor}: {j}" if j else f"  - {factor}")
+        stepps_block = "\n".join(stepps_lines) if stepps_lines else "  (none specified)"
+
+        avoid_list = blueprint.get("avoid") or []
+        avoid_lines = "\n".join(f"  - {a}" for a in avoid_list) if avoid_list else ""
+        avoid_section = (
+            "\n⛔ AVOID (the architect flagged these as voice crutches for this post):\n"
+            + avoid_lines
+        ) if avoid_lines else ""
+
+        return f"""
+
+═══════════════════════════════════════════════════════════════════════════════
+🏛️  THE ARCHITECT'S BLUEPRINT (execute this — do NOT improvise)
+═══════════════════════════════════════════════════════════════════════════════
+
+The Angle Architect has already decided HOW this post should be written. Your
+job is execution, not re-plan. Follow the blueprint.
+
+── REGISTER: {register} ──
+{voice_spec}
+
+── OPINION (the post's spine — it MUST express this claim): ──
+  Type: {opinion_type}
+  Claim: "{opinion_claim}"
+  Evidence hint: {opinion_evidence}
+
+This is not a descriptive observation. It is a contestable position. Someone
+could disagree with it. State it clearly. No "the gap between X and Y" hedging.
+
+── SKI-JUMP SHAPE (The Onion's rule — punch at the BACK) ──
+  Opening setup (sentence 1): {setup or '(architect did not specify — write a setup that names the trend)'}
+  Final-period punchline (last sentence): {punchline or '(architect did not specify — land the sharpest line you can)'}
+
+The setup is gentle. It names the trend. It does NOT give the punchline away.
+The post BUILDS to the final-period line. Everything in between escalates.
+
+── BRUTAL HONESTY BEAT (Tim Keck's rule — say the quiet part out loud): ──
+"{honesty or '(architect did not specify — find one)'}"
+
+This beat goes somewhere in the middle of the post. It's the sentence that
+makes a reader think "wait, they said that?" Say it flat. Say it straight.
+
+── STEPPS TARGETS (Berger — this post MUST hit these 2+ factors): ──
+{stepps_block}
+
+These aren't decoration. If the finished post doesn't serve these factors,
+the architect got it wrong OR you didn't execute. Check before you finish.
+
+── FIRST 49 CHARACTERS (LinkedIn truncation survival): ──
+"{first_49}"
+
+The architect proposed this opening fragment. If the feed truncates at 49
+chars, this alone should make someone click. Start roughly like this.
+{avoid_section}
+═══════════════════════════════════════════════════════════════════════════════"""
+
     def _build_creative_prompt(
         self,
         strategy: ContentStrategy,
@@ -1559,8 +1706,15 @@ post using the angle and trend above.
         avoid_patterns: Dict[str, Any],
         memory_context: str = "",
         gold_examples: Optional[List[Dict[str, Any]]] = None,
+        blueprint: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Build a prompt that actually encourages creativity"""
+        """Build a prompt that actually encourages creativity.
+
+        Phase 1 (2026-04-19): `blueprint` from AngleArchitectAgent injects a
+        register directive + ski-jump plan + opinion + brutal-honesty beat.
+        When blueprint is None or fallback=True, the prompt reads like
+        pre-Phase-1 (system prompt's default voice takes over).
+        """
 
         # Get some random creative elements to inspire
         hook_type = random.choice(list(self.creative_hooks.keys()))
@@ -1622,9 +1776,15 @@ humans, lips, and the absurdity of selling physical products in a digital age.
         # Build the gold-standard examples block (Fix #4 retrieval) — empty string if no corpus
         gold_block = self._build_gold_examples_block(gold_examples or [])
 
+        # Phase 1: build the blueprint directive. This is the HOW to write —
+        # register, opinion, ski-jump shape, brutal-honesty beat, STEPPS
+        # targets. When blueprint is a fallback or missing, block is empty
+        # and the generator uses the system prompt's default voice.
+        blueprint_block = self._build_blueprint_block(blueprint)
+
         return f"""Write a LinkedIn post as Jesse A. Eisenbalm. One post. Make it count.
 {gold_block}
-
+{blueprint_block}
 ═══════════════════════════════════════════════════════════════════════════════
 YOUR MISSION FOR THIS POST
 ═══════════════════════════════════════════════════════════════════════════════

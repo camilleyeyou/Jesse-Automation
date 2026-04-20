@@ -33,6 +33,13 @@ except ImportError:
     NEWS_CURATOR_AVAILABLE = False
 
 try:
+    from ..agents.angle_architect import AngleArchitectAgent
+    ANGLE_ARCHITECT_AVAILABLE = True
+except ImportError:
+    ANGLE_ARCHITECT_AVAILABLE = False
+    AngleArchitectAgent = None
+
+try:
     from ..infrastructure.trend_service import get_trend_service, MultiTierTrendService
     from ..infrastructure.theme_classifier import ThemeClassifier
     TREND_SERVICE_AVAILABLE = True
@@ -168,6 +175,18 @@ class ContentOrchestrator:
             else:
                 logger.warning("⚠️ NewsCuratorAgent not available, using direct trend selection")
 
+        # Initialize AngleArchitect — sits between curator and generator,
+        # picks register + forces real opinion + plans ski-jump shape. Phase
+        # 1 (2026-04-19). If unavailable or disabled, generator falls back
+        # to its legacy single-register behavior.
+        self.angle_architect = None
+        if ANGLE_ARCHITECT_AVAILABLE:
+            try:
+                self.angle_architect = AngleArchitectAgent(ai_client, config)
+                logger.info("✅ AngleArchitect initialized - register rotation + POV forcing enabled")
+            except Exception as e:
+                logger.warning(f"AngleArchitect init failed (graceful degrade): {e}")
+
         # Initialize memory system
         self.memory = None
         if MEMORY_AVAILABLE:
@@ -191,6 +210,50 @@ class ContentOrchestrator:
         else:
             logger.warning("⚠️ ContentOrchestrator initialized WITHOUT image generator")
     
+    async def _architect_angle(self, trend, pillar: str = None, post_id: str = None):
+        """Run the AngleArchitect on a curated trend. Attaches `blueprint`
+        attribute to the trend object. Graceful degrade: if architect is
+        unavailable or fails, `blueprint` is None and the generator falls
+        back to legacy single-register behavior.
+
+        Phase 1 (2026-04-19). Same logic for batch + live flows — must stay
+        shared so both paths get identical register rotation.
+        """
+        if not trend or not self.angle_architect:
+            return None
+
+        # Extract curator's structured angle if it exists on the trend
+        curator_angle = getattr(trend, "structured_angle", None) or {}
+        if not isinstance(curator_angle, dict):
+            curator_angle = {}
+
+        # Pull recent register history from memory so architect can rotate
+        recent_registers: list = []
+        if self.memory:
+            try:
+                recent_registers = self.memory.get_recent_registers(days=7, limit=10)
+            except Exception as e:
+                logger.debug(f"Could not fetch recent_registers: {e}")
+
+        try:
+            blueprint = await self.angle_architect.execute(
+                trend_headline=trend.headline,
+                trend_summary=getattr(trend, "summary", "") or "",
+                curator_angle=curator_angle,
+                recent_registers=recent_registers,
+                pillar=pillar,
+                post_id=post_id,
+            )
+            # Attach to trend so it flows with the post through generation
+            trend.blueprint = blueprint
+            trend.register = blueprint.get("register") if isinstance(blueprint, dict) else None
+            return blueprint
+        except Exception as e:
+            logger.warning(f"Architect invocation failed (graceful degrade): {e}")
+            trend.blueprint = None
+            trend.register = None
+            return None
+
     def _determine_post_context(self):
         """Decide today's (theme, angle_seed, format) — the editorial guidance
         that travels with a generation.
@@ -304,6 +367,10 @@ class ContentOrchestrator:
                 if trend:
                     logger.info(f"📰 Trend ({trend.category}): {trend.headline[:70]}...")
 
+            # Phase 1: architect the angle BEFORE generation
+            if trend:
+                await self._architect_angle(trend, pillar=preferred_theme, post_id=post_id)
+
             try:
                 post, validation_scores, was_approved = await self._process_single_post_with_memory(
                     post_number=post_number,
@@ -407,6 +474,13 @@ class ContentOrchestrator:
                     if hasattr(trend, 'confidence_score') and trend.confidence_score:
                         theme_metadata['theme_confidence'] = trend.confidence_score
 
+                # Phase 1: capture architect + curator artifacts for observability
+                register = getattr(trend, "register", None) if trend else None
+                blueprint = getattr(trend, "blueprint", None) if trend else None
+                curator_angle = getattr(trend, "structured_angle", None) if trend else None
+                if isinstance(curator_angle, dict) is False:
+                    curator_angle = None
+
                 self.memory.remember_post(
                     post_id=post_id,
                     batch_id=batch_id,
@@ -416,7 +490,10 @@ class ContentOrchestrator:
                     was_approved=was_approved,
                     average_score=avg_score,
                     validation_scores=scores_as_dicts,
-                    metadata=theme_metadata if theme_metadata else None
+                    metadata=theme_metadata if theme_metadata else None,
+                    register=register,
+                    blueprint=blueprint,
+                    curator_angle=curator_angle,
                 )
                 logger.debug(f"📝 Stored post {post_id} in memory (approved={was_approved})")
 
@@ -563,6 +640,12 @@ Don't create generic content. Don't summarize the headline. Find YOUR angle and 
         # instead of selecting a random methodology string.
         structured_angle = getattr(trend, 'structured_angle', None) if trend else None
 
+        # Phase 1: pull the architect's blueprint (register / opinion / ski-jump /
+        # brutal-honesty / STEPPS / first-49-char). Generator reads it and
+        # picks the matching register's voice. None when architect unavailable
+        # or failed — generator degrades to legacy single-register behavior.
+        blueprint = getattr(trend, 'blueprint', None) if trend else None
+
         # Generate content
         post = await self.content_generator.execute(
             post_number=post_number,
@@ -570,6 +653,7 @@ Don't create generic content. Don't summarize the headline. Find YOUR angle and 
             trending_context=trend_context,
             requested_format=requested_format,
             structured_angle=structured_angle,
+            blueprint=blueprint,
         )
         
         # Generate media
@@ -828,6 +912,10 @@ Don't create generic content. Don't summarize the headline. Find YOUR angle and 
                     logger.info(f"📰 Fresh trend ({trend.category}): {trend.headline[:70]}...")
                 else:
                     logger.warning("⚠️ No fresh trend available, generating without trend")
+
+            # Phase 1: architect the angle BEFORE generation (live flow)
+            if trend:
+                await self._architect_angle(trend, pillar=preferred_theme, post_id=post_id)
 
             # Step 4: Generate content (with memory + calendar guidance)
             logger.info("✍️ Generating content...")
