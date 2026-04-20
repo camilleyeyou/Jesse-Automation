@@ -2314,6 +2314,21 @@ Now write something that makes someone stop scrolling."""
 
         content = content.strip()
 
+        # Phase 4 deterministic observability: compute the first-49-char
+        # hook and log it for every generation. This is a WARN-level check
+        # — Jordan's Q4 is the validator-level enforcer; this logs for
+        # observability and catches obvious misses (all-whitespace, too
+        # short to judge, etc.) that the LLM might rate passably.
+        if content:
+            first_49 = content[:49]
+            if len(content) >= 49 and first_49.strip():
+                self.logger.debug(f"First-49 hook: \"{first_49}\"")
+            elif content.strip() and len(content) < 49:
+                self.logger.warning(
+                    f"Post shorter than 49 chars — LinkedIn truncation "
+                    f"window can't apply: {content[:60]!r}"
+                )
+
         # Hard word limit enforcement — truncate to 90 words max
         words = content.split()
         if len(words) > 90:

@@ -1321,6 +1321,53 @@ async def get_system_health():
     avoid_count = len(memory.get_active_avoid_phrases(limit=100))
     recent_findings = memory.get_recent_drift_findings(days=7, limit=20)
 
+    # Phase 4 (2026-04-19): register rotation view. Shows what the architect
+    # has been picking and flags monotony as an info/warning. The Quality
+    # Drift supervisor (Phase 5) acts on severe monotony; this endpoint
+    # surfaces it for the dashboard.
+    register_distribution = {}
+    register_issue = None
+    try:
+        recent_registers = memory.get_recent_registers(days=7, limit=20)
+    except Exception:
+        recent_registers = []
+    if recent_registers:
+        from collections import Counter
+        counts = Counter(recent_registers)
+        total = len(recent_registers)
+        register_distribution = {
+            "total_with_register": total,
+            "by_register": dict(counts),
+            "distinct_registers_used": len(counts),
+            "dominant_register": counts.most_common(1)[0][0] if counts else None,
+            "dominant_share": (
+                counts.most_common(1)[0][1] / total if counts and total else 0.0
+            ),
+        }
+        # Register-monotony issue surfacing
+        if total >= 5:
+            dominant_share = register_distribution["dominant_share"]
+            if dominant_share >= 0.8:
+                register_issue = {
+                    "severity": "warning",
+                    "type": "register_monotony",
+                    "detail": (
+                        f"{register_distribution['dominant_register']} is "
+                        f"{dominant_share:.0%} of last {total} posts — "
+                        f"architect rotation not working"
+                    ),
+                }
+            elif register_distribution["distinct_registers_used"] < 3 and total >= 7:
+                register_issue = {
+                    "severity": "info",
+                    "type": "register_narrow",
+                    "detail": (
+                        f"Only {register_distribution['distinct_registers_used']} "
+                        f"distinct registers in last {total} posts — "
+                        f"could rotate wider"
+                    ),
+                }
+
     # Classify health at a glance
     issues = []
     if fallback.get("fallback_rate", 0) > 0.3:
@@ -1341,12 +1388,15 @@ async def get_system_health():
             "type": "pillar_imbalance",
             "detail": f"Missing pillars: {pillar_dist.get('missing_pillars', [])}"
         })
+    if register_issue:
+        issues.append(register_issue)
 
     return {
         "overall_health": "degraded" if any(i["severity"] == "critical" for i in issues)
-            else "warning" if issues
+            else "warning" if any(i["severity"] == "warning" for i in issues)
             else "healthy",
         "pillar_distribution": pillar_dist,
+        "register_distribution": register_distribution,
         "fallback_rate": fallback,
         "starved_pillar": starved,
         "active_avoid_count": avoid_count,
