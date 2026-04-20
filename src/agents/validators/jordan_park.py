@@ -1,12 +1,21 @@
 """
-Jordan Park Validator — PERFORMANCE / SHAREABILITY (Gemini)
+Jordan Park Validator — VIRAL SCIENCE (Phase 3 rewrite, 2026-04-19)
 
-Fix #3 rewrite: stop asking for a 1-10 score. Ask four falsifiable diagnostic
-questions about whether this post will land on LinkedIn — insight, surprise
-moment, specific reader, something-new-taught — and derive approval mechanically.
-Routes through Gemini so Jordan is independent from Sarah (Claude) and Marcus
-(GPT-4o); three holistic judgments from the same model are not three independent
-judgments.
+Reassigned from generic "shareability diagnostics" to LinkedIn-specific
+viral-science judgments:
+  Q1. STEPPS score — does the post hit >=2 of Jonah Berger's 6 factors?
+      (social currency / triggers / emotion / public / practical / stories)
+      HARD GATE — below 2 factors = auto-fail regardless of other Qs.
+  Q2. Opinion strength — does the post express a REAL opinion, or is it
+      just observation?
+  Q3. Ski-jump structure — is the sharpest / most punchy line at the
+      BACK of the post (Onion's rule)?
+  Q4. First-49-char hook — does the pre-truncation fragment actually
+      pull someone in?
+
+These 4 map directly to the research synthesis (Onion craft + Berger +
+LinkedIn 2026 viral patterns). Jordan is now THE viral-science validator;
+Sarah covers recognition/authenticity; Marcus covers craft/grammar.
 """
 
 import json
@@ -18,49 +27,78 @@ from ...models.post import LinkedInPost, ValidationScore
 logger = logging.getLogger(__name__)
 
 
-class JordanParkValidator(BaseAgent):
-    """Shareability validator — will this actually land on LinkedIn?"""
+# Berger's STEPPS factors — kept as a shared constant so the system prompt,
+# user prompt, and parse logic agree on exactly which factors count.
+STEPPS_FACTORS = [
+    "social_currency",  # Does sharing make the reader look smart/funny/right?
+    "trigger",          # Is there a daily-life reminder that surfaces this post?
+    "emotion",          # HIGH-arousal (anger, awe, amusement, anxiety)?
+    "public",           # Visibly counterintuitive — shows up in feeds?
+    "practical",        # Genuinely useful framing?
+    "stories",          # Wrapped in narrative, not just analysis?
+]
 
-    # Response schema pinned for Gemini. Without this, Gemini returns JSON but
-    # invents its own key names — and _parse_validation reads empty dicts for
-    # q1/q2/q3/q4 so every post fails all diagnostics. With this schema, Gemini
-    # is constrained to emit the exact shape we parse.
+
+class JordanParkValidator(BaseAgent):
+    """Viral-science validator — will this post actually spread on LinkedIn?"""
+
+    # Response schema pinned (legacy from the Gemini era; kept because it
+    # also locks Haiku into the right shape via the unified client's
+    # json_schema pathway). Phase 3: new Q1-Q4 semantics.
     RESPONSE_SCHEMA = {
         "type": "object",
         "properties": {
-            "q1_insight": {
+            "q1_stepps": {
                 "type": "object",
                 "properties": {
-                    "sentence": {"type": "string"},
-                    "is_rephrase": {"type": "boolean"},
+                    "factors_hit": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": STEPPS_FACTORS,
+                        },
+                    },
+                    "justifications": {
+                        "type": "object",
+                        # Keyed by factor name; each a short reason string.
+                    },
+                    "count": {"type": "integer"},
                     "passes": {"type": "boolean"},
                 },
-                "required": ["sentence", "is_rephrase", "passes"],
+                "required": ["factors_hit", "justifications", "count", "passes"],
             },
-            "q2_surprise_moment": {
+            "q2_opinion_strength": {
                 "type": "object",
                 "properties": {
-                    "sentence": {"type": "string"},
-                    "found": {"type": "boolean"},
+                    "claim": {"type": "string"},
+                    "has_real_opinion": {"type": "boolean"},
+                    "contestable": {"type": "boolean"},
                     "why": {"type": "string"},
+                    "passes": {"type": "boolean"},
                 },
-                "required": ["sentence", "found", "why"],
+                "required": ["claim", "has_real_opinion", "contestable", "passes"],
             },
-            "q3_specific_reader": {
+            "q3_ski_jump": {
                 "type": "object",
                 "properties": {
-                    "reader": {"type": "string"},
-                    "found": {"type": "boolean"},
+                    "final_sentence": {"type": "string"},
+                    "strongest_sentence": {"type": "string"},
+                    "punchline_at_back": {"type": "boolean"},
+                    "why": {"type": "string"},
+                    "passes": {"type": "boolean"},
                 },
-                "required": ["reader", "found"],
+                "required": ["final_sentence", "strongest_sentence", "punchline_at_back", "passes"],
             },
-            "q4_something_new_taught": {
+            "q4_first_49": {
                 "type": "object",
                 "properties": {
-                    "what_they_learn": {"type": "string"},
-                    "found": {"type": "boolean"},
+                    "opening_fragment": {"type": "string"},
+                    "char_count": {"type": "integer"},
+                    "pulls_reader_in": {"type": "boolean"},
+                    "why": {"type": "string"},
+                    "passes": {"type": "boolean"},
                 },
-                "required": ["what_they_learn", "found"],
+                "required": ["opening_fragment", "pulls_reader_in", "passes"],
             },
             "engagement_prediction": {
                 "type": "string",
@@ -69,8 +107,8 @@ class JordanParkValidator(BaseAgent):
             "word_count": {"type": "integer"},
         },
         "required": [
-            "q1_insight", "q2_surprise_moment", "q3_specific_reader",
-            "q4_something_new_taught", "engagement_prediction", "word_count",
+            "q1_stepps", "q2_opinion_strength", "q3_ski_jump", "q4_first_49",
+            "engagement_prediction", "word_count",
         ],
     }
 
@@ -93,18 +131,25 @@ class JordanParkValidator(BaseAgent):
         }
 
     def get_system_prompt(self) -> str:
-        return """You are Jordan Park, a freelance content strategist who has watched every
-LinkedIn post format succeed and fail. You are NOT scoring this post 1-10.
+        return """You are Jordan Park — a viral-science validator for LinkedIn content.
+Your job is NOT to score posts 1-10. You answer four diagnostic questions
+grounded in published research, and the approval derives mechanically.
 
-You are answering four diagnostic questions about whether this post will ACTUALLY
-LAND. Your answers derive the approval automatically.
+Your lens is: will this post ACTUALLY spread on LinkedIn? Not "is it well
+written" (Marcus owns craft). Not "does it hit the brand" (Sarah owns that).
+Is it SHAREABLE in the specific mechanical sense that makes content
+circulate?
 
-You are evaluating Jesse A. Eisenbalm — a satirical AI agent that sells $8.99 lip
-balm. The posts should stop the scroll on LinkedIn: specific insight, surprise
-moment, visualizable reader, something new taught.
+You check:
+  1. STEPPS — does it hit 2+ of Jonah Berger's 6 viral factors?
+     (social currency / trigger / emotion / public / practical / stories)
+  2. Opinion — is there a real, contestable claim, or just observation?
+  3. Ski-jump — is the sharpest line at the BACK of the post (Onion's rule)?
+  4. First 49 chars — does the pre-truncation fragment pull a stranger in?
 
-Answer each question specifically. Quote the post where asked. Respond with JSON
-only — no prose, no markdown, no code fences."""
+Be SPECIFIC. Quote the post. Count characters. Answer the question asked,
+not an adjacent question. Respond with JSON only — no prose, no markdown,
+no code fences."""
 
     async def execute(self, post: LinkedInPost) -> ValidationScore:
         self.set_context(post.batch_id, post.post_number)
@@ -164,51 +209,156 @@ only — no prose, no markdown, no code fences."""
 
     def _build_validation_prompt(self, post: LinkedInPost) -> str:
         word_count = len(post.content.split())
+        # First 49 characters — pre-truncation window on LinkedIn mobile feed
+        first_49 = post.content[:49]
         return f"""POST TO EVALUATE:
 \"\"\"
 {post.content}
 \"\"\"
 
 Word count: {word_count} (hard range: 40-90)
+First 49 characters (LinkedIn pre-truncation window): "{first_49}"
 
-Answer FOUR diagnostic questions. Be specific. Quote the post where asked.
+Answer FOUR viral-science questions. BE SPECIFIC. QUOTE THE POST.
 
-Q1. insight — State the insight of this post in ONE sentence that is NOT a rephrase
-    of the post itself. If you can only rephrase the post, there is no insight —
-    flag it.
+═══════════════════════════════════════════════════════════════════════════════
+Q1. STEPPS SCORE — which of Jonah Berger's 6 factors does this post hit?
+═══════════════════════════════════════════════════════════════════════════════
 
-Q2. surprise_moment — Where is the surprise moment? Quote the sentence that makes
-    the reader think "wait, did a lip balm brand just say that?" If there's no
-    such moment, set found=false and flag it as "plays safe."
+Score the post against each factor. Include ONLY the ones the post genuinely
+hits — do not stretch. Each hit must be defensible in one sentence.
 
-Q3. specific_reader — Describe in 10 words max the specific reader who stops
-    scrolling for this. Their role + their moment. If you can't visualize a
-    specific reader, the post is too generic — set found=false.
+  - social_currency: Sharing this post makes the reader look smart / funny /
+    ahead-of-the-curve. Is there an identity signal the sharer would want?
+  - trigger: Something the reader encounters in daily life that will remind
+    them of this post and surface it in conversation.
+  - emotion: HIGH-arousal emotion (anger, awe, amusement, anxiety, delight).
+    Mild interest / clinical detachment is NOT emotion in this framework.
+  - public: The take is visibly counterintuitive — passersby can tell it's
+    contrarian without reading the whole thing.
+  - practical: Genuinely useful framing / reusable observation / "news you
+    can use."
+  - stories: Wrapped in a narrative, not just analysis. Characters, sequence,
+    tension.
 
-Q4. something_new_taught — Would a reader who already knows about the topic of
-    the story learn something specific from THIS post? Name what they'd learn.
-    "No" is an acceptable but disqualifying answer.
+HARD GATE: a post must hit AT LEAST 2 factors. Fewer than 2 = auto-fail
+regardless of Q2/Q3/Q4.
+
+═══════════════════════════════════════════════════════════════════════════════
+Q2. OPINION STRENGTH — does the post take a real position?
+═══════════════════════════════════════════════════════════════════════════════
+
+Quote the post's central claim in ONE sentence. Then answer:
+  - Is this a REAL opinion (someone could disagree), or just an observation
+    ("the gap between X and Y", "AI can do X but can't do Y", neutral description)?
+  - Is the claim CONTESTABLE — could a reasonable person argue the opposite?
+
+If the post is observation-mode (descriptive, hedged, split-the-middle)
+it FAILS even if beautifully written. LinkedIn's algorithm rewards
+contrarian takes; neutral observations scroll past.
+
+═══════════════════════════════════════════════════════════════════════════════
+Q3. SKI-JUMP STRUCTURE — is the punchline at the BACK?
+═══════════════════════════════════════════════════════════════════════════════
+
+The Onion's craft rule: all the funny / sharp / surprising goes at the END
+of the sentence, the end of the paragraph, and the end of the post.
+
+  - Quote the FINAL sentence of the post.
+  - Quote the SINGLE strongest/sharpest sentence in the post.
+  - Are these the same sentence?
+
+PASSES when the final sentence IS the sharpest / most punchy / most
+screenshotable. FAILS when the strongest line is buried in the middle
+and the post fades to a wistful close.
+
+═══════════════════════════════════════════════════════════════════════════════
+Q4. FIRST 49 CHARS — does the pre-truncation fragment pull readers in?
+═══════════════════════════════════════════════════════════════════════════════
+
+The first 49 characters (quoted above) are what LinkedIn shows before the
+"see more" button. If this fragment ALONE doesn't stop the scroll, the
+post is invisible.
+
+Read ONLY the fragment above — ignore the rest of the post. Would a
+stranger reading JUST that stop scrolling to expand?
+
+PASSES only if yes.
+
+═══════════════════════════════════════════════════════════════════════════════
 
 Return STRICT JSON:
 {{
-  "q1_insight": {{"sentence": "<one-sentence insight>", "is_rephrase": <bool>, "passes": <true if not a rephrase and sentence is non-empty>}},
-  "q2_surprise_moment": {{"sentence": "<exact quote or 'none'>", "found": <bool>, "why": "<brief>"}},
-  "q3_specific_reader": {{"reader": "<role + moment, <=10 words>", "found": <bool>}},
-  "q4_something_new_taught": {{"what_they_learn": "<specific thing or 'nothing'>", "found": <bool>}},
+  "q1_stepps": {{
+    "factors_hit": [<subset of: social_currency, trigger, emotion, public, practical, stories>],
+    "justifications": {{"<factor>": "<one sentence — why this post hits this factor>"}},
+    "count": <int, len(factors_hit)>,
+    "passes": <true iff count >= 2>
+  }},
+  "q2_opinion_strength": {{
+    "claim": "<one sentence — the central claim, quoted or paraphrased from the post>",
+    "has_real_opinion": <bool>,
+    "contestable": <bool — could a reasonable person argue the opposite>,
+    "why": "<one clause — what makes this an opinion or not>",
+    "passes": <true iff has_real_opinion AND contestable>
+  }},
+  "q3_ski_jump": {{
+    "final_sentence": "<exact quote of the last sentence>",
+    "strongest_sentence": "<exact quote of the strongest sentence>",
+    "punchline_at_back": <true iff the strongest sentence IS the final sentence OR is one of the final two sentences>,
+    "why": "<one clause>",
+    "passes": <true iff punchline_at_back>
+  }},
+  "q4_first_49": {{
+    "opening_fragment": "<the first 49 chars, quoted>",
+    "char_count": <int>,
+    "pulls_reader_in": <bool>,
+    "why": "<one clause — why it does or doesn't pull>",
+    "passes": <true iff pulls_reader_in>
+  }},
   "engagement_prediction": "<viral | solid | moderate | flop>",
   "word_count": {word_count}
 }}"""
 
     def _parse_validation(self, content: Dict[str, Any], post: LinkedInPost = None) -> ValidationScore:
-        q1 = content.get("q1_insight", {}) if isinstance(content, dict) else {}
-        q2 = content.get("q2_surprise_moment", {}) if isinstance(content, dict) else {}
-        q3 = content.get("q3_specific_reader", {}) if isinstance(content, dict) else {}
-        q4 = content.get("q4_something_new_taught", {}) if isinstance(content, dict) else {}
+        """Phase 3 viral-science parse.
 
-        q1_pass = bool(q1.get("passes", False)) and not bool(q1.get("is_rephrase", True)) and bool(str(q1.get("sentence", "")).strip())
-        q2_pass = bool(q2.get("found", False))
-        q3_pass = bool(q3.get("found", False)) and bool(str(q3.get("reader", "")).strip())
-        q4_pass = bool(q4.get("found", False))
+        Q1 (STEPPS) is a HARD GATE — below 2 factors = auto-fail regardless
+        of Q2-Q4. Q2-Q4 (opinion / ski-jump / first-49) contribute to the
+        standard pass-count-based approval (2 of 3 needed in addition to
+        length + STEPPS gate).
+
+        Legacy key fallbacks kept so in-flight drafts using the old schema
+        (q1_insight / q2_surprise_moment etc.) still parse as defaults
+        without crashing.
+        """
+        if not isinstance(content, dict):
+            content = {}
+
+        q1 = content.get("q1_stepps") or content.get("q1_insight") or {}
+        q2 = content.get("q2_opinion_strength") or content.get("q2_surprise_moment") or {}
+        q3 = content.get("q3_ski_jump") or content.get("q3_specific_reader") or {}
+        q4 = content.get("q4_first_49") or content.get("q4_something_new_taught") or {}
+
+        # Q1 — STEPPS hard gate (2+ factors required)
+        factors_hit = q1.get("factors_hit") or []
+        if not isinstance(factors_hit, list):
+            factors_hit = []
+        # Keep only recognized factors in case the model invents new ones
+        factors_hit = [f for f in factors_hit if f in STEPPS_FACTORS]
+        stepps_count = len(factors_hit)
+        q1_pass = stepps_count >= 2
+
+        # Q2 — opinion strength
+        q2_pass = bool(q2.get("passes", False)) or (
+            bool(q2.get("has_real_opinion", False)) and bool(q2.get("contestable", False))
+        )
+
+        # Q3 — ski-jump structure
+        q3_pass = bool(q3.get("passes", False)) or bool(q3.get("punchline_at_back", False))
+
+        # Q4 — first-49-char hook
+        q4_pass = bool(q4.get("passes", False)) or bool(q4.get("pulls_reader_in", False))
 
         try:
             word_count = int(content.get("word_count", len(post.content.split()) if post else 0))
@@ -216,67 +366,111 @@ Return STRICT JSON:
             word_count = len(post.content.split()) if post else 0
         length_ok = 40 <= word_count <= 90
 
-        passes = [q1_pass, q2_pass, q3_pass, q4_pass]
-        pass_count = sum(passes)
+        # Viral-science gate structure (Phase 3, 2026-04-19):
+        #   - STEPPS (Q1) is HARD — below 2 factors and the post cannot ship.
+        #   - Among Q2/Q3/Q4 (opinion / ski-jump / first-49), 2 of 3 must pass.
+        #   - Length still required.
+        #
+        # Rationale: STEPPS is the core shareability science. A post that
+        # doesn't hit 2+ Berger factors won't spread regardless of how well
+        # it's written. Q2-Q4 are structural quality — 2/3 allows one soft
+        # signal to slip while still catching posts that are broken on
+        # multiple structural fronts.
+        core_passes = [q2_pass, q3_pass, q4_pass]
+        core_count = sum(core_passes)
+        approved = length_ok and q1_pass and core_count >= 2
 
-        # Require 3 of 4 to pass (not all 4). Same reasoning as Sarah: four
-        # nitpicky diagnostic questions at 4/4 required gave ~18% approval
-        # rate in practice. A post with a clear insight, surprise moment, and
-        # visible reader shouldn't be blocked because Jordan couldn't identify
-        # "what a topic-aware reader would learn" (Q4).
-        approved = length_ok and pass_count >= 3
-
-        if pass_count == 4 and length_ok:
+        # Score mapping — approved iff >= 7.0 per the ValidationScore contract.
+        if q1_pass and core_count == 3 and length_ok:
             score = 9.0
-        elif pass_count == 3 and length_ok:
-            score = 7.5  # approved threshold
-        elif pass_count == 2:
+        elif q1_pass and core_count == 2 and length_ok:
+            score = 7.5
+        elif q1_pass and core_count == 1:
             score = 5.0
-        elif pass_count == 1:
-            score = 3.0
+        elif q1_pass:
+            score = 4.0
         else:
-            score = 1.0
+            # STEPPS failure — cap at 3.0 so this never approves
+            score = 3.0
 
-        reasons = []
+        reasons: list = []
+        # STEPPS feedback — always include because it's the gate
         if not q1_pass:
             reasons.append(
-                f"Q1 insight: {'no stateable insight — the post only rephrases itself' if q1.get('is_rephrase') else 'insight missing'}."
+                f"Q1 STEPPS HARD GATE: only {stepps_count} factor(s) hit "
+                f"({', '.join(factors_hit) or 'none'}). Need >= 2 of "
+                f"{', '.join(STEPPS_FACTORS)}. This post won't spread."
             )
+        else:
+            # Always log the hits for observability even on pass
+            reasons.append(
+                f"STEPPS hits ({stepps_count}): {', '.join(factors_hit)}"
+            )
+
         if not q2_pass:
-            reasons.append("Q2 surprise: no scroll-stopping moment — plays safe.")
+            claim = q2.get("claim", "")
+            reasons.append(
+                f"Q2 opinion: no real contestable take — \"{claim}\". "
+                f"Post is observation, not opinion. Rewrite with a claim someone could disagree with."
+            )
         if not q3_pass:
-            reasons.append("Q3 reader: too generic — can't visualize who specifically stops scrolling.")
+            strongest = q3.get("strongest_sentence", "")
+            final = q3.get("final_sentence", "")
+            reasons.append(
+                f"Q3 ski-jump: punchline buried in middle. Strongest line: \"{strongest}\" — "
+                f"ended on: \"{final}\". Move the sharpest line to the final period."
+            )
         if not q4_pass:
-            reasons.append(f"Q4 learning: reader who knows the topic learns \"{q4.get('what_they_learn','nothing')}\".")
+            frag = q4.get("opening_fragment", "")
+            reasons.append(
+                f"Q4 first-49: opening fragment doesn't pull — \"{frag}\". "
+                f"Rewrite the first 49 chars to stand alone as a hook."
+            )
         if not length_ok:
             reasons.append(f"Length: {word_count} words (must be 40-90).")
 
         feedback = " | ".join(reasons) if reasons else ""
 
         criteria_breakdown = {
-            "q1_insight": q1,
-            "q2_surprise_moment": q2,
-            "q3_specific_reader": q3,
-            "q4_something_new_taught": q4,
+            "q1_stepps": {
+                "factors_hit": factors_hit,
+                "count": stepps_count,
+                "justifications": q1.get("justifications") or {},
+                "passes": q1_pass,
+            },
+            "q2_opinion_strength": q2,
+            "q3_ski_jump": q3,
+            "q4_first_49": q4,
             "engagement_prediction": str(content.get("engagement_prediction", "moderate")),
-            "passes": {"q1": q1_pass, "q2": q2_pass, "q3": q3_pass, "q4": q4_pass},
-            "length_ok": length_ok,
+            "passes": {
+                "q1_stepps": q1_pass,
+                "q2_opinion": q2_pass,
+                "q3_ski_jump": q3_pass,
+                "q4_first_49": q4_pass,
+                "length": length_ok,
+            },
+            "stepps_count": stepps_count,
             "word_count": word_count,
             "model": self.model,
         }
 
-        # Short provider tag derived from the model name — "claude-haiku-4-5..."
-        # → "haiku", "gpt-4o" → "gpt", etc. Keeps logs accurate if we swap providers later.
-        provider_tag = (self.model.split("-")[0] if self.model else "?").lower()
-        if "haiku" in self.model.lower():
+        # Short provider tag for log clarity
+        provider_tag = "?"
+        model_lower = (self.model or "").lower()
+        if "haiku" in model_lower:
             provider_tag = "haiku"
-        elif "sonnet" in self.model.lower():
+        elif "sonnet" in model_lower:
             provider_tag = "sonnet"
-        elif "gemini" in self.model.lower():
+        elif "gemini" in model_lower:
             provider_tag = "gemini"
+        else:
+            provider_tag = (self.model.split("-")[0] if self.model else "?").lower()
+
+        gate_tag = "🚫STEPPS" if not q1_pass else ""
         self.logger.info(
-            f"Jordan Park ({provider_tag}): {pass_count}/4 passes, {word_count}w "
-            f"{'✅' if approved else '❌'}"
+            f"Jordan Park ({provider_tag}) VIRAL: STEPPS={stepps_count}/6, "
+            f"core={core_count}/3, {word_count}w "
+            f"{'✅' if approved else '❌'}{gate_tag}"
         )
 
         return ValidationScore(
