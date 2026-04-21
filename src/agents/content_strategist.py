@@ -12,9 +12,11 @@ Key differences from v1:
 - Dynamic voice that changes per post
 """
 
+import asyncio
 import json
 import logging
 import random
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional, Any
@@ -831,14 +833,120 @@ phrasing — write a new post in the same voice register."""
             generator_temp = getattr(anthropic_cfg, 'temperature', 0.9) if anthropic_cfg else 0.9
             generator_max_tokens = getattr(anthropic_cfg, 'max_tokens', 600) if anthropic_cfg else 600
 
-            result = await self.generate(
-                prompt=prompt,
-                system_prompt=self.system_prompt,
-                response_format=self.response_format,
-                model=generator_model,
-                temperature=generator_temp,
-                max_tokens=generator_max_tokens,
+            # Phase F (2026-04-21): generate-3-pick-1 (verbalized sampling,
+            # parallel-call variant). Research finding: mode collapse produces
+            # "cold-smart" default completions on every draft; generating
+            # multiple candidates with temp perturbation and picking the one
+            # that weaves in the most architect-specified emotional_contact
+            # specifics yields +25% human-rated quality (Zhang et al., 2025).
+            #
+            # Feature-flagged via config.generator.candidate_selection (default
+            # on). 3 calls in parallel via asyncio.gather. Heuristic scorer
+            # (no extra LLM cost) picks winner based on how much of the
+            # architect's blueprint landed in the candidate text.
+            gen_cfg = getattr(self.config, "generator", None)
+            candidate_selection_enabled = True
+            if gen_cfg is not None:
+                candidate_selection_enabled = bool(
+                    getattr(gen_cfg, "candidate_selection", True)
+                )
+            bp_has_ec = bool(
+                (blueprint or {}).get("emotional_contact", {}).get("complete")
             )
+            use_candidates = candidate_selection_enabled and bp_has_ec
+
+            if use_candidates:
+                # Perturb temperature across 3 runs to escape mode collapse.
+                # Research shows same-prompt + same-temp tends to converge
+                # on the same safe completion; varying temps forces the
+                # sampler to explore.
+                base_t = float(generator_temp)
+                temps = [
+                    max(0.2, base_t - 0.08),
+                    base_t,
+                    min(1.2, base_t + 0.08),
+                ]
+
+                async def _one_call(t: float):
+                    return await self.generate(
+                        prompt=prompt,
+                        system_prompt=self.system_prompt,
+                        response_format=self.response_format,
+                        model=generator_model,
+                        temperature=t,
+                        max_tokens=generator_max_tokens,
+                    )
+
+                candidate_results = await asyncio.gather(
+                    *(_one_call(t) for t in temps), return_exceptions=True
+                )
+
+                # Unpack, score, pick best
+                scored: List[Dict[str, Any]] = []
+                for idx, cand_res in enumerate(candidate_results):
+                    if isinstance(cand_res, Exception):
+                        self.logger.warning(
+                            f"Candidate #{idx+1} (t={temps[idx]:.2f}) raised: {cand_res}"
+                        )
+                        continue
+                    cand_text = self._unpack_generation_content(cand_res)
+                    if not cand_text:
+                        continue
+                    cand_text = self._clean_content(cand_text)
+                    score_info = self._score_emotional_contact(cand_text, blueprint)
+                    scored.append({
+                        "idx": idx,
+                        "temp": temps[idx],
+                        "result": cand_res,
+                        "content": cand_text,
+                        "score": score_info["score"],
+                        "hits": score_info["hits"],
+                        "misses": score_info["misses"],
+                        "length_ok": score_info["length_ok"],
+                        "sentence_length_ok": score_info["sentence_length_ok"],
+                        "slop_present": score_info["slop_present"],
+                    })
+
+                if scored:
+                    # Pick highest-scored candidate; ties go to lower index
+                    scored.sort(key=lambda s: (-s["score"], s["idx"]))
+                    winner = scored[0]
+                    result = winner["result"]
+                    summary = ", ".join(
+                        f"#{s['idx']+1}(t={s['temp']:.2f}):{s['score']}"
+                        for s in scored
+                    )
+                    self.logger.info(
+                        f"🎲 Candidate selection ({len(scored)}/3): "
+                        f"{summary} → winner #{winner['idx']+1} "
+                        f"(score={winner['score']}, hits={len(winner['hits'])}, "
+                        f"misses={len(winner['misses'])})"
+                    )
+                else:
+                    self.logger.warning(
+                        "All 3 candidates failed to unpack — falling back to single-call"
+                    )
+                    result = await self.generate(
+                        prompt=prompt,
+                        system_prompt=self.system_prompt,
+                        response_format=self.response_format,
+                        model=generator_model,
+                        temperature=generator_temp,
+                        max_tokens=generator_max_tokens,
+                    )
+            else:
+                if not bp_has_ec:
+                    self.logger.info(
+                        "🎲 Candidate selection skipped — blueprint emotional_contact incomplete"
+                    )
+                result = await self.generate(
+                    prompt=prompt,
+                    system_prompt=self.system_prompt,
+                    response_format=self.response_format,
+                    model=generator_model,
+                    temperature=generator_temp,
+                    max_tokens=generator_max_tokens,
+                )
             
             # FIXED: Better handling of the response structure
             # The result contains a 'content' field with the parsed JSON from OpenAI
@@ -1622,6 +1730,172 @@ post using the angle and trend above.
         ),
     }
 
+    def _score_emotional_contact(
+        self,
+        content: str,
+        blueprint: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Heuristic score: does this candidate contain the architect's
+        four emotional_contact specifics?
+
+        This is the picker for the generate-3-pick-1 flow. Higher-scoring
+        candidates weave more of the architect's concrete specifics into
+        the actual post body — which the research identifies as the
+        mechanism for emotional contact (Ogilvy/Onion/Berger convergence:
+        specificity is the emotional vector).
+
+        Returns dict with fields:
+            score: int (0-100)
+            hits: list of (field_name, matched_snippet) tuples
+            misses: list of field_name strings
+            length_ok: bool
+            sentence_length_ok: bool
+
+        Signal design (rough points):
+          +15  named_stakeholder keywords present
+          +15  private_scene keywords present
+          +15  photographable_noun present (exact noun)
+          +10  scale_anchor left-side keyword present
+          +10  scale_anchor right-side keyword present
+          +10  anchor_human named
+          +5   length within target
+          +5   no sentence over 25 words (Marcus hard gate)
+          -10  slop terms present ("the market", "the economy", etc.)
+        """
+        result = {
+            "score": 0,
+            "hits": [],
+            "misses": [],
+            "length_ok": False,
+            "sentence_length_ok": True,
+            "slop_present": [],
+        }
+        if not content:
+            return result
+        lower = content.lower()
+
+        def _has_any_keyword(val: str) -> Optional[str]:
+            """Return the first keyword from val that appears in content."""
+            if not val:
+                return None
+            # Extract meaningful nouns (3+ chars, drop stopwords/articles)
+            words = re.findall(r"[A-Za-z']{3,}", val.lower())
+            stopwords = {
+                "the", "and", "for", "with", "from", "that", "this", "their",
+                "some", "one", "two", "three", "who", "had", "has", "have",
+                "been", "was", "were", "are", "is", "about", "into", "just",
+                "only", "also", "your", "you", "our", "not", "its", "a", "an",
+                "in", "at", "on", "of", "to", "by", "or", "as", "be", "it",
+                "they", "them", "she", "he", "her", "him", "but", "if",
+            }
+            words = [w for w in words if w not in stopwords]
+            for w in words:
+                if w in lower:
+                    return w
+            # Fallback: check entire phrase substring (handles multi-word)
+            if len(val) > 3 and val.lower() in lower:
+                return val.lower()
+            return None
+
+        bp = blueprint or {}
+        ec = bp.get("emotional_contact") or {}
+
+        # 1. named_stakeholder
+        stake = (ec.get("named_stakeholder") or "").strip()
+        hit = _has_any_keyword(stake)
+        if hit:
+            result["score"] += 15
+            result["hits"].append(("named_stakeholder", hit))
+        elif stake:
+            result["misses"].append("named_stakeholder")
+
+        # 2. private_scene
+        scene = (ec.get("private_scene") or "").strip()
+        hit = _has_any_keyword(scene)
+        if hit:
+            result["score"] += 15
+            result["hits"].append(("private_scene", hit))
+        elif scene:
+            result["misses"].append("private_scene")
+
+        # 3. photographable_noun — we weight this heavily: the Ogilvy rule
+        noun = (ec.get("photographable_noun") or "").strip()
+        hit = _has_any_keyword(noun)
+        if hit:
+            result["score"] += 15
+            result["hits"].append(("photographable_noun", hit))
+        elif noun:
+            result["misses"].append("photographable_noun")
+
+        # 4. scale_anchor — split on '/' and check both sides
+        scale = (ec.get("scale_anchor") or "").strip()
+        if scale:
+            if "/" in scale:
+                left, right = scale.split("/", 1)
+            else:
+                left, right = scale, ""
+            lh = _has_any_keyword(left)
+            rh = _has_any_keyword(right) if right else None
+            if lh:
+                result["score"] += 10
+                result["hits"].append(("scale_anchor_left", lh))
+            elif left.strip():
+                result["misses"].append("scale_anchor_left")
+            if rh:
+                result["score"] += 10
+                result["hits"].append(("scale_anchor_right", rh))
+            elif right.strip():
+                result["misses"].append("scale_anchor_right")
+
+        # 5. anchor_human
+        anchor = (bp.get("anchor_human") or "").strip()
+        if anchor:
+            first_name = anchor.split()[0]
+            if first_name.lower() in lower or anchor.lower() in lower:
+                result["score"] += 10
+                result["hits"].append(("anchor_human", first_name))
+            else:
+                result["misses"].append("anchor_human")
+
+        # 6. length in target range
+        length_target = (bp.get("length_target") or "medium").lower()
+        length_ranges = {
+            "short": (40, 55),
+            "medium": (55, 75),
+            "long": (75, 95),
+        }
+        lo, hi = length_ranges.get(length_target, (40, 90))
+        wc = len(content.split())
+        if lo <= wc <= hi:
+            result["score"] += 5
+            result["length_ok"] = True
+        # Lighter penalty for near-miss (±10% of range)
+        elif (lo - 5) <= wc <= (hi + 5):
+            result["score"] += 2
+
+        # 7. sentence-length gate (Marcus style)
+        flat = re.sub(r"\s+", " ", content).strip()
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", flat) if s.strip()]
+        max_sentence_wc = max((len(s.split()) for s in sentences), default=0)
+        if max_sentence_wc <= 25:
+            result["score"] += 5
+            result["sentence_length_ok"] = True
+        else:
+            result["sentence_length_ok"] = False
+
+        # 8. slop penalty — presence of abstraction-slop terms
+        slop_terms = [
+            "employees", "the workforce", "the market", "the economy",
+            "innovation", "progress", "the narrative", "the industry",
+            "stakeholders", "humanity", "investors", "the big picture",
+        ]
+        hit_slop = [t for t in slop_terms if t in lower]
+        if hit_slop:
+            result["score"] -= min(10, len(hit_slop) * 5)
+            result["slop_present"] = hit_slop
+
+        return result
+
     def _build_blueprint_block(self, blueprint: Optional[Dict[str, Any]]) -> str:
         """Render the architect's blueprint as a prominent prompt block.
 
@@ -1684,6 +1958,46 @@ post using the angle and trend above.
         temperature_hint = temperature_hints.get(emotional_temperature, "Deadpan but warm.")
         anchor_human = (blueprint.get("anchor_human") or "").strip() or None
         contact_beat = (blueprint.get("contact_beat") or "").strip()
+
+        # Phase F (2026-04-21): emotional_contact four-field block.
+        # These are the RAW MATERIALS the generator must weave into at
+        # least one sentence. Specificity is the emotional vector.
+        ec = blueprint.get("emotional_contact") or {}
+        ec_named = (ec.get("named_stakeholder") or "").strip()
+        ec_scene = (ec.get("private_scene") or "").strip()
+        ec_noun = (ec.get("photographable_noun") or "").strip()
+        ec_scale = (ec.get("scale_anchor") or "").strip()
+        ec_complete = bool(ec.get("complete"))
+        ec_block = ""
+        if ec_named or ec_scene or ec_noun or ec_scale:
+            ec_block = f"""
+── EMOTIONAL CONTACT — RAW MATERIALS (Phase F, must appear in the post) ──
+These four micro-fields are the architect's contract. The post MUST
+weave these concrete specifics into at least ONE sentence that
+functions as the contact beat. Abstraction equivalents ("employees",
+"the market", "investors") are BANNED — they void the contract.
+
+  1. named_stakeholder:   {ec_named or '(missing — invent a specific human)'}
+  2. private_scene:       {ec_scene or '(missing — invent a private hour/place/state)'}
+  3. photographable_noun: {ec_noun or '(missing — invent one concrete object)'}
+  4. scale_anchor:        {ec_scale or '(missing — invent an institutional/domestic pair)'}
+
+HOW TO USE: weave these four specifics into at least ONE sentence of
+the post. You do NOT have to cram all four into one line — but the
+post must NAME the stakeholder OR the scene, include the photographable
+noun somewhere, and at some point land the scale_anchor gap. That
+sentence IS the contact beat. It is simultaneously the funny line AND
+the feeling line AND the eye-catching line.
+
+EXAMPLE of how the four fields compose into a contact beat:
+  named_stakeholder: "a Microsoft PM"
+  private_scene: "2:47am, unable to sleep"
+  photographable_noun: "a phone face-down on the pillow"
+  scale_anchor: "13% market cap gain / one couple deciding to have the kid"
+  → Composed line: "Microsoft gained the GDP of Slovenia in a week. A PM
+     somewhere checked the 401k app at 2:47am and put the phone face-down.
+     The couple had been waiting to decide about the kid. They decided."
+"""
         length_meta = {
             "short": ("40-55 words", "Compressed punch. 3-5 sentences. No setup, just impact."),
             "medium": ("55-75 words", "Standard length. 5-8 sentences. Setup → escalation → punch."),
@@ -1736,6 +2050,7 @@ separate sincere moment (that's Medium-essay). The Jesse voice doing double-
 duty in ONE line. Example from a strong past post: "We are more comfortable
 being witnessed by fiction than by each other. The fake prayer lands. The
 real one bounces off the voicemail."
+{ec_block}
 
 ── OPINION (the post's spine — it MUST express this claim): ──
   Type: {opinion_type}

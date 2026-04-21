@@ -151,33 +151,42 @@ Q5. grammar_clean — Is the post free of grammatical errors, typos, awkward
     Quote the specific error and explain in one clause. If the post is clean,
     set is_clean=true and quote nothing.
 
-Q6. emotional_contact — SOFT SIGNAL (does NOT block approval, just flags).
-    Does the post have AT LEAST ONE sentence that makes emotional contact with
-    the reader — a line that is simultaneously FUNNY + EMOTIONALLY LANDING +
-    EYE-CATCHING? This is the "contact beat" — the moment the post stops being
-    pure clinical observation and lands a line that MOVES the reader (makes
-    them laugh-and-wince, feel seen, feel something specific).
+Q6. emotional_contact_checksum — SOFT SIGNAL (does NOT block approval).
+    This is NOT a taste judgment. This is a concrete checksum for the
+    specificity rule (Ogilvy/Onion/Berger): the reader only feels something
+    when the post names ONE photographable object OR ONE private human hour.
 
-    A contact beat is NOT:
-      ✗ Generic observation ("The algorithm saw it.")
-      ✗ Pure deadpan data ("Engagement dropped 40%.")
-      ✗ Aphoristic closer pretending to be profound
-      ✗ Clinical diagnosis with no human stakes
+    You are answering two yes/no questions:
 
-    A contact beat IS:
-      ✓ "The resume said 8 years of experience. The hands said otherwise."
-      ✓ "Her LinkedIn still says Senior Engineer. The badge stopped working Tuesday."
-      ✓ "He asked the model to write his father's eulogy. It opened with 'In today's
-         fast-paced world.'"
-      Something that is funny AND reveals a specific human texture AND makes the
-      reader do a double-take.
+    (A) photographable_noun — Does the post name at least ONE concrete
+        object that could physically be photographed?
+          ✓ YES: "a thermostat", "a phone on the counter", "a lanyard",
+                 "a Post-it note", "the paper he handwrote it on", "a yellow
+                 legal pad", "her pager"
+          ✗ NO:  "the market", "the economy", "innovation", "progress",
+                 "the narrative", "stakeholders", "the industry" — these
+                 are concepts, not objects. A camera can't catch them.
 
-    If ZERO sentences make emotional contact (the whole post is cold-smart
-    observation with no line that lands), set has_contact=false and identify
-    the closest candidate sentence + why it falls short.
+    (B) private_human_hour — Does the post name at least ONE specific
+        human hour, place, or private state?
+          ✓ YES: "3am", "2:47am", "the parking lot at closing",
+                 "Thanksgiving dinner", "the bathroom at work", "alone
+                 with no good answers", "refreshing the app on mute"
+          ✗ NO:  "the workplace", "the media cycle", "the news", "the
+                 quarterly earnings call" — these are institutional
+                 abstractions, not private human moments.
 
-    If at least one sentence lands (funny + feeling + eye-catching in one move),
-    quote it and set has_contact=true.
+    PASS (has_checksum=true) if EITHER (A) or (B) is satisfied.
+    FLAG (has_checksum=false) only if the post has NEITHER a photographable
+    object NOR a private human hour.
+
+    If flagged, quote the closest candidate and what a concrete version
+    would look like (e.g., "replace 'the market reacted' with 'a retiree
+    checking the brokerage app at 6am'").
+
+    This is a mechanical check, not a vibe check. Either the concrete noun
+    is present or it isn't. Do not soften it — either the post has it or
+    it doesn't.
 
 Return STRICT JSON:
 {{
@@ -191,7 +200,7 @@ Return STRICT JSON:
   "q3_essay_drift_anywhere": {{"tell": "<exact phrase or 'nowhere'>", "location": "<'opener' | 'middle' | 'closer' | 'nowhere'>", "mode": "<'reflective' | 'aphoristic_closer' | 'long_introspective' | 'llm_tell' | 'nowhere'>", "justification": "<one sentence>", "has_tell": <bool>}},
   "q4_template_crutch": {{"has_crutch": <bool>, "crutch_opener": "<quote or 'none'>", "earned": <bool>, "alternative_opener": "<proposed opener or 'n/a'>"}},
   "q5_grammar_clean": {{"is_clean": <bool>, "error_quote": "<exact phrase if error, else ''>", "error_type": "<typo|agreement|dangling|run_on|punctuation|fragment|word_choice|tense|nowhere>", "fix_hint": "<one clause suggesting the fix>"}},
-  "q6_emotional_contact": {{"has_contact": <bool>, "contact_quote": "<exact sentence that lands, or ''>", "near_miss_quote": "<closest candidate if has_contact=false, else ''>", "near_miss_why": "<one clause — why it falls short, if applicable>"}},
+  "q6_emotional_contact": {{"has_checksum": <bool>, "photographable_noun": "<exact noun from post, or '' if none>", "private_human_hour": "<exact phrase from post, or '' if none>", "nearest_abstraction": "<closest-to-concrete abstract phrase from post if flagged, else ''>", "concrete_fix_hint": "<one clause — what a concrete replacement would look like, if flagged>"}},
   "word_count": {word_count}
 }}"""
 
@@ -224,9 +233,15 @@ Return STRICT JSON:
         # Default to True when the field is absent so in-flight drafts from
         # older prompts don't get over-blamed.
         q5_pass = bool(q5.get("is_clean", True))
-        # Q6 (emotional contact) is a SOFT signal — does NOT block approval.
-        # Default to True so legacy drafts without the field don't get flagged.
-        q6_has_contact = bool(q6.get("has_contact", True))
+        # Q6 (emotional-contact checksum) is a SOFT signal — does NOT block
+        # approval. Phase F (2026-04-21): rewritten from a taste judgment
+        # to an empirical checksum. The post passes Q6 if it names either
+        # a photographable object OR a private human hour (specificity
+        # rule from Ogilvy/Onion/Berger). Default True so legacy drafts
+        # without the field don't get blamed.
+        q6_has_contact = bool(
+            q6.get("has_checksum", q6.get("has_contact", True))
+        )
 
         try:
             word_count = int(content.get("word_count", len(post.content.split()) if post else 0))
@@ -336,17 +351,20 @@ Return STRICT JSON:
                 f'"{offender}..." Break into 2-3 short declaratives. '
                 f"Liquid Death sentences average 6-10 words — never over 25."
             )
-        # Q6 soft flag — post is cold-smart, no line that lands emotionally.
-        # Does NOT block approval but surfaces feedback so next revision lands harder.
+        # Q6 soft flag — post failed the concrete-specificity checksum.
+        # Does NOT block approval but surfaces feedback so next revision
+        # hits either a photographable noun or a private human hour.
         if not q6_has_contact:
-            near_miss = q6.get("near_miss_quote", "")
-            near_why = q6.get("near_miss_why", "")
+            nearest = q6.get("nearest_abstraction", "")
+            concrete_hint = q6.get("concrete_fix_hint", "")
             reasons.append(
-                f"SOFT — no emotional contact beat. Closest candidate: "
-                f'"{near_miss}" — {near_why} '
-                f"Every post needs ONE sentence that is funny + emotionally landing "
-                f"+ eye-catching at once. Not pure observation — a line that makes "
-                f"the reader laugh-and-wince."
+                f"SOFT — no emotional-contact checksum. Post has no "
+                f"photographable object and no private human hour. "
+                f'Closest abstraction: "{nearest}". Concrete fix: '
+                f"{concrete_hint} — specificity IS the emotional vector "
+                f"(Ogilvy/Onion rule). The reader only feels when the "
+                f"post names one thing a camera could catch or one "
+                f"hour a specific human is living."
             )
 
         feedback = " | ".join(reasons) if reasons else ""

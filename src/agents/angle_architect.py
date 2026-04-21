@@ -258,6 +258,120 @@ STRUCTURE_SHAPES = {
     },
 }
 
+# Phase F (2026-04-21): emotional_contact compositional blueprint.
+# Research finding: prose "contact_beat" field too abstract — generator
+# drifts to cold-smart observation because there's too much interpretation
+# room. Fix per Onion/Ogilvy/Berger convergence: force 4 typed micro-fields
+# that the generator cannot fulfill with abstraction.
+#
+#   - named_stakeholder: ONE implied human + role (not "employees" — "a PM",
+#     "someone's kid", "a Best Buy clerk"). Universal via specificity.
+#   - private_scene: ONE human hour/place/state (3am, kitchen table,
+#     refreshing email, parking lot, waiting for a text).
+#   - photographable_noun: ONE concrete object that could be photographed
+#     (thermostat, lanyard, phone, sticky note, paper) — NOT a concept
+#     (the market, the economy, progress, innovation).
+#   - scale_anchor: ONE bureaucratic/institutional unit paired with one
+#     domestic consequence in the same sentence-scale. "The GDP of Slovenia
+#     / the dental appointment that got cancelled".
+#
+# These four fields are REQUIRED non-empty. If the architect emits an
+# empty field, re-prompt once to fill; if still missing, degrade with a
+# warning (don't block generation).
+EMOTIONAL_CONTACT_FIELDS = {
+    "named_stakeholder": {
+        "definition": (
+            "ONE implied human with a role or relation. Not 'employees' — "
+            "'a PM at Microsoft.' Not 'people' — 'someone's kid.' Not "
+            "'investors' — 'a retiree checking their brokerage app.' "
+            "Specificity is the emotional vector (Ogilvy/Handley/Onion)."
+        ),
+        "good_examples": [
+            "a Microsoft PM calling their partner",
+            "someone's kid who heard about the layoff at Thanksgiving",
+            "a Best Buy clerk waiting for closing",
+            "the French prosecutor who cleared their afternoon",
+            "a single mother refreshing the 401k app",
+        ],
+        "bad_examples": [
+            "employees",
+            "the workforce",
+            "people",
+            "investors",
+            "the market",
+        ],
+    },
+    "private_scene": {
+        "definition": (
+            "ONE human hour, place, or state. A private moment — the kind "
+            "of moment institutions don't show. The 3am Test: did you name "
+            "a specific hour, a kitchen, a parking lot, a state of waiting? "
+            "If the post could happen only in boardrooms and press releases, "
+            "the scene is missing."
+        ),
+        "good_examples": [
+            "2:47am, ceiling staring",
+            "Thanksgiving dinner with the brother-in-law",
+            "a parking lot, engine running, phone unopened",
+            "reading the email in the bathroom",
+            "refreshing Twitter before getting out of bed",
+        ],
+        "bad_examples": [
+            "the workplace",
+            "the industry",
+            "the media cycle",
+            "the boardroom",
+            "the press conference",
+        ],
+    },
+    "photographable_noun": {
+        "definition": (
+            "ONE concrete object that could physically be photographed. "
+            "The Ogilvy/Handley spec: sensory and real. Not a concept — "
+            "an object. A thermostat, a lanyard, a Post-it, a fridge note, "
+            "a phone, a paper chart. If you can't photograph it, you "
+            "haven't specified it. NEVER 'the market' or 'innovation.'"
+        ),
+        "good_examples": [
+            "a thermostat",
+            "a laminated lanyard",
+            "a yellow legal pad",
+            "a phone face-down on the counter",
+            "a sticky note on the fridge",
+            "the paper the hearing was handwritten on",
+        ],
+        "bad_examples": [
+            "the market",
+            "the economy",
+            "innovation",
+            "progress",
+            "the narrative",
+        ],
+    },
+    "scale_anchor": {
+        "definition": (
+            "ONE pair: a bureaucratic/institutional unit on one side, a "
+            "domestic/bodily consequence on the other. The Grok-no-legs "
+            "move. 'The GDP of Slovenia / the dental appointment' — the "
+            "two belong in the same sentence, and the gap IS the joke "
+            "AND the feeling. Both sides are concrete."
+        ),
+        "good_examples": [
+            "13% market cap gain / one PM's ceiling at 2am",
+            "trillion-dollar pivot / a hardware VP's promotion party",
+            "AI chatbot subpoena / no legs to walk to the hearing",
+            "Oval Office ceremony / what a Bible is at 3am",
+            "39-cent price target revision / a vending machine rounding error",
+        ],
+        "bad_examples": [
+            "the big picture / the small picture",
+            "macro trends / micro trends",
+            "the company / the people",
+            "progress / humanity",
+        ],
+    },
+}
+
 # Phase E (2026-04-21): emotional temperature. Client feedback: posts are
 # technically varied in register/length/shape but emotionally flat —
 # "cold-smart" across the board. This is what Jesse FEELS about the story,
@@ -414,13 +528,16 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
                 recent_emotional_temperatures=recent_emotional_temperatures,
             )
 
+            ec = blueprint.get("emotional_contact", {}) or {}
+            ec_mark = "✅" if ec.get("complete") else "⚠️ INCOMPLETE"
             self.logger.info(
                 f"🏛️  Architect: register={blueprint.get('register')} "
                 f"temp={blueprint.get('emotional_temperature','?')} "
                 f"opinion={blueprint.get('opinion', {}).get('type','?')} "
                 f"len={blueprint.get('length_target','?')} "
                 f"shape={blueprint.get('structure_shape','?')} "
-                f"anchor={blueprint.get('anchor_human','?')[:20] if blueprint.get('anchor_human') else '—'}"
+                f"anchor={blueprint.get('anchor_human','?')[:20] if blueprint.get('anchor_human') else '—'} "
+                f"ec={ec_mark}"
             )
             return blueprint
 
@@ -629,6 +746,27 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
             for k, v in EMOTIONAL_TEMPERATURES.items()
         )
 
+        # Phase F: render the four emotional_contact field specs with
+        # worked examples inline (good + bad) so the architect has
+        # concrete signal to copy from, not just abstract definitions.
+        def _render_contact_field(spec: Dict[str, Any]) -> str:
+            good = "\n".join(f"    ✓ {g}" for g in spec["good_examples"])
+            bad = "\n".join(f"    ✗ {b}" for b in spec["bad_examples"])
+            return f"  {spec['definition']}\n  GOOD:\n{good}\n  BAD (abstract slop):\n{bad}"
+
+        named_stakeholder_spec = _render_contact_field(
+            EMOTIONAL_CONTACT_FIELDS["named_stakeholder"]
+        )
+        private_scene_spec = _render_contact_field(
+            EMOTIONAL_CONTACT_FIELDS["private_scene"]
+        )
+        photographable_noun_spec = _render_contact_field(
+            EMOTIONAL_CONTACT_FIELDS["photographable_noun"]
+        )
+        scale_anchor_spec = _render_contact_field(
+            EMOTIONAL_CONTACT_FIELDS["scale_anchor"]
+        )
+
         # Phase E: recent-opening-pattern block. Client review: every
         # clinical post opens "Clinical finding:". Track the first word
         # or first 2-3 words of recent posts so architect can vary.
@@ -783,22 +921,67 @@ story but the post never looks at her. It looks at "the handwriting."
 The handwriting isn't the subject. Liv is.
 
 ═══════════════════════════════════════════════════════════════════════════════
-CONTACT BEAT (one sentence that delivers feeling + funny + surprise in ONE line)
+EMOTIONAL CONTACT — FOUR REQUIRED MICRO-FIELDS (Phase F, 2026-04-21)
 ═══════════════════════════════════════════════════════════════════════════════
 
-This is the emotional pivot. Not a separate sincere moment — the Jesse
-voice doing double duty. One sentence somewhere in the post (often
-near the brutal honesty beat or the punchline, but can be standalone)
-where the reader feels something specific.
+Research finding from the last batch review: only 3/10 posts landed an
+emotional contact beat. The others were cold-smart. The diagnosis: the
+prior "contact_beat" field was prose — generator had too much room to
+interpret and kept defaulting to abstraction.
 
-Example contact beats:
-  - "She wrote them by hand. The paper pressed back."  (tender + eye-catching)
-  - "The algorithm did not flag it. Moderation requires something the
-     platform stopped funding."  (outraged + dry)
-  - "The real one bounces off the voicemail."  (tender + funny + sharp)
+Fix: you now specify the RAW MATERIALS of the contact beat as four typed
+fields. The generator will compose the actual line from your materials.
+ALL FOUR FIELDS ARE REQUIRED. Empty/null fields mean the post will be
+cold-smart and the generator will flounder.
 
-DO NOT write: "It's moving." / "We can all relate." / "This matters." —
-those are tell-don't-show sincerity. The contact beat shows, doesn't tell.
+The mechanic (grounded in Onion + Berger + Ogilvy + Handley):
+SPECIFICITY IS THE EMOTIONAL VECTOR. A named human + a private scene +
+a photographable object + a scale shift = the reader FEELS something.
+Institutions + concepts + abstractions = cold-smart.
+
+── 1. named_stakeholder ──
+{named_stakeholder_spec}
+
+── 2. private_scene ──
+{private_scene_spec}
+
+── 3. photographable_noun ──
+{photographable_noun_spec}
+
+── 4. scale_anchor ──
+{scale_anchor_spec}
+
+WORKED EXAMPLES FROM THE LAST BATCH (what would have fixed the misses):
+
+MISS: "Microsoft jumped 13% in a week. The market is reacting like a dog
+      that just heard the word 'walk.'"
+  named_stakeholder: "a Microsoft PM who just told their partner they
+                     can refinance"
+  private_scene: "2:47am, checking the 401k app on mute"
+  photographable_noun: "a phone face-down on the pillow"
+  scale_anchor: "13% market cap gain / one couple deciding to have the kid"
+
+MISS: "Nvidia's fair value moved $0.39."
+  named_stakeholder: "a retail investor who held for two years"
+  private_scene: "the couch, Sunday, too much coffee"
+  photographable_noun: "a printed-out spreadsheet"
+  scale_anchor: "trillion-dollar AI bet / thirty-nine cents"
+
+MISS: "Faulty drug tests are in CNN's forgotten archives."
+  named_stakeholder: "a parent who got the false-positive result"
+  private_scene: "the driveway after the call from school"
+  photographable_noun: "a printed-out test strip"
+  scale_anchor: "the content cycle / the moment a family is told"
+
+DO NOT write: "employees" / "the workforce" / "the market" / "innovation"
+/ "progress" — these are abstraction slop. Every one of your four fields
+must be something a camera could catch or a specific human could say.
+
+If the story truly has no specific human angle (a pure abstract trend),
+PICK A DIFFERENT STORY — tell the generator by emitting:
+  emotional_contact.abstract_story_warning: true
+and still fill the four fields with your best synthesized imagined
+specifics. The four fields are non-negotiable.
 
 ═══════════════════════════════════════════════════════════════════════════════
 FIRST 49 CHARS — EYE-CATCHING REQUIREMENT
@@ -825,7 +1008,14 @@ Return STRICT JSON — no prose, no code fences:
   "emotional_temperature": "<one of: cold_clinical | dry_amused | tender | outraged | reverent | delighted | weary>",
   "temperature_reasoning": "<one sentence — why this temperature for this trend>",
   "anchor_human": "<name of the specific person at the center of the story, or null if none>",
-  "contact_beat": "<one sentence — the emotional-contact pivot the post will build around>",
+  "emotional_contact": {{
+    "named_stakeholder": "<REQUIRED: one implied human + role — NOT 'employees' or 'investors'>",
+    "private_scene": "<REQUIRED: one human hour/place/state — 3am, a parking lot, waiting>",
+    "photographable_noun": "<REQUIRED: one concrete object — thermostat, phone, lanyard — NOT 'the market'>",
+    "scale_anchor": "<REQUIRED: institutional unit / domestic consequence pair>",
+    "abstract_story_warning": <true if story has no real human angle, false otherwise>
+  }},
+  "contact_beat": "<one sentence — the emotional-contact pivot the post will build around, derived from the four fields above>",
   "opinion": {{
     "type": "<attack | defense | prediction | reframe | confession>",
     "claim": "<one sentence — the actual position Jesse holds>",
@@ -1077,6 +1267,93 @@ Return STRICT JSON — no prose, no code fences:
         if contact_beat.lower() in ("null", "none", "n/a", "—"):
             contact_beat = ""
 
+        # Phase F: emotional_contact four-field enforcement. Parse the
+        # nested dict; each of the 4 required fields must be non-empty and
+        # must not be abstraction-slop (matched against bad_examples
+        # keywords). If ANY field is missing or slop, mark the blueprint
+        # incomplete so the generator can compensate + we log telemetry.
+        ec_raw = content.get("emotional_contact") or {}
+        if not isinstance(ec_raw, dict):
+            ec_raw = {}
+
+        def _normalize_ec_field(key: str, raw_val: Any) -> str:
+            """Trim, strip null-markers, cap length."""
+            s = str(raw_val or "").strip()
+            if s.lower() in ("null", "none", "n/a", "—", ""):
+                return ""
+            return s[:250]
+
+        _slop_terms = {
+            "employees", "the workforce", "the market", "the economy",
+            "innovation", "progress", "the narrative", "the industry",
+            "the big picture", "investors", "people", "humanity",
+            "stakeholders", "society", "workers",
+        }
+
+        def _is_slop(val: str) -> bool:
+            v = val.lower().strip()
+            if not v:
+                return True
+            return v in _slop_terms
+
+        ec_named = _normalize_ec_field(
+            "named_stakeholder", ec_raw.get("named_stakeholder")
+        )
+        ec_scene = _normalize_ec_field(
+            "private_scene", ec_raw.get("private_scene")
+        )
+        ec_noun = _normalize_ec_field(
+            "photographable_noun", ec_raw.get("photographable_noun")
+        )
+        ec_scale = _normalize_ec_field(
+            "scale_anchor", ec_raw.get("scale_anchor")
+        )
+
+        missing_ec: List[str] = []
+        slop_ec: List[str] = []
+        for field_key, val in (
+            ("named_stakeholder", ec_named),
+            ("private_scene", ec_scene),
+            ("photographable_noun", ec_noun),
+            ("scale_anchor", ec_scale),
+        ):
+            if not val:
+                missing_ec.append(field_key)
+            elif _is_slop(val):
+                slop_ec.append(f"{field_key}='{val}'")
+
+        emotional_contact_complete = not missing_ec and not slop_ec
+        if not emotional_contact_complete:
+            if missing_ec:
+                self.logger.warning(
+                    f"🩺 emotional_contact INCOMPLETE — missing: {missing_ec}"
+                )
+            if slop_ec:
+                self.logger.warning(
+                    f"🩺 emotional_contact SLOP — abstract fields: {slop_ec}"
+                )
+
+        abstract_warning = bool(ec_raw.get("abstract_story_warning", False))
+
+        emotional_contact = {
+            "named_stakeholder": ec_named,
+            "private_scene": ec_scene,
+            "photographable_noun": ec_noun,
+            "scale_anchor": ec_scale,
+            "abstract_story_warning": abstract_warning,
+            "complete": emotional_contact_complete,
+            "missing_fields": missing_ec,
+            "slop_fields": slop_ec,
+        }
+
+        # If architect left contact_beat prose empty but filled the four
+        # fields, synthesize a compact contact_beat line so downstream
+        # code that still reads contact_beat has something to render.
+        if not contact_beat and emotional_contact_complete:
+            contact_beat = (
+                f"{ec_named} — {ec_scene}. {ec_noun}. {ec_scale}."
+            )[:400]
+
         temperature_reasoning = str(content.get("temperature_reasoning", "")).strip()[:400]
 
         avoid_raw = content.get("avoid") or []
@@ -1091,6 +1368,7 @@ Return STRICT JSON — no prose, no code fences:
             "temperature_reasoning": temperature_reasoning,
             "anchor_human": anchor_human,
             "contact_beat": contact_beat,
+            "emotional_contact": emotional_contact,
             "opinion": opinion,
             "ski_jump_setup": str(content.get("ski_jump_setup", "")).strip()[:400],
             "ski_jump_punchline": str(content.get("ski_jump_punchline", "")).strip()[:400],
@@ -1134,6 +1412,19 @@ Return STRICT JSON — no prose, no code fences:
             "temperature_reasoning": "",
             "anchor_human": None,
             "contact_beat": "",
+            "emotional_contact": {
+                "named_stakeholder": "",
+                "private_scene": "",
+                "photographable_noun": "",
+                "scale_anchor": "",
+                "abstract_story_warning": False,
+                "complete": False,
+                "missing_fields": [
+                    "named_stakeholder", "private_scene",
+                    "photographable_noun", "scale_anchor",
+                ],
+                "slop_fields": [],
+            },
             "opinion": {
                 "type": "reframe",
                 "claim": (curator_angle or {}).get("take", ""),
