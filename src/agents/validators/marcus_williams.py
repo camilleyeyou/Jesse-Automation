@@ -151,6 +151,34 @@ Q5. grammar_clean — Is the post free of grammatical errors, typos, awkward
     Quote the specific error and explain in one clause. If the post is clean,
     set is_clean=true and quote nothing.
 
+Q6. emotional_contact — SOFT SIGNAL (does NOT block approval, just flags).
+    Does the post have AT LEAST ONE sentence that makes emotional contact with
+    the reader — a line that is simultaneously FUNNY + EMOTIONALLY LANDING +
+    EYE-CATCHING? This is the "contact beat" — the moment the post stops being
+    pure clinical observation and lands a line that MOVES the reader (makes
+    them laugh-and-wince, feel seen, feel something specific).
+
+    A contact beat is NOT:
+      ✗ Generic observation ("The algorithm saw it.")
+      ✗ Pure deadpan data ("Engagement dropped 40%.")
+      ✗ Aphoristic closer pretending to be profound
+      ✗ Clinical diagnosis with no human stakes
+
+    A contact beat IS:
+      ✓ "The resume said 8 years of experience. The hands said otherwise."
+      ✓ "Her LinkedIn still says Senior Engineer. The badge stopped working Tuesday."
+      ✓ "He asked the model to write his father's eulogy. It opened with 'In today's
+         fast-paced world.'"
+      Something that is funny AND reveals a specific human texture AND makes the
+      reader do a double-take.
+
+    If ZERO sentences make emotional contact (the whole post is cold-smart
+    observation with no line that lands), set has_contact=false and identify
+    the closest candidate sentence + why it falls short.
+
+    If at least one sentence lands (funny + feeling + eye-catching in one move),
+    quote it and set has_contact=true.
+
 Return STRICT JSON:
 {{
   "q1_weakest_sentence": {{"sentence": "<exact quote>", "why": "<one clause>"}},
@@ -163,6 +191,7 @@ Return STRICT JSON:
   "q3_essay_drift_anywhere": {{"tell": "<exact phrase or 'nowhere'>", "location": "<'opener' | 'middle' | 'closer' | 'nowhere'>", "mode": "<'reflective' | 'aphoristic_closer' | 'long_introspective' | 'llm_tell' | 'nowhere'>", "justification": "<one sentence>", "has_tell": <bool>}},
   "q4_template_crutch": {{"has_crutch": <bool>, "crutch_opener": "<quote or 'none'>", "earned": <bool>, "alternative_opener": "<proposed opener or 'n/a'>"}},
   "q5_grammar_clean": {{"is_clean": <bool>, "error_quote": "<exact phrase if error, else ''>", "error_type": "<typo|agreement|dangling|run_on|punctuation|fragment|word_choice|tense|nowhere>", "fix_hint": "<one clause suggesting the fix>"}},
+  "q6_emotional_contact": {{"has_contact": <bool>, "contact_quote": "<exact sentence that lands, or ''>", "near_miss_quote": "<closest candidate if has_contact=false, else ''>", "near_miss_why": "<one clause — why it falls short, if applicable>"}},
   "word_count": {word_count}
 }}"""
 
@@ -179,6 +208,7 @@ Return STRICT JSON:
         ) if isinstance(content, dict) else {}
         q4 = content.get("q4_template_crutch", {}) if isinstance(content, dict) else {}
         q5 = content.get("q5_grammar_clean", {}) if isinstance(content, dict) else {}
+        q6 = content.get("q6_emotional_contact", {}) if isinstance(content, dict) else {}
 
         # Q1 is informational — every post has a weakest sentence. Use presence of a quote as pass.
         q1_pass = bool(str(q1.get("sentence", "")).strip())
@@ -194,6 +224,9 @@ Return STRICT JSON:
         # Default to True when the field is absent so in-flight drafts from
         # older prompts don't get over-blamed.
         q5_pass = bool(q5.get("is_clean", True))
+        # Q6 (emotional contact) is a SOFT signal — does NOT block approval.
+        # Default to True so legacy drafts without the field don't get flagged.
+        q6_has_contact = bool(q6.get("has_contact", True))
 
         try:
             word_count = int(content.get("word_count", len(post.content.split()) if post else 0))
@@ -303,6 +336,18 @@ Return STRICT JSON:
                 f'"{offender}..." Break into 2-3 short declaratives. '
                 f"Liquid Death sentences average 6-10 words — never over 25."
             )
+        # Q6 soft flag — post is cold-smart, no line that lands emotionally.
+        # Does NOT block approval but surfaces feedback so next revision lands harder.
+        if not q6_has_contact:
+            near_miss = q6.get("near_miss_quote", "")
+            near_why = q6.get("near_miss_why", "")
+            reasons.append(
+                f"SOFT — no emotional contact beat. Closest candidate: "
+                f'"{near_miss}" — {near_why} '
+                f"Every post needs ONE sentence that is funny + emotionally landing "
+                f"+ eye-catching at once. Not pure observation — a line that makes "
+                f"the reader laugh-and-wince."
+            )
 
         feedback = " | ".join(reasons) if reasons else ""
 
@@ -312,6 +357,7 @@ Return STRICT JSON:
             "q3_essay_drift": q3,
             "q4_template_crutch": q4,
             "q5_grammar": q5,
+            "q6_emotional_contact": q6,
             "sentence_length_ok": sentence_length_ok,
             "long_sentence": (
                 {"text": long_sentence_blocker[0], "word_count": long_sentence_blocker[1]}
@@ -321,6 +367,7 @@ Return STRICT JSON:
                 "q2": q2_pass, "q3": q3_pass, "q4": q4_pass,
                 "q5_grammar": q5_pass, "length": length_ok,
                 "sentence_length": sentence_length_ok,
+                "q6_emotional_contact": q6_has_contact,
             },
             "word_count": word_count,
             "model": self.model,
@@ -330,9 +377,11 @@ Return STRICT JSON:
         long_mark = (
             f" 🚫SENTENCE-{long_sentence_blocker[1]}w" if long_sentence_blocker else ""
         )
+        contact_mark = "" if q6_has_contact else " ⚠️NO-CONTACT"
         self.logger.info(
             f"Marcus Williams (GPT-4o): {pass_count}/3 core + grammar={q5_pass}, "
-            f"{word_count}w {'✅' if approved else '❌'}{grammar_mark}{long_mark}"
+            f"contact={q6_has_contact}, "
+            f"{word_count}w {'✅' if approved else '❌'}{grammar_mark}{long_mark}{contact_mark}"
         )
 
         return ValidationScore(

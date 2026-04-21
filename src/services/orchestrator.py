@@ -237,15 +237,41 @@ class ContentOrchestrator:
             except Exception as e:
                 logger.debug(f"Could not fetch recent_registers: {e}")
             try:
-                # Phase C (2026-04-20): length + structure rotation state
+                # Phase C (2026-04-20) + E (2026-04-21): length + structure +
+                # emotional_temperature rotation state.
                 bp_fields = self.memory.get_recent_blueprint_fields(
-                    fields=["length_target", "structure_shape"],
+                    fields=["length_target", "structure_shape", "emotional_temperature"],
                     days=7, limit=10,
                 )
                 recent_length_targets = bp_fields.get("length_target", [])
                 recent_structure_shapes = bp_fields.get("structure_shape", [])
+                recent_emotional_temperatures = bp_fields.get("emotional_temperature", [])
             except Exception as e:
                 logger.debug(f"Could not fetch recent blueprint fields: {e}")
+                recent_emotional_temperatures = []
+
+            # Phase E: opening-pattern tracking for eye-catching first-49-chars
+            # rotation. Pull the first 15 chars of the last 5 post hooks to
+            # detect overused opener patterns ("Clinical finding:", etc).
+            recent_opening_patterns: list = []
+            try:
+                import sqlite3 as _sq
+                with _sq.connect(self.memory.db_path) as conn:
+                    cur = conn.cursor()
+                    cur.execute(
+                        "SELECT content FROM content_memory "
+                        "WHERE content IS NOT NULL "
+                        "ORDER BY created_at DESC LIMIT 5"
+                    )
+                    for row in cur.fetchall():
+                        c = (row[0] or "").strip()
+                        if c:
+                            # Normalize the first 15 chars as a pattern
+                            first_chunk = c[:15].strip().lower()
+                            if first_chunk:
+                                recent_opening_patterns.append(first_chunk)
+            except Exception as e:
+                logger.debug(f"Could not fetch opening patterns: {e}")
 
         try:
             blueprint = await self.angle_architect.execute(
@@ -257,6 +283,8 @@ class ContentOrchestrator:
                 post_id=post_id,
                 recent_length_targets=recent_length_targets,
                 recent_structure_shapes=recent_structure_shapes,
+                recent_emotional_temperatures=recent_emotional_temperatures,
+                recent_opening_patterns=recent_opening_patterns,
             )
             # Attach to trend so it flows with the post through generation
             trend.blueprint = blueprint

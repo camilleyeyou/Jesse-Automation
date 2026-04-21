@@ -1668,6 +1668,22 @@ post using the angle and trend above.
         # Phase C (2026-04-20): length + structure directives.
         length_target = (blueprint.get("length_target") or "medium").lower()
         structure_shape = (blueprint.get("structure_shape") or "standard_4para").lower()
+
+        # Phase E (2026-04-21): emotional temperature + anchor human + contact beat.
+        # These address the "cold-smart, not emotionally contacting" failure mode.
+        emotional_temperature = (blueprint.get("emotional_temperature") or "dry_amused").lower()
+        temperature_hints = {
+            "cold_clinical": "Detached observer. Arm's-length analysis. Phenomenon-first.",
+            "dry_amused": "Deadpan but warm. Jesse finds this genuinely funny. Twinkle behind the observation.",
+            "tender": "Something MOVED Jesse. Softer voice. Name the human. End on recognition, not a slap.",
+            "outraged": "Specific injustice landed. Controlled fury. Still dry, still clinical — anger shows through.",
+            "reverent": "Jesse takes this seriously. Still weird, still sharp — but acknowledging that something matters.",
+            "delighted": "Genuinely tickled. Not sarcastic-delighted. Lean into the absurd joy.",
+            "weary": "Jesse has seen this pattern enough times to be tired of it. Resigned, not angry.",
+        }
+        temperature_hint = temperature_hints.get(emotional_temperature, "Deadpan but warm.")
+        anchor_human = (blueprint.get("anchor_human") or "").strip() or None
+        contact_beat = (blueprint.get("contact_beat") or "").strip()
         length_meta = {
             "short": ("40-55 words", "Compressed punch. 3-5 sentences. No setup, just impact."),
             "medium": ("55-75 words", "Standard length. 5-8 sentences. Setup → escalation → punch."),
@@ -1690,8 +1706,36 @@ post using the angle and trend above.
 The Angle Architect has already decided HOW this post should be written. Your
 job is execution, not re-plan. Follow the blueprint.
 
+🎯 THE BOTH RULE (this is THE load-bearing instruction for Phase E)
+Every post must be FUNNY AND EMOTIONALLY CONTACTING AND EYE-CATCHING
+all at once. Not alternatives. Not separate sentences. The funny IS
+the mechanism that delivers the feeling. The eye-catching is the line
+that carries BOTH. Cold-smart observations with no emotional contact
+FAIL regardless of how clever they sound. Great content makes humans
+laugh AND feel seen in the same move.
+
 ── REGISTER: {register} ──
 {voice_spec}
+
+── EMOTIONAL TEMPERATURE: {emotional_temperature} ──
+{temperature_hint}
+
+Temperature is orthogonal to register. Clinical + tender ≠ clinical + cold.
+This is HOW JESSE FEELS about the story — NOT how Jesse writes. The voice
+stays the register above; the feeling underneath is this temperature.
+
+── ANCHOR HUMAN: {anchor_human if anchor_human else '(no specific human at the center of this story)'} ──
+{f'NAME {anchor_human} in the first 1-2 sentences. Contact them at least once — a moment that actually looks at them as a person, not as a data point in the story. Example: not "the handwriting is grief technology" but "{anchor_human.split()[0] if anchor_human else ""} wrote them by hand. The paper pressed back."' if anchor_human else 'The story has no specific named human at its center. Skip this beat — do NOT manufacture a fake anchor. Write about the phenomenon, but still find the emotional contact beat below.'}
+
+── CONTACT BEAT (the line that does funny + feeling + eye-catching in ONE move): ──
+"{contact_beat or '(architect did not specify — you must still create one somewhere in the post)'}"
+
+This beat is planned upfront. Weave it into the post. This is the sentence
+where a reader stops and thinks "oh god, that's true" AND laughs. NOT a
+separate sincere moment (that's Medium-essay). The Jesse voice doing double-
+duty in ONE line. Example from a strong past post: "We are more comfortable
+being witnessed by fiction than by each other. The fake prayer lands. The
+real one bounces off the voicemail."
 
 ── OPINION (the post's spine — it MUST express this claim): ──
   Type: {opinion_type}

@@ -258,6 +258,56 @@ STRUCTURE_SHAPES = {
     },
 }
 
+# Phase E (2026-04-21): emotional temperature. Client feedback: posts are
+# technically varied in register/length/shape but emotionally flat —
+# "cold-smart" across the board. This is what Jesse FEELS about the story,
+# layered ONTO the register (the voice). Clinical+tender ≠ clinical+cold.
+# Rotation-aware like register: same temperature 3+ in last 5 = banned.
+EMOTIONAL_TEMPERATURES = {
+    "cold_clinical": (
+        "Detached observer. Arm's-length analysis. The phenomenon is "
+        "interesting; Jesse has no skin in it. Appropriate for policy / "
+        "corporate / tech-industry stories where emotional contact would "
+        "feel manufactured. USE SPARINGLY — this is the default drift if "
+        "nothing else is specified, and we're trying to avoid it."
+    ),
+    "dry_amused": (
+        "Finds the story genuinely funny in an understated way. Jesse's "
+        "default warm-funny register. Deadpan delivery but there's a twinkle "
+        "behind it. Works for absurdist news, cultural moments, corporate "
+        "pratfalls."
+    ),
+    "tender": (
+        "Something in the story moved Jesse. Softer voice. Lingering attention. "
+        "Names the human. Ends with recognition rather than a slap. Works for "
+        "grief, small human moments, dying-teen-kind-of-stories. Still punchy "
+        "— still Jesse — but the final note is warmth, not smirk."
+    ),
+    "outraged": (
+        "A specific injustice landed. Jesse's pissed. Controlled fury — still "
+        "dry, still clinical, but the anger shows through. Works for "
+        "exploitation, corporate abuse, named-party hypocrisy. The reader "
+        "should feel the reader's OWN anger validated."
+    ),
+    "reverent": (
+        "Jesse takes the moment seriously. Stepping back with respect. "
+        "Still Jesse — still weird, still sharp — but acknowledging that "
+        "something matters. Works for achievements, deaths of icons, moments "
+        "of genuine human achievement or loss."
+    ),
+    "delighted": (
+        "Something in the story is genuinely delightful. Jesse leans into "
+        "it. Not sarcastic-delighted (that's dry_amused) — genuinely "
+        "tickled. Works for absurd wins, weird viral wholesome moments, "
+        "human doing human things that work."
+    ),
+    "weary": (
+        "Jesse has seen this pattern enough times to be tired of it. Not "
+        "angry — resigned. Works for predictable corporate cycles, repeated "
+        "failures, 'this happens every quarter' stories."
+    ),
+}
+
 
 class AngleArchitectAgent(BaseAgent):
     """Decides HOW to write a post — register, opinion, shape, taboo beat, STEPPS targets."""
@@ -295,6 +345,8 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         post_id: Optional[str] = None,
         recent_length_targets: List[str] = None,
         recent_structure_shapes: List[str] = None,
+        recent_emotional_temperatures: List[str] = None,
+        recent_opening_patterns: List[str] = None,
     ) -> Dict[str, Any]:
         """Produce a blueprint for a post.
 
@@ -320,6 +372,8 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         recent_registers = recent_registers or []
         recent_length_targets = recent_length_targets or []
         recent_structure_shapes = recent_structure_shapes or []
+        recent_emotional_temperatures = recent_emotional_temperatures or []
+        recent_opening_patterns = recent_opening_patterns or []
 
         prompt = self._build_prompt(
             trend_headline=trend_headline,
@@ -329,6 +383,8 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
             pillar=pillar,
             recent_length_targets=recent_length_targets,
             recent_structure_shapes=recent_structure_shapes,
+            recent_emotional_temperatures=recent_emotional_temperatures,
+            recent_opening_patterns=recent_opening_patterns,
         )
 
         try:
@@ -355,14 +411,16 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
                 recent_registers,
                 recent_length_targets=recent_length_targets,
                 recent_structure_shapes=recent_structure_shapes,
+                recent_emotional_temperatures=recent_emotional_temperatures,
             )
 
             self.logger.info(
                 f"🏛️  Architect: register={blueprint.get('register')} "
+                f"temp={blueprint.get('emotional_temperature','?')} "
                 f"opinion={blueprint.get('opinion', {}).get('type','?')} "
-                f"length={blueprint.get('length_target','?')} "
+                f"len={blueprint.get('length_target','?')} "
                 f"shape={blueprint.get('structure_shape','?')} "
-                f"stepps={','.join(blueprint.get('stepps_targets', []))}"
+                f"anchor={blueprint.get('anchor_human','?')[:20] if blueprint.get('anchor_human') else '—'}"
             )
             return blueprint
 
@@ -379,9 +437,13 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         pillar: Optional[str],
         recent_length_targets: List[str] = None,
         recent_structure_shapes: List[str] = None,
+        recent_emotional_temperatures: List[str] = None,
+        recent_opening_patterns: List[str] = None,
     ) -> str:
         recent_length_targets = recent_length_targets or []
         recent_structure_shapes = recent_structure_shapes or []
+        recent_emotional_temperatures = recent_emotional_temperatures or []
+        recent_opening_patterns = recent_opening_patterns or []
         # Render REGISTERS spec block once — kept in-prompt so the model
         # sees all five options every time, WITH the mandatory_signals /
         # must_not fields (2026-04-20 sharpening — prevents register
@@ -522,6 +584,69 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
             for k, v in STRUCTURE_SHAPES.items()
         )
 
+        # Phase E (2026-04-21): emotional temperature rotation block.
+        # Client review: posts are technically varied but emotionally flat.
+        # Temperature is how Jesse FEELS about the story — orthogonal to
+        # register (the voice). Rotation-aware: same temp 3+ in last 5 = banned.
+        temp_block = ""
+        banned_temps: List[str] = []
+        if recent_emotional_temperatures:
+            temp_counts5: Dict[str, int] = {}
+            for t in recent_emotional_temperatures[:5]:
+                temp_counts5[t] = temp_counts5.get(t, 0) + 1
+            banned_temps = [t for t, c in temp_counts5.items() if c >= 3]
+            lines = [f"  - {k}: {c}" for k, c in sorted(temp_counts5.items(), key=lambda x: -x[1])]
+            banned_suffix = ""
+            if banned_temps:
+                banned_suffix = (
+                    f"\n  ⛔ BANNED (3+ in last 5): {', '.join(banned_temps)} — "
+                    "MUST pick a different emotional temperature."
+                )
+            # Extra pressure: if cold_clinical has been 3+ of last 5, explicitly
+            # note that it's the default-drift mode we're trying to escape.
+            if "cold_clinical" in banned_temps:
+                banned_suffix += (
+                    "\n  ⚠ cold_clinical is the default-drift mode. The last "
+                    "5 posts have been cold-smart. The feed is starving for "
+                    "an emotional beat. Pick tender, delighted, outraged, or "
+                    "reverent when the story can support it."
+                )
+            temp_block = (
+                "\n\nRECENT EMOTIONAL TEMPERATURE ROTATION (last 5):\n"
+                + "\n".join(lines)
+                + banned_suffix
+            )
+        elif recent_registers:  # Have data but no temp tracked yet
+            temp_block = (
+                "\n\nNO EMOTIONAL TEMPERATURE HISTORY YET. "
+                "This is the first post using this system. Pick a warm "
+                "temperature (tender, dry_amused, delighted, outraged, reverent) "
+                "— NOT cold_clinical — so the first batch isn't flat."
+            )
+
+        temperature_options = "\n".join(
+            f"  - **{k}**: {v}"
+            for k, v in EMOTIONAL_TEMPERATURES.items()
+        )
+
+        # Phase E: recent-opening-pattern block. Client review: every
+        # clinical post opens "Clinical finding:". Track the first word
+        # or first 2-3 words of recent posts so architect can vary.
+        opening_block = ""
+        if recent_opening_patterns:
+            op_counts5: Dict[str, int] = {}
+            for o in recent_opening_patterns[:5]:
+                op_counts5[o] = op_counts5.get(o, 0) + 1
+            overused = [o for o, c in op_counts5.items() if c >= 3]
+            if overused:
+                opening_block = (
+                    f"\n\nRECENT OPENERS — OVERUSED (3+ of last 5):\n"
+                    + "\n".join(f"  - \"{o}\"" for o in overused)
+                    + "\n  ⛔ First 49 chars MUST NOT start with any of these. "
+                    "Vary the opener pattern. No 'Clinical finding:' on a "
+                    "clinical post if it's already dominated the rotation."
+                )
+
         return f"""TREND TO ARCHITECT:
 
 Headline: {trend_headline}
@@ -615,11 +740,92 @@ what's been saturating the last 5 posts.
 {structure_block}
 
 ═══════════════════════════════════════════════════════════════════════════════
+EMOTIONAL TEMPERATURE (pick ONE — rotation-aware) — PHASE E CRITICAL
+═══════════════════════════════════════════════════════════════════════════════
+
+Client feedback 2026-04-21: "I don't find any of this funny or emotionally
+attractive. Humans relate to anything that touches their heart." The
+rotation/shape/length variation is working but posts are still emotionally
+flat — cold-smart observations across the board.
+
+Temperature is WHAT JESSE FEELS about this story. It's orthogonal to
+register (the voice). Clinical+tender ≠ clinical+cold. The same story
+about Liv Perrotto can be a cold clinical observation OR a tender clinical
+observation — one contacts the reader, one doesn't.
+
+{temperature_options}
+{temp_block}
+
+THE "BOTH" RULE:
+Every post must be FUNNY AND EMOTIONALLY CONTACTING AND EYE-CATCHING all
+at once. These aren't alternatives. The funny IS the delivery mechanism
+for the feeling. Post 6 about the Pulp Fiction prayer nailed it:
+  "We are more comfortable being witnessed by fiction than by each other.
+   The fake prayer lands. The real one bounces off the voicemail."
+That sentence is funny (the absurd comparison), emotionally true
+(loneliness), AND eye-catching (unexpected image) — all in ONE move.
+That's the target. Cold-smart observations with no contact are FAILING.
+
+═══════════════════════════════════════════════════════════════════════════════
+ANCHOR HUMAN (name a specific person at the center of the story, if one exists)
+═══════════════════════════════════════════════════════════════════════════════
+
+If this story has a specific named person — Liv Perrotto (dying teen),
+Nic Dowd (NHL player who threatened), a named nurse, a specific victim,
+a specific target — identify them. The generator will name them in the
+first 2 sentences and make contact with them at least once.
+
+If the story has NO specific human (abstract trend, corporate move with
+no person at center), set anchor_human to null. Don't manufacture one.
+
+This is what makes post 1 about Liv Perrotto feel cold: she's the whole
+story but the post never looks at her. It looks at "the handwriting."
+The handwriting isn't the subject. Liv is.
+
+═══════════════════════════════════════════════════════════════════════════════
+CONTACT BEAT (one sentence that delivers feeling + funny + surprise in ONE line)
+═══════════════════════════════════════════════════════════════════════════════
+
+This is the emotional pivot. Not a separate sincere moment — the Jesse
+voice doing double duty. One sentence somewhere in the post (often
+near the brutal honesty beat or the punchline, but can be standalone)
+where the reader feels something specific.
+
+Example contact beats:
+  - "She wrote them by hand. The paper pressed back."  (tender + eye-catching)
+  - "The algorithm did not flag it. Moderation requires something the
+     platform stopped funding."  (outraged + dry)
+  - "The real one bounces off the voicemail."  (tender + funny + sharp)
+
+DO NOT write: "It's moving." / "We can all relate." / "This matters." —
+those are tell-don't-show sincerity. The contact beat shows, doesn't tell.
+
+═══════════════════════════════════════════════════════════════════════════════
+FIRST 49 CHARS — EYE-CATCHING REQUIREMENT
+═══════════════════════════════════════════════════════════════════════════════
+
+{opening_block if opening_block else ''}
+The proposed first_49_chars_hook must be EYE-CATCHING. One of:
+  (a) Named proper noun + unexpected verb ("Elon Musk just turned PR...")
+  (b) Specific number/time/place ("At 3am on a Tuesday...")
+  (c) Declarative question or imperative ("Stop panicking about X.")
+  (d) Weird concrete image ("The paper pressed back.")
+
+NOT acceptable:
+  (x) "Clinical finding:" as a default opener (overused — see rotation above)
+  (x) Generic observation ("The internet is...")
+  (x) Abstract commentary opener
+
+═══════════════════════════════════════════════════════════════════════════════
 
 Return STRICT JSON — no prose, no code fences:
 {{
   "register": "<one of: clinical_diagnostician | contrarian | prophet | confession | roast>",
   "register_reasoning": "<one sentence — why this register for this trend>",
+  "emotional_temperature": "<one of: cold_clinical | dry_amused | tender | outraged | reverent | delighted | weary>",
+  "temperature_reasoning": "<one sentence — why this temperature for this trend>",
+  "anchor_human": "<name of the specific person at the center of the story, or null if none>",
+  "contact_beat": "<one sentence — the emotional-contact pivot the post will build around>",
   "opinion": {{
     "type": "<attack | defense | prediction | reframe | confession>",
     "claim": "<one sentence — the actual position Jesse holds>",
@@ -630,10 +836,10 @@ Return STRICT JSON — no prose, no code fences:
   "brutal_honesty_beat": "<one sentence — the taboo / quiet-part-out-loud observation>",
   "stepps_targets": ["<factor_1>", "<factor_2>"],
   "stepps_justifications": {{"<factor_1>": "<short reason>", "<factor_2>": "<short reason>"}},
-  "first_49_chars_hook": "<proposed first 49 characters, exactly>",
+  "first_49_chars_hook": "<proposed first 49 characters, exactly — must be eye-catching per rules above>",
   "length_target": "<one of: short | medium | long>",
   "structure_shape": "<one of: tight_3para | standard_4para | long_5para | single_block | list_form>",
-  "avoid": ["<voice crutches this post should NOT use — e.g. 'AI can X but cant Y', 'the specific weight of'>"]
+  "avoid": ["<voice crutches this post should NOT use — e.g. 'AI can X but cant Y', 'the specific weight of', 'Clinical finding:' if overused>"]
 }}"""
 
     def _validate_and_normalize(
@@ -642,6 +848,7 @@ Return STRICT JSON — no prose, no code fences:
         recent_registers: List[str],
         recent_length_targets: List[str] = None,
         recent_structure_shapes: List[str] = None,
+        recent_emotional_temperatures: List[str] = None,
     ) -> Dict[str, Any]:
         """Coerce the model's output into a safe, normalized blueprint. Never
         raises — bad fields get replaced with sane defaults. The generator
@@ -649,6 +856,7 @@ Return STRICT JSON — no prose, no code fences:
         """
         recent_length_targets = recent_length_targets or []
         recent_structure_shapes = recent_structure_shapes or []
+        recent_emotional_temperatures = recent_emotional_temperatures or []
         register = str(content.get("register", "")).strip().lower()
         if register not in REGISTERS:
             self.logger.warning(f"Architect returned unknown register '{register}'; defaulting to clinical_diagnostician")
@@ -816,6 +1024,61 @@ Return STRICT JSON — no prose, no code fences:
                         f"(3+ of last 5) — forced to '{structure_shape}'"
                     )
 
+        # Phase E (2026-04-21) — emotional_temperature validation + rotation
+        emotional_temperature = str(content.get("emotional_temperature", "")).strip().lower()
+        if emotional_temperature not in EMOTIONAL_TEMPERATURES:
+            # Default to dry_amused rather than cold_clinical — client
+            # explicitly flagged cold as the default-drift failure mode.
+            emotional_temperature = "dry_amused"
+        if recent_emotional_temperatures:
+            last5_t = recent_emotional_temperatures[:5]
+            t_counts: Dict[str, int] = {}
+            for t in last5_t:
+                t_counts[t] = t_counts.get(t, 0) + 1
+            banned_t = {t for t, c in t_counts.items() if c >= 3}
+            if emotional_temperature in banned_t:
+                non_banned_t = {
+                    k: t_counts.get(k, 0)
+                    for k in EMOTIONAL_TEMPERATURES.keys()
+                    if k not in banned_t
+                }
+                if non_banned_t:
+                    # Prefer warm temps over cold when banning
+                    warm_order = [
+                        "tender", "outraged", "delighted", "reverent",
+                        "dry_amused", "weary", "cold_clinical"
+                    ]
+                    pick = None
+                    for candidate in warm_order:
+                        if candidate in non_banned_t:
+                            pick = candidate
+                            break
+                    if pick:
+                        original_t = emotional_temperature
+                        emotional_temperature = pick
+                        self.logger.warning(
+                            f"🌡️  Temperature rotation: architect picked '{original_t}' "
+                            f"(3+ of last 5) — forced to '{emotional_temperature}'"
+                        )
+
+        # Phase E: anchor_human + contact_beat — optional fields but strongly
+        # preferred. Normalize empty strings to None.
+        anchor_human_raw = content.get("anchor_human")
+        if isinstance(anchor_human_raw, str):
+            anchor_human = anchor_human_raw.strip() or None
+            if anchor_human and anchor_human.lower() in ("null", "none", "n/a", "—"):
+                anchor_human = None
+            if anchor_human:
+                anchor_human = anchor_human[:200]
+        else:
+            anchor_human = None
+
+        contact_beat = str(content.get("contact_beat", "")).strip()[:400]
+        if contact_beat.lower() in ("null", "none", "n/a", "—"):
+            contact_beat = ""
+
+        temperature_reasoning = str(content.get("temperature_reasoning", "")).strip()[:400]
+
         avoid_raw = content.get("avoid") or []
         if not isinstance(avoid_raw, list):
             avoid_raw = []
@@ -824,6 +1087,10 @@ Return STRICT JSON — no prose, no code fences:
         blueprint = {
             "register": register,
             "register_reasoning": str(content.get("register_reasoning", "")).strip()[:400],
+            "emotional_temperature": emotional_temperature,
+            "temperature_reasoning": temperature_reasoning,
+            "anchor_human": anchor_human,
+            "contact_beat": contact_beat,
             "opinion": opinion,
             "ski_jump_setup": str(content.get("ski_jump_setup", "")).strip()[:400],
             "ski_jump_punchline": str(content.get("ski_jump_punchline", "")).strip()[:400],
@@ -863,6 +1130,10 @@ Return STRICT JSON — no prose, no code fences:
         return {
             "register": "clinical_diagnostician",  # safe default
             "register_reasoning": "fallback due to architect failure",
+            "emotional_temperature": "dry_amused",  # warmer default than cold_clinical
+            "temperature_reasoning": "",
+            "anchor_human": None,
+            "contact_beat": "",
             "opinion": {
                 "type": "reframe",
                 "claim": (curator_angle or {}).get("take", ""),
