@@ -461,6 +461,7 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         recent_structure_shapes: List[str] = None,
         recent_emotional_temperatures: List[str] = None,
         recent_opening_patterns: List[str] = None,
+        recent_contact_beat_frames: List[str] = None,
     ) -> Dict[str, Any]:
         """Produce a blueprint for a post.
 
@@ -488,6 +489,7 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         recent_structure_shapes = recent_structure_shapes or []
         recent_emotional_temperatures = recent_emotional_temperatures or []
         recent_opening_patterns = recent_opening_patterns or []
+        recent_contact_beat_frames = recent_contact_beat_frames or []
 
         prompt = self._build_prompt(
             trend_headline=trend_headline,
@@ -499,6 +501,7 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
             recent_structure_shapes=recent_structure_shapes,
             recent_emotional_temperatures=recent_emotional_temperatures,
             recent_opening_patterns=recent_opening_patterns,
+            recent_contact_beat_frames=recent_contact_beat_frames,
         )
 
         try:
@@ -556,11 +559,13 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         recent_structure_shapes: List[str] = None,
         recent_emotional_temperatures: List[str] = None,
         recent_opening_patterns: List[str] = None,
+        recent_contact_beat_frames: List[str] = None,
     ) -> str:
         recent_length_targets = recent_length_targets or []
         recent_structure_shapes = recent_structure_shapes or []
         recent_emotional_temperatures = recent_emotional_temperatures or []
         recent_opening_patterns = recent_opening_patterns or []
+        recent_contact_beat_frames = recent_contact_beat_frames or []
         # Render REGISTERS spec block once — kept in-prompt so the model
         # sees all five options every time, WITH the mandatory_signals /
         # must_not fields (2026-04-20 sharpening — prevents register
@@ -766,6 +771,86 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         scale_anchor_spec = _render_contact_field(
             EMOTIONAL_CONTACT_FIELDS["scale_anchor"]
         )
+
+        # Phase G (2026-04-21): contact-beat frame rotation. Once the 4-field
+        # emotional_contact blueprint is working, generators converge on one
+        # compositional move ("Somewhere a [role] at [time]...") because
+        # that's the path of least resistance for weaving all four
+        # specifics into one readable sentence. Over-reliance on any single
+        # frame across 3-5 posts makes the feed feel formulaic. Architect
+        # must vary the compositional frame — not the specificity, the
+        # SHAPE of how the specificity lands.
+        contact_frame_block = ""
+        if recent_contact_beat_frames:
+            # Count BOTH 2-word prefixes (fine-grained) AND 1-word prefixes
+            # for known scene-setter words (coarse-grained). "Somewhere a"
+            # and "Somewhere tonight" should both roll up under "Somewhere"
+            # — the family of frame is what saturates, not the literal
+            # word sequence.
+            _scene_setter_heads = {
+                "somewhere", "imagine", "at", "in", "a", "the", "it",
+            }
+            prefix_counts: Dict[str, int] = {}
+            for frame in recent_contact_beat_frames:
+                toks = frame.split()
+                if not toks:
+                    continue
+                if len(toks) >= 2:
+                    two_word = " ".join(toks[:2])
+                    prefix_counts[two_word] = prefix_counts.get(two_word, 0) + 1
+                head = toks[0]
+                if head in _scene_setter_heads:
+                    # Roll up under the head word so "somewhere a" and
+                    # "somewhere tonight" both count toward "somewhere..."
+                    prefix_counts[head + " ..."] = prefix_counts.get(head + " ...", 0) + 1
+            # A frame prefix is "saturated" at 2+ uses across recent posts
+            saturated = sorted(
+                [(p, c) for p, c in prefix_counts.items() if c >= 2],
+                key=lambda x: -x[1],
+            )
+            if saturated:
+                sat_lines = "\n".join(
+                    f"  ⛔ '{p}...' ({c} of last 5 posts)" for p, c in saturated
+                )
+                contact_frame_block = f"""
+
+═══════════════════════════════════════════════════════════════════════════════
+CONTACT-BEAT FRAME ROTATION (Phase G — anti-formulaic)
+═══════════════════════════════════════════════════════════════════════════════
+
+Recent posts have over-used these compositional frames for the contact beat:
+
+{sat_lines}
+
+Your 4-field emotional_contact specifics are NOT the problem — keep those
+sharp. The problem is the SHAPE of the sentence that weaves them in. A
+LinkedIn reader scrolling 6 posts will notice 3 that all open "Somewhere
+a [role] at [time]..." — formulaic reads as machine-generated.
+
+Draft your contact_beat prose in a DIFFERENT compositional frame. Use
+one the architecture has NOT been using recently:
+
+ALTERNATIVE FRAMES (pick one that hasn't saturated):
+  (a) "The [photographable_noun] [verb]. The [role] [reaction]."
+      ("The paper pressed back. The archivist turned the page.")
+  (b) "[Name] [verb] [object] [time]."
+      ("Elon Musk cleared his schedule at 2am.")
+  (c) "[Role] [concrete action]. [Concrete consequence]."
+      ("A PM checked the 401k app. The phone went face-down.")
+  (d) "[Private scene fragment] — [what happened]."
+      ("2am, kitchen table — the engineer decided not to care.")
+  (e) "[Number/time] and [role] [verb] [object]."
+      ("It was 9pm and the analyst was still reading the sticky note.")
+  (f) Direct observation of the object: "[Photographable_noun] [state]."
+      ("A phone on the pavement. Uploading nothing.")
+  (g) Questions to a specific scene: "What does a [role] do at [time]?"
+      ("What does a nurse do at the end of a double shift?")
+  (h) "[Bureaucratic unit] / [domestic consequence]." (scale_anchor raw)
+      ("Trillion-dollar pivot / one VP's promotion party.")
+
+The 4 concrete fields (named_stakeholder, private_scene, photographable_noun,
+scale_anchor) stay the same. Only the SENTENCE FRAME rotates. Specificity
+in, variety out."""
 
         # Phase E: recent-opening-pattern block. Client review: every
         # clinical post opens "Clinical finding:". Track the first word
@@ -982,7 +1067,7 @@ PICK A DIFFERENT STORY — tell the generator by emitting:
   emotional_contact.abstract_story_warning: true
 and still fill the four fields with your best synthesized imagined
 specifics. The four fields are non-negotiable.
-
+{contact_frame_block}
 ═══════════════════════════════════════════════════════════════════════════════
 FIRST 49 CHARS — EYE-CATCHING REQUIREMENT
 ═══════════════════════════════════════════════════════════════════════════════

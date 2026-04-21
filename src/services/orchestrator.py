@@ -10,6 +10,7 @@ import asyncio
 import logging
 import os
 import random
+import re
 import uuid
 from typing import Dict, Any, List, Optional
 
@@ -253,7 +254,12 @@ class ContentOrchestrator:
             # Phase E: opening-pattern tracking for eye-catching first-49-chars
             # rotation. Pull the first 15 chars of the last 5 post hooks to
             # detect overused opener patterns ("Clinical finding:", etc).
+            # Phase G (2026-04-21): also extract contact-beat frame
+            # signatures from the same content — prevents saturation of
+            # one compositional move ("Somewhere a [role] at [time]...")
+            # once the 4-field emotional_contact blueprint locks in.
             recent_opening_patterns: list = []
+            recent_contact_beat_frames: list = []
             try:
                 import sqlite3 as _sq
                 with _sq.connect(self.memory.db_path) as conn:
@@ -270,6 +276,11 @@ class ContentOrchestrator:
                             first_chunk = c[:15].strip().lower()
                             if first_chunk:
                                 recent_opening_patterns.append(first_chunk)
+                            # Phase G: extract any contact-beat sentence
+                            # frame signatures from the post body
+                            recent_contact_beat_frames.extend(
+                                self._extract_contact_beat_frames(c)
+                            )
             except Exception as e:
                 logger.debug(f"Could not fetch opening patterns: {e}")
 
@@ -285,6 +296,7 @@ class ContentOrchestrator:
                 recent_structure_shapes=recent_structure_shapes,
                 recent_emotional_temperatures=recent_emotional_temperatures,
                 recent_opening_patterns=recent_opening_patterns,
+                recent_contact_beat_frames=recent_contact_beat_frames,
             )
             # Attach to trend so it flows with the post through generation
             trend.blueprint = blueprint
@@ -295,6 +307,72 @@ class ContentOrchestrator:
             trend.blueprint = None
             trend.register = None
             return None
+
+    @staticmethod
+    def _extract_contact_beat_frames(content: str) -> List[str]:
+        """Extract likely contact-beat sentence frames from post content.
+
+        Phase G (2026-04-21): once the 4-field emotional_contact blueprint
+        is working, generators converge on one compositional move
+        ("Somewhere a [role] at [time]...") because that's the path of
+        least resistance for weaving named_stakeholder + private_scene +
+        photographable_noun into one sentence. This extractor finds those
+        sentences and returns a frame signature (first 3 words,
+        lowercased) so the architect can rotate compositional frames
+        the same way it rotates registers/lengths/temperatures.
+
+        Signals a sentence is a contact beat:
+          - Starts with "Somewhere" / "Imagine" (explicit scene-setter)
+          - Contains a time marker (am, pm, midnight, morning, 3am)
+          - Contains a private-scene marker (kitchen, desk, parking lot,
+            bedroom, pavement)
+          - Contains an anchor-human role (engineer, PM, intern, kid,
+            retiree, clerk) in the first 8 words
+
+        Returns list of frame signatures (may be empty).
+        """
+        if not content or not isinstance(content, str):
+            return []
+        # Split on sentence-ending punctuation
+        flat = re.sub(r"\s+", " ", content).strip()
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", flat) if s.strip()]
+
+        scene_markers = (
+            "am", "pm", "midnight", "morning", "3am", "2am", "4am", "6am",
+            "9pm", "10pm", "11pm", "kitchen", "desk", "parking lot",
+            "bedroom", "pavement", "bathroom", "hallway",
+        )
+        anchor_roles = (
+            "engineer", "pm", "intern", "kid", "retiree", "clerk", "pm",
+            "prosecutor", "nurse", "doctor", "partner", "parent",
+            "employee", "dev", "founder", "clerk", "manager", "analyst",
+        )
+        scene_setters = ("somewhere", "imagine", "at ", "in a ", "a kid", "a man", "a woman")
+
+        frames: List[str] = []
+        for s in sentences:
+            low = s.lower()
+            # Sentence must be short enough to be a readable frame (< 35 words)
+            if len(s.split()) > 35:
+                continue
+            looks_like_contact_beat = False
+            # Scene-setter openers
+            if any(low.startswith(m) for m in scene_setters):
+                looks_like_contact_beat = True
+            # Time marker anywhere
+            if not looks_like_contact_beat and any(f" {m}" in low or f"{m} " in low for m in scene_markers):
+                looks_like_contact_beat = True
+            # Anchor role in first 8 words
+            first_words = re.findall(r"[a-zA-Z]+", low)[:8]
+            if not looks_like_contact_beat and any(r in first_words for r in anchor_roles):
+                looks_like_contact_beat = True
+            if not looks_like_contact_beat:
+                continue
+            # Extract first 3 meaningful words as the frame signature
+            toks = re.findall(r"[a-zA-Z0-9]+", low)[:3]
+            if toks:
+                frames.append(" ".join(toks))
+        return frames
 
     def _determine_post_context(self):
         """Decide today's (theme, angle_seed, format) — the editorial guidance
