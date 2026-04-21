@@ -831,7 +831,11 @@ phrasing — write a new post in the same voice register."""
             anthropic_cfg = getattr(self.config, 'anthropic', None)
             generator_model = getattr(anthropic_cfg, 'model', None) or "claude-sonnet-4-6"
             generator_temp = getattr(anthropic_cfg, 'temperature', 0.9) if anthropic_cfg else 0.9
-            generator_max_tokens = getattr(anthropic_cfg, 'max_tokens', 600) if anthropic_cfg else 600
+            # Phase K (2026-04-21): default bumped 600 → 1000 to fix truncation.
+            # JSON response has 5 fields (content + hook_type + image_direction
+            # + why_this_works + creative_reasoning) — 600 was clipping the
+            # content mid-sentence on longer posts.
+            generator_max_tokens = getattr(anthropic_cfg, 'max_tokens', 1000) if anthropic_cfg else 1000
 
             # Phase F (2026-04-21): generate-3-pick-1 (verbalized sampling,
             # parallel-call variant). Research finding: mode collapse produces
@@ -2849,6 +2853,42 @@ Now write something that makes someone stop scrolling."""
         content = '\n\n'.join(line for line in lines if line)
 
         content = content.strip()
+
+        # Phase K (2026-04-21) — truncation-recovery.
+        # If the final token left a mid-word cut ("The gold is" with no
+        # closing punctuation) or a dangling em-dash ("destination is—"),
+        # trim back to the last complete sentence so we never ship a
+        # half-written post. Check: final "sentence" (everything after
+        # the last .!? in the content) must end with proper terminator.
+        # If it doesn't, drop that fragment IFF the remaining content is
+        # still ≥ 20 words (so we don't ship a 3-word post).
+        if content:
+            last = content[-1]
+            closers = set(".!?\"')")
+            ends_clean = last in closers
+            if not ends_clean:
+                last_end = max(
+                    content.rfind('.'),
+                    content.rfind('!'),
+                    content.rfind('?'),
+                )
+                if last_end > 0:
+                    clipped = content[: last_end + 1]
+                    clipped_words = len(clipped.split())
+                    if clipped_words >= 20:  # keep if result is still a full post
+                        fragment = content[last_end + 1:].strip()
+                        self.logger.warning(
+                            f"🔪 Truncation recovery: dropped trailing "
+                            f"mid-sentence fragment ({len(fragment)} chars): "
+                            f"'{fragment[:60]}'. Kept {clipped_words} words."
+                        )
+                        content = clipped
+                    else:
+                        self.logger.warning(
+                            f"⚠️  Truncation detected but recovery would leave "
+                            f"only {clipped_words} words — shipping as-is. "
+                            f"Mid-sentence end: '{content[-40:]!r}'"
+                        )
 
         # Phase 4 deterministic observability: compute the first-49-char
         # hook and log it for every generation. This is a WARN-level check

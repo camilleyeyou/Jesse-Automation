@@ -11,6 +11,7 @@ Called on-demand by the orchestrator before content generation.
 import json
 import logging
 import random
+import re
 from typing import Dict, Any, Optional, List
 
 from .base_agent import BaseAgent
@@ -475,6 +476,56 @@ NO viable {preferred_theme.replace('_', ' ')} trends exist among the candidates.
             except Exception as e:
                 # Non-blocking — if entity extraction fails, keep original pick
                 self.logger.debug(f"Curator self-correction check failed: {e}")
+
+            # Phase K (2026-04-21) — concrete_details fact-check.
+            # Observed bug: curator's concrete_details listed ['NBA', 'Flyers',
+            # 'Penguins'] for an NBA-only headline (Flyers + Penguins are NHL).
+            # Generator wrote Flyers/Penguins into the NBA post verbatim.
+            # Fix: verify each concrete_detail appears in the source headline
+            # OR summary (case-insensitive, whole-word or substring).
+            # Filter out hallucinated details. If >50% fabricated, blank the
+            # whole structured angle and let the generator fall back to the
+            # headline alone rather than trust poisoned details.
+            if concrete_details:
+                source_text = (
+                    (chosen.headline or "") + " " + (chosen.summary or "")
+                ).lower()
+                verified_details = []
+                hallucinated_details = []
+                for detail in concrete_details:
+                    d_low = detail.lower().strip()
+                    if not d_low:
+                        continue
+                    # Accept if any word of the detail (3+ chars) is in source
+                    d_words = [
+                        w for w in re.findall(r"[a-zA-Z0-9']{3,}", d_low)
+                        if w not in {"the", "and", "for", "with"}
+                    ]
+                    in_source = (
+                        d_low in source_text
+                        or any(w in source_text for w in d_words)
+                    )
+                    if in_source:
+                        verified_details.append(detail)
+                    else:
+                        hallucinated_details.append(detail)
+
+                if hallucinated_details:
+                    self.logger.warning(
+                        f"🚫 Curator hallucinated {len(hallucinated_details)}/"
+                        f"{len(concrete_details)} concrete_details not in source: "
+                        f"{hallucinated_details}"
+                    )
+                # If >50% hallucinated, zero out details entirely — force
+                # generator to ground on headline, not poisoned specifics
+                if len(hallucinated_details) > len(concrete_details) / 2:
+                    self.logger.warning(
+                        "🚫 Majority of concrete_details fabricated — "
+                        "dropping ALL details to prevent downstream factual errors"
+                    )
+                    concrete_details = []
+                else:
+                    concrete_details = verified_details
 
             chosen.jesse_angle = jesse_angle
             # Attach the structured angle — the four-field version the generator consumes directly

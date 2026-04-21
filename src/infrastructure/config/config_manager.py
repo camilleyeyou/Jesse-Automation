@@ -29,7 +29,14 @@ class AnthropicConfig(BaseModel):
     api_key: str = ""
     model: str = "claude-sonnet-4-6"
     temperature: float = 0.9
-    max_tokens: int = 600
+    # Phase K (2026-04-21): bumped 600 → 1000 to fix truncation bug.
+    # 600 was enough for content alone but the JSON response also
+    # includes hook_type, image_direction, why_this_works,
+    # creative_reasoning (~200-300 tokens of other fields) — when the
+    # post ran long the content field got clipped mid-sentence
+    # ("The destination is—", "The gold is"). 1000 gives comfortable
+    # headroom for a ~90-word post + full reasoning JSON.
+    max_tokens: int = 1000
     timeout: int = 60
 
 

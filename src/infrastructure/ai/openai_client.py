@@ -787,10 +787,33 @@ class OpenAIClient:
         """Generate image using Imagen API - Production paid model at $0.03/image"""
         
         logger.info(f"🎨 Generating image with Imagen ({self.image_model})")
-        
+
         try:
+            # Phase K (2026-04-21) — defend against SDK API drift.
+            # google-genai 0.3.x doesn't have .models.generate_images; we
+            # bumped the pin but Railway may cache old wheels briefly.
+            # Check attr before calling — if missing, skip images cleanly
+            # rather than crash the post pipeline.
+            gen_fn = getattr(
+                getattr(self.gemini_client, "models", None),
+                "generate_images",
+                None,
+            )
+            if gen_fn is None:
+                logger.error(
+                    "❌ Imagen SDK incompatible — gemini_client.models.generate_images "
+                    "not available. Pin bumped in requirements.txt; Railway should "
+                    "pick it up on next deploy. Skipping image for this post."
+                )
+                return {
+                    "error": "imagen_sdk_incompatible",
+                    "image_data": None,
+                    "provider": "google_imagen",
+                    "model": self.image_model,
+                    "generation_time_seconds": round(time.time() - start_time, 2),
+                }
             # Imagen uses generate_images() method
-            response = self.gemini_client.models.generate_images(
+            response = gen_fn(
                 model=self.image_model,
                 prompt=prompt,
                 config=types.GenerateImagesConfig(
