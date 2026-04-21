@@ -41,26 +41,33 @@ logger = logging.getLogger(__name__)
 
 
 # Slot registry. Each slot is a (register, emotional_temperature,
-# contact_frame) tuple. At batch start, we shuffle and take the first
-# N slots. N posts cannot converge on the same slot because each one
-# gets a pre-assigned different cell.
+# contact_frame, comedy_move) tuple. At batch start, we shuffle and
+# take the first N slots. N posts cannot converge on the same slot
+# because each one gets a pre-assigned different cell.
+#
+# Phase J (2026-04-21): added comedy_move. Client diagnosis: same
+# formula across posts. Fix: rotate the comedic engine itself, not just
+# voice/shape. Four moves cover the Phase J scope; each slot ships with
+# one pre-assigned. Cross-slot ensures we never ship two posts in the
+# same batch with the same comedy_move.
 #
 # Registers/temps are the names defined in angle_architect.REGISTERS and
 # angle_architect.EMOTIONAL_TEMPERATURES respectively. Frames are the
 # compositional frame families from Phase G's alternative-frames menu.
+# comedy_move is one of the 4 Phase J techniques.
 _SLOTS: List[Dict[str, str]] = [
     # Warm/tender slice — softer temperatures, intimate frames
-    {"register": "clinical_diagnostician", "emotional_temperature": "tender",     "frame": "direct_object_observation"},
-    {"register": "contrarian",             "emotional_temperature": "dry_amused", "frame": "scale_anchor_bare"},
-    {"register": "prophet",                "emotional_temperature": "outraged",   "frame": "name_verb_object_time"},
-    {"register": "confession",             "emotional_temperature": "weary",      "frame": "scene_fragment_emdash"},
-    {"register": "roast",                  "emotional_temperature": "delighted",  "frame": "role_action_consequence"},
+    {"register": "clinical_diagnostician", "emotional_temperature": "tender",     "frame": "direct_object_observation", "comedy_move": "genre_pastiche"},
+    {"register": "contrarian",             "emotional_temperature": "dry_amused", "frame": "scale_anchor_bare",         "comedy_move": "false_parallel_list"},
+    {"register": "prophet",                "emotional_temperature": "outraged",   "frame": "name_verb_object_time",     "comedy_move": "register_costume"},
+    {"register": "confession",             "emotional_temperature": "weary",      "frame": "scene_fragment_emdash",     "comedy_move": "anti_climactic_diminishment"},
+    {"register": "roast",                  "emotional_temperature": "delighted",  "frame": "role_action_consequence",   "comedy_move": "genre_pastiche"},
     # Second tier — complementary combinations
-    {"register": "clinical_diagnostician", "emotional_temperature": "reverent",   "frame": "noun_verb_role_reaction"},
-    {"register": "contrarian",             "emotional_temperature": "outraged",   "frame": "scene_question"},
-    {"register": "prophet",                "emotional_temperature": "dry_amused", "frame": "number_time_role_verb"},
-    {"register": "confession",             "emotional_temperature": "tender",     "frame": "direct_object_observation"},
-    {"register": "roast",                  "emotional_temperature": "weary",      "frame": "scale_anchor_bare"},
+    {"register": "clinical_diagnostician", "emotional_temperature": "reverent",   "frame": "noun_verb_role_reaction",   "comedy_move": "register_costume"},
+    {"register": "contrarian",             "emotional_temperature": "outraged",   "frame": "scene_question",            "comedy_move": "anti_climactic_diminishment"},
+    {"register": "prophet",                "emotional_temperature": "dry_amused", "frame": "number_time_role_verb",     "comedy_move": "false_parallel_list"},
+    {"register": "confession",             "emotional_temperature": "tender",     "frame": "direct_object_observation", "comedy_move": "anti_climactic_diminishment"},
+    {"register": "roast",                  "emotional_temperature": "weary",      "frame": "scale_anchor_bare",         "comedy_move": "genre_pastiche"},
 ]
 
 

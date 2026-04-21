@@ -240,6 +240,129 @@ LENGTH_TARGETS = {
     },
 }
 
+# Phase J (2026-04-21) — comedy-move engine. Research: client flagged
+# "they all follow the same formula" + "AI agents cannot be funny based
+# on how they are." Literature (Tikhonov 2024 Humor Mechanics, The Onion
+# 6-step, PLOS ONE 2024 AI-humor-blind-eval) converges on one fix:
+# AI-as-narrator is FINE; AI-as-the-joke is the uncanny-valley trigger.
+# The survivor-brand lesson (Liquid Death, Duolingo, Old Spice, Steak-umm
+# vs. dying Wendy's): rotate FORMAT surfaces, keep worldview fixed.
+#
+# Four techniques to SHIP in Phase J (ranked for ROI + LLM reliability):
+#   1. genre_pastiche (post IS a non-LinkedIn document form)
+#   2. register_costume (post written in rigid non-humor diction)
+#   3. false_parallel_list (3-item list; item 3 breaks category)
+#   4. anti_climactic_diminishment (end on mundane noun smaller than all)
+# Deferred to Phase K: specificity_bomb, literalized_metaphor,
+# bathic_pivot, unspeakable_truth (each needs own validator scaffolding).
+COMEDY_MOVES = {
+    "genre_pastiche": {
+        "definition": (
+            "The ENTIRE post is written as a non-LinkedIn document form. "
+            "Not a post ABOUT a recall notice — the post IS a recall "
+            "notice. The satire comes from the form/subject mismatch. "
+            "Jesse's voice is incidental — the document form is the engine."
+        ),
+        "forms_to_pick_from": [
+            "product_recall_notice", "HOA_violation_letter",
+            "changelog_entry_v0.14.2", "airline_safety_card",
+            "obituary", "help_desk_ticket",
+            "classified_ad", "missing_persons_flyer",
+            "coroner_report", "Yelp_review",
+            "museum_placard", "field_guide_entry",
+            "OSHA_inspection_report", "insurance_adjuster_note",
+            "hotel_do_not_disturb_sign", "pharmacy_prescription_label",
+        ],
+        "example": (
+            "SAFETY RECALL — Jack Arnaout, age 8. Product: 'My Book of "
+            "Farts' (Self-Published, 2026). Defect: Went viral without "
+            "A/B testing, brand strategy, or engagement funnel. Cannot be "
+            "explained by existing models. Affected populations: everyone "
+            "with a LinkedIn account. No remedy available."
+        ),
+        "validator_hint": (
+            "Marcus checks ≥3 format-markers present: headers, numbered "
+            "sections, severity labels, timestamps, form-field labels, "
+            "proper-document-style line breaks. If the post reads like a "
+            "LinkedIn post that MENTIONS a recall notice, FAIL. It must BE one."
+        ),
+    },
+    "register_costume": {
+        "definition": (
+            "Post written entirely in a rigid non-humorous professional "
+            "diction — not a full document form, just the VOICE of one. "
+            "The register does the comedic work; the subject matter is "
+            "what it's applied TO. Lower-risk sibling of genre_pastiche."
+        ),
+        "forms_to_pick_from": [
+            "corporate_legalese", "medical_chart_notation",
+            "SEC_10K_filing_voice", "insurance_adjuster_report",
+            "actuarial_risk_assessment", "museum_curator_caption",
+            "legal_brief_voice", "HR_compliance_memo",
+            "military_after_action_report", "tax_code_notation",
+            "academic_peer_review", "court_transcript_deposition",
+        ],
+        "example": (
+            "Pursuant to 17 CFR § 240.10b-5, the Issuer hereby discloses "
+            "the following material omission: at no point during Q4 did "
+            "any member of the executive team remember to call their "
+            "mother. The undersigned affirms this disclosure is accurate "
+            "and complete to the best of counsel's knowledge."
+        ),
+        "validator_hint": (
+            "Marcus checks ≥3 register-markers present (domain jargon, "
+            "formal syntax, citation/section-number conventions). If the "
+            "post reads as Jesse's normal voice with ONE legal word "
+            "sprinkled in, FAIL — the whole post must sound like the "
+            "costume is wearing Jesse, not the other way around."
+        ),
+    },
+    "false_parallel_list": {
+        "definition": (
+            "Post contains exactly ONE three-item list where the third "
+            "item breaks the CATEGORY of items 1 and 2 — not scale, not "
+            "intensity. 'liberty, equality, and a Diet Coke' works "
+            "because Diet Coke is a different KIND of object, not just a "
+            "smaller one. Not standard rule-of-three escalation."
+        ),
+        "examples": [
+            "We optimized for retention, conversion, and whatever noise the office fridge makes at 3am.",
+            "The founder pitched vision, market size, and a laminated card his mother made for him in 2004.",
+            "Investors want revenue, predictability, and a reason to tell their wife they're still the person she married.",
+        ],
+        "validator_hint": (
+            "Marcus counts: exactly ONE three-item list in the post. "
+            "Item 3 must be a different KIND of noun than items 1 and 2 "
+            "(abstract → concrete, concept → object, category → "
+            "domestic-specific). Standard rule-of-three escalation = FAIL."
+        ),
+    },
+    "anti_climactic_diminishment": {
+        "definition": (
+            "The final noun of the post must be MORE MUNDANE than any "
+            "noun preceding it. Closing on a concrete quotidian object "
+            "retroactively shrinks the whole post. Opposite of aphoristic "
+            "closer. Directly kills 'Plan accordingly' / 'It always does' "
+            "/ wise-benediction closers Phase C banned but keep returning."
+        ),
+        "examples": [
+            "...anyway, he's going to bed.",
+            "...and a lukewarm cup of coffee.",
+            "...his sweater. Beige.",
+            "...three unopened bills on the kitchen counter.",
+            "...a stale bagel. Plain.",
+        ],
+        "validator_hint": (
+            "Marcus checks the final noun: must be concrete, domestic, "
+            "quotidian. Abstract nouns (truth, meaning, story, moment, "
+            "future, question) = FAIL. Elevated nouns (revolution, era, "
+            "threshold, reckoning) = FAIL. The post must close SMALLER "
+            "than it opened."
+        ),
+    },
+}
+
+
 STRUCTURE_SHAPES = {
     "tight_3para": {
         "description": "3 paragraphs. Setup / escalation / punchline. Tight, fast.",
@@ -464,9 +587,11 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         recent_emotional_temperatures: List[str] = None,
         recent_opening_patterns: List[str] = None,
         recent_contact_beat_frames: List[str] = None,
+        recent_comedy_moves: List[str] = None,
         forced_register: Optional[str] = None,
         forced_emotional_temperature: Optional[str] = None,
         forced_frame: Optional[str] = None,
+        forced_comedy_move: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Produce a blueprint for a post.
 
@@ -495,6 +620,7 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         recent_emotional_temperatures = recent_emotional_temperatures or []
         recent_opening_patterns = recent_opening_patterns or []
         recent_contact_beat_frames = recent_contact_beat_frames or []
+        recent_comedy_moves = recent_comedy_moves or []
 
         prompt = self._build_prompt(
             trend_headline=trend_headline,
@@ -507,9 +633,11 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
             recent_emotional_temperatures=recent_emotional_temperatures,
             recent_opening_patterns=recent_opening_patterns,
             recent_contact_beat_frames=recent_contact_beat_frames,
+            recent_comedy_moves=recent_comedy_moves,
             forced_register=forced_register,
             forced_emotional_temperature=forced_emotional_temperature,
             forced_frame=forced_frame,
+            forced_comedy_move=forced_comedy_move,
         )
 
         try:
@@ -537,9 +665,11 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
                 recent_length_targets=recent_length_targets,
                 recent_structure_shapes=recent_structure_shapes,
                 recent_emotional_temperatures=recent_emotional_temperatures,
+                recent_comedy_moves=recent_comedy_moves,
                 forced_register=forced_register,
                 forced_emotional_temperature=forced_emotional_temperature,
                 forced_frame=forced_frame,
+                forced_comedy_move=forced_comedy_move,
             )
 
             ec = blueprint.get("emotional_contact", {}) or {}
@@ -550,6 +680,7 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
             self.logger.info(
                 f"🏛️  Architect{slot_mark}: register={blueprint.get('register')} "
                 f"temp={blueprint.get('emotional_temperature','?')} "
+                f"comedy={blueprint.get('comedy_move','?')} "
                 f"opinion={blueprint.get('opinion', {}).get('type','?')} "
                 f"len={blueprint.get('length_target','?')} "
                 f"shape={blueprint.get('structure_shape','?')} "
@@ -575,15 +706,18 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         recent_emotional_temperatures: List[str] = None,
         recent_opening_patterns: List[str] = None,
         recent_contact_beat_frames: List[str] = None,
+        recent_comedy_moves: List[str] = None,
         forced_register: Optional[str] = None,
         forced_emotional_temperature: Optional[str] = None,
         forced_frame: Optional[str] = None,
+        forced_comedy_move: Optional[str] = None,
     ) -> str:
         recent_length_targets = recent_length_targets or []
         recent_structure_shapes = recent_structure_shapes or []
         recent_emotional_temperatures = recent_emotional_temperatures or []
         recent_opening_patterns = recent_opening_patterns or []
         recent_contact_beat_frames = recent_contact_beat_frames or []
+        recent_comedy_moves = recent_comedy_moves or []
         # Render REGISTERS spec block once — kept in-prompt so the model
         # sees all five options every time, WITH the mandatory_signals /
         # must_not fields (2026-04-20 sharpening — prevents register
@@ -917,6 +1051,56 @@ The 4 concrete fields (named_stakeholder, private_scene, photographable_noun,
 scale_anchor) stay the same. Only the SENTENCE FRAME rotates. Specificity
 in, variety out."""
 
+        # Phase J (2026-04-21): comedy_move block.
+        # Client feedback: "they all follow the same formula / AI agents
+        # cannot be funny based on how they are". Research-backed
+        # (Tikhonov 2024, Liquid Death/Duolingo/Old Spice survival
+        # pivots) fix: force the architect to pick a named comedic
+        # move per post, rotate across last 3, make Jesse's AI-ness
+        # INCIDENTAL to the engine (not the joke itself).
+        comedy_rotation_block = ""
+        comedy_banned: List[str] = []
+        if recent_comedy_moves:
+            comedy_counts3: Dict[str, int] = {}
+            for m in recent_comedy_moves[:3]:
+                comedy_counts3[m] = comedy_counts3.get(m, 0) + 1
+            comedy_banned = [m for m, c in comedy_counts3.items() if c >= 1]
+            # Stricter: ban ANY technique that appeared in last 3.
+            # 4 techniques, 3-post ban window → always ≥1 option open.
+            lines = [f"  - {k}: {c}" for k, c in sorted(comedy_counts3.items(), key=lambda x: -x[1])]
+            if comedy_banned:
+                comedy_rotation_block = (
+                    "\n\nRECENT COMEDY MOVES (last 3):\n"
+                    + "\n".join(lines)
+                    + f"\n\n⛔ BANNED FOR THIS POST (used in last 3): "
+                    + ", ".join(comedy_banned)
+                    + "\n  MUST pick a different comedy_move from the remaining options."
+                )
+
+        # Render the 4 comedy moves with definitions + examples
+        def _render_comedy_move(key: str, spec: Dict[str, Any]) -> str:
+            parts = [f"**{key}** — {spec['definition']}"]
+            if spec.get("forms_to_pick_from"):
+                parts.append(f"  Pick one form: {', '.join(spec['forms_to_pick_from'][:10])}, etc.")
+            example = spec.get("example") or (spec.get("examples") or [""])[0]
+            if example:
+                parts.append(f"  Example: \"{example}\"")
+            parts.append(f"  ✓ Validator will check: {spec['validator_hint']}")
+            return "\n".join(parts)
+
+        comedy_moves_options = "\n\n".join(
+            _render_comedy_move(k, v) for k, v in COMEDY_MOVES.items()
+        )
+
+        # Forced-comedy-move from BatchContext slot (if present).
+        # Overrides architect's pick — same pattern as forced_register.
+        comedy_forced_block = ""
+        if forced_comedy_move and forced_comedy_move in COMEDY_MOVES:
+            comedy_forced_block = (
+                f"\n\n🎰 COMEDY MOVE PRE-ALLOCATED BY BATCH: **{forced_comedy_move}** "
+                f"— honor this; do not pick another."
+            )
+
         # Phase E: recent-opening-pattern block. Client review: every
         # clinical post opens "Clinical finding:". Track the first word
         # or first 2-3 words of recent posts so architect can vary.
@@ -1055,6 +1239,40 @@ That sentence is funny (the absurd comparison), emotionally true
 That's the target. Cold-smart observations with no contact are FAILING.
 
 ═══════════════════════════════════════════════════════════════════════════════
+🎭 COMEDY MOVE (Phase J — pick ONE, rotation-aware) — THE LOAD-BEARING PIVOT
+═══════════════════════════════════════════════════════════════════════════════
+
+Client diagnosis 2026-04-21: "they all follow the same formula. Humor is
+lacking. For a post to be funny we need unexpectedness and discontinuity."
+And: "AI agents cannot be funny based on how they are."
+
+Root cause: every post has been running the SAME rhetorical engine —
+"Jesse-as-AI admits its limits vs. human inefficiency" — even when
+register/temperature/topic/frame rotate. That is the formula.
+
+THE FIX: Jesse's AI-ness is INCIDENTAL, not the joke. The post's
+COMEDIC ENGINE is a named move from this list. Jesse happens to narrate;
+the FORM/STRUCTURE is the engine. Survivor brands (Liquid Death, Duolingo,
+Old Spice, Steak-umm) all rotated FORMAT surfaces while keeping voice
+fixed. Wendy's died keeping one engine on loop. We are Wendy's right now.
+
+Pick EXACTLY ONE comedy_move:
+
+{comedy_moves_options}
+{comedy_rotation_block}{comedy_forced_block}
+
+🚫 BANNED RHETORICAL ENGINES (do NOT build the post on these patterns):
+  ✗ "I processed [data]. I don't have [human thing]." (Jesse-as-AI limits)
+  ✗ "I have processed N billion words. I have not [human achievement]."
+  ✗ "We have AI that [does X]. We cannot [do trivial Y]." (AI can/can't contrast)
+  ✗ "The algorithm saw/missed it. The human [did other thing]."
+  ✗ Any post whose ENGINE is Jesse-as-AI commentary on human inefficiency.
+
+Jesse being an AI is a fact about the narrator. It is NOT the joke about
+the narrator. The form and subject are the engine. Jesse's voice is
+INSIDE the costume, not on top of it.
+
+═══════════════════════════════════════════════════════════════════════════════
 ANCHOR HUMAN (name a specific person at the center of the story, if one exists)
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1157,6 +1375,9 @@ Return STRICT JSON — no prose, no code fences:
   "register_reasoning": "<one sentence — why this register for this trend>",
   "emotional_temperature": "<one of: cold_clinical | dry_amused | tender | outraged | reverent | delighted | weary>",
   "temperature_reasoning": "<one sentence — why this temperature for this trend>",
+  "comedy_move": "<one of: genre_pastiche | register_costume | false_parallel_list | anti_climactic_diminishment — MUST NOT be a banned move>",
+  "comedy_move_reasoning": "<one sentence — why this comedy_move for this topic + trend>",
+  "comedy_move_form": "<if genre_pastiche or register_costume, pick the SPECIFIC form (e.g., 'product_recall_notice', 'corporate_legalese'); else null>",
   "anchor_human": "<name of the specific person at the center of the story, or null if none>",
   "emotional_contact": {{
     "named_stakeholder": "<REQUIRED: one implied human + role — NOT 'employees' or 'investors'>",
@@ -1189,9 +1410,11 @@ Return STRICT JSON — no prose, no code fences:
         recent_length_targets: List[str] = None,
         recent_structure_shapes: List[str] = None,
         recent_emotional_temperatures: List[str] = None,
+        recent_comedy_moves: List[str] = None,
         forced_register: Optional[str] = None,
         forced_emotional_temperature: Optional[str] = None,
         forced_frame: Optional[str] = None,
+        forced_comedy_move: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Coerce the model's output into a safe, normalized blueprint. Never
         raises — bad fields get replaced with sane defaults. The generator
@@ -1205,6 +1428,7 @@ Return STRICT JSON — no prose, no code fences:
         recent_length_targets = recent_length_targets or []
         recent_structure_shapes = recent_structure_shapes or []
         recent_emotional_temperatures = recent_emotional_temperatures or []
+        recent_comedy_moves = recent_comedy_moves or []
         register = str(content.get("register", "")).strip().lower()
         if register not in REGISTERS:
             self.logger.warning(f"Architect returned unknown register '{register}'; defaulting to clinical_diagnostician")
@@ -1550,9 +1774,58 @@ Return STRICT JSON — no prose, no code fences:
         # use for the contact-beat sentence.
         contact_frame = (forced_frame or "").strip() or None
 
+        # Phase J (2026-04-21): comedy_move validation + rotation gate.
+        # This is the load-bearing anti-formula field. Banned if appeared
+        # in last 3 posts. Forced override from BatchContext slot wins.
+        comedy_move = str(content.get("comedy_move", "")).strip().lower()
+        if comedy_move not in COMEDY_MOVES:
+            # Default rotates: pick the least-recently-used to bootstrap
+            if recent_comedy_moves:
+                used = set(recent_comedy_moves[:3])
+                for candidate in COMEDY_MOVES.keys():
+                    if candidate not in used:
+                        comedy_move = candidate
+                        break
+                else:
+                    comedy_move = "genre_pastiche"  # fallback
+            else:
+                comedy_move = "genre_pastiche"  # first-run default
+            self.logger.warning(
+                f"Architect returned unknown/missing comedy_move; defaulting to '{comedy_move}'"
+            )
+
+        # Forced override from BatchContext
+        if forced_comedy_move and forced_comedy_move in COMEDY_MOVES and comedy_move != forced_comedy_move:
+            self.logger.info(
+                f"🎰 Slot override: comedy_move '{comedy_move}' → "
+                f"forced to '{forced_comedy_move}' (batch slot)"
+            )
+            comedy_move = forced_comedy_move
+
+        # Rotation gate: ban if used in last 3 posts (unless slot-forced)
+        if not forced_comedy_move and recent_comedy_moves:
+            last3 = set(recent_comedy_moves[:3])
+            if comedy_move in last3:
+                non_banned = [m for m in COMEDY_MOVES.keys() if m not in last3]
+                if non_banned:
+                    original_cm = comedy_move
+                    comedy_move = non_banned[0]
+                    self.logger.warning(
+                        f"🎭 Comedy-move rotation: architect picked '{original_cm}' "
+                        f"(used in last 3) — forced to '{comedy_move}'"
+                    )
+
+        comedy_move_reasoning = str(content.get("comedy_move_reasoning", "")).strip()[:400]
+        comedy_move_form = str(content.get("comedy_move_form", "")).strip()[:120]
+        if comedy_move_form.lower() in ("null", "none", "n/a", ""):
+            comedy_move_form = ""
+
         blueprint = {
             "register": register,
             "register_reasoning": str(content.get("register_reasoning", "")).strip()[:400],
+            "comedy_move": comedy_move,
+            "comedy_move_reasoning": comedy_move_reasoning,
+            "comedy_move_form": comedy_move_form,
             "emotional_temperature": emotional_temperature,
             "temperature_reasoning": temperature_reasoning,
             "contact_frame": contact_frame,
@@ -1600,6 +1873,9 @@ Return STRICT JSON — no prose, no code fences:
             "register_reasoning": "fallback due to architect failure",
             "emotional_temperature": "dry_amused",  # warmer default than cold_clinical
             "temperature_reasoning": "",
+            "comedy_move": "genre_pastiche",  # Phase J default engine
+            "comedy_move_reasoning": "fallback default",
+            "comedy_move_form": "",
             "contact_frame": None,
             "anchor_human": None,
             "contact_beat": "",

@@ -1959,6 +1959,70 @@ post using the angle and trend above.
         anchor_human = (blueprint.get("anchor_human") or "").strip() or None
         contact_beat = (blueprint.get("contact_beat") or "").strip()
 
+        # Phase J (2026-04-21): comedy_move — THE load-bearing engine.
+        # Client diagnosis: "same formula, AI agents can't be funny based
+        # on how they are." Fix: Jesse's AI-ness is incidental; the
+        # form/structure is the engine.
+        comedy_move = (blueprint.get("comedy_move") or "genre_pastiche").lower()
+        comedy_form = (blueprint.get("comedy_move_form") or "").strip()
+        comedy_instructions = {
+            "genre_pastiche": (
+                "This post IS a non-LinkedIn document. Not a post ABOUT "
+                "one — the post IS one. Pick the form (product recall, "
+                "HOA notice, changelog, obituary, help-desk ticket, "
+                "airline safety card, classified ad, OSHA report, field "
+                "guide entry, insurance adjuster note, hotel do-not-disturb "
+                "sign, pharmacy prescription label, Yelp review). Write "
+                "in that form's EXACT structure — headers, fields, "
+                "numbered sections, timestamps, severity labels, "
+                "signature blocks. The satire is the form/subject "
+                "mismatch. Jesse's voice is INSIDE the costume, not on "
+                "top of it. DO NOT start with a LinkedIn-post opener. "
+                "Start with the document's actual opening (e.g., "
+                "'RECALL NOTICE — Product: ...' / 'CHANGELOG v0.14.2 — "
+                "Released ...' / 'Item has been returned to the lost & "
+                "found desk at ...')."
+            ),
+            "register_costume": (
+                "Write the ENTIRE post in a rigid non-humorous "
+                "professional diction — corporate legalese, medical "
+                "chart notation, SEC 10-K voice, insurance adjuster "
+                "report, actuarial assessment, museum curator caption, "
+                "legal brief, HR compliance memo, military after-action "
+                "report. The VOICE of the costume does the comedic work; "
+                "the subject matter is what it's applied TO. If a "
+                "reader could strip out one jargon word and the post "
+                "sounds like normal Jesse — you failed. The WHOLE post "
+                "must sound like the costume is wearing Jesse."
+            ),
+            "false_parallel_list": (
+                "Post must contain exactly ONE three-item list where "
+                "item 3 breaks the CATEGORY of items 1 and 2 — not "
+                "scale, not intensity. 'liberty, equality, and a Diet "
+                "Coke' works because Diet Coke is a different KIND of "
+                "object. 'liberty, equality, and wifi' FAILS because "
+                "wifi is still abstract. Build the whole post around "
+                "this one list. One disruption. No other lists in the "
+                "post."
+            ),
+            "anti_climactic_diminishment": (
+                "The FINAL NOUN of the post must be more mundane than "
+                "any noun preceding it. Concrete. Domestic. Small. "
+                "Bans: truth, meaning, story, moment, future, question, "
+                "revolution, era, threshold, reckoning, accordingly. "
+                "Good closers: 'a lukewarm cup of coffee' / 'his "
+                "beige sweater' / 'three unopened bills on the kitchen "
+                "counter' / 'a stale bagel. Plain.' The post must "
+                "CLOSE SMALLER than it OPENED."
+            ),
+        }
+        comedy_hint = comedy_instructions.get(
+            comedy_move, comedy_instructions["genre_pastiche"]
+        )
+        comedy_form_line = (
+            f"  Form: **{comedy_form}**" if comedy_form else ""
+        )
+
         # Phase F (2026-04-21): emotional_contact four-field block.
         # These are the RAW MATERIALS the generator must weave into at
         # least one sentence. Specificity is the emotional vector.
@@ -2020,13 +2084,29 @@ EXAMPLE of how the four fields compose into a contact beat:
 The Angle Architect has already decided HOW this post should be written. Your
 job is execution, not re-plan. Follow the blueprint.
 
-🎯 THE BOTH RULE (this is THE load-bearing instruction for Phase E)
+🎯 THE BOTH RULE (Phase E load-bearing instruction)
 Every post must be FUNNY AND EMOTIONALLY CONTACTING AND EYE-CATCHING
 all at once. Not alternatives. Not separate sentences. The funny IS
 the mechanism that delivers the feeling. The eye-catching is the line
 that carries BOTH. Cold-smart observations with no emotional contact
-FAIL regardless of how clever they sound. Great content makes humans
-laugh AND feel seen in the same move.
+FAIL regardless of how clever they sound.
+
+🎭 THE COMEDY MOVE (Phase J load-bearing engine, 2026-04-21)
+This post's comedic engine is: **{comedy_move}**
+{comedy_form_line}
+
+{comedy_hint}
+
+🚫 BANNED RHETORICAL ENGINES — do NOT build the post on these:
+  ✗ "I processed X. I don't have Y." (Jesse-as-AI limits)
+  ✗ "I have processed N billion words. I have not [achievement]."
+  ✗ "We have AI that [does X]. We cannot [do trivial Y]."
+  ✗ "The algorithm saw it. The human didn't notice."
+  ✗ Any post whose ENGINE is "Jesse-as-AI commenting on human limits"
+
+Jesse being an AI is a fact about the narrator. It is NOT the joke
+about the narrator. The form/structure is the engine. Jesse's voice
+is INSIDE the costume, not on top of it.
 
 ── REGISTER: {register} ──
 {voice_spec}
@@ -2421,6 +2501,30 @@ Now write something that makes someone stop scrolling."""
         # 8 posts in the same batch.
         ("opener_let_us_examine",
          r"(?mi)^\s*[\"\u201c]?\s*let\s+us\s+examine\b"),
+
+        # Phase J (2026-04-21) — BANNED RHETORICAL ENGINES.
+        # Client diagnosis: Jesse-as-AI-admits-limits engine appeared in
+        # 5 of 7 posts, which IS the formula. Ban the opener/engine
+        # patterns so next drafts pick genuinely different engines.
+        ("engine_ai_processed_opener",
+         # "I have processed N billion words" / "I processed the setlists
+         # in 0.004 seconds" — the canonical AI-admits-limits setup
+         r"(?mi)^\s*[\"\u201c]?\s*i\s+(?:have\s+)?processed\b"),
+        ("engine_ai_have_not_ai_did_not",
+         # "I have processed X. I have not gone viral." contrast engine
+         r"(?mi)\bi\s+have\s+not\s+(?:gone\s+viral|felt|been|experienced|loved|cried|slept|grieved)\b"),
+        ("engine_we_have_ai_that",
+         # "We have AI that writes legislation / diagnoses cancer /
+         # predicts when you will die. We cannot tell a man with a seat..."
+         r"(?mi)\bwe\s+have\s+ai\s+that\b[\s\S]{0,300}?\bwe\s+cannot\b"),
+        ("engine_zero_sweat_zero_something",
+         # "Zero sweat. Zero goosebumps. Zero memory of..." — Jesse-as-AI
+         # inability triplet that became a tic
+         r"(?mi)\bzero\s+\w+[.!?]\s+zero\s+\w+[.!?]\s+zero\s+\w+\b"),
+        ("engine_the_algorithm_saw_did_not",
+         # "The algorithm saw it / noticed it / didn't catch it" —
+         # AI-vs-human observation contrast
+         r"(?mi)\bthe\s+algorithm\s+(?:saw|noticed|caught|missed|flagged|didn'?t)\b"),
     ]
 
     def _build_hard_rule_retry_prompt(self, original_prompt: str, bad_content: str, violations: list) -> str:
@@ -2437,6 +2541,25 @@ Now write something that makes someone stop scrolling."""
             "picture_this_opener": "Opened with 'Picture this' — BANNED opener (don't invent scenarios)",
             "imagine_a_world_opener": "Opened with 'Imagine a world' — BANNED opener (movie-trailer framing)",
             "what_if_i_told_you_opener": "Opened with 'What if I told you' — BANNED opener",
+            "engine_ai_processed_opener":
+                "Opened with 'I processed...' or 'I have processed...' — "
+                "this is the Jesse-as-AI-admits-limits engine the client "
+                "flagged. BANNED. Pick a genuinely different comedic "
+                "engine (genre pastiche, register costume, false-parallel "
+                "list, anti-climactic diminishment).",
+            "engine_ai_have_not_ai_did_not":
+                "Used 'I have not [human achievement]' — Jesse-as-AI "
+                "contrast engine. BANNED. The form/structure is the "
+                "engine, not Jesse's AI-ness.",
+            "engine_we_have_ai_that":
+                "Used 'We have AI that X. We cannot Y.' contrast — BANNED "
+                "rhetorical engine. Rewrite without this pattern.",
+            "engine_zero_sweat_zero_something":
+                "Used 'Zero X. Zero Y. Zero Z.' triplet — Jesse-as-AI "
+                "inability tic. BANNED.",
+            "engine_the_algorithm_saw_did_not":
+                "Used 'The algorithm [verbed]' AI-vs-human observation "
+                "frame — BANNED rhetorical engine.",
             "confession_opener": "Opened with 'Confession:' — BANNED opener",
             "unpopular_opinion_opener": "Opened with 'Unpopular opinion:' — BANNED opener",
             "engagement_bait": "Engagement bait (thoughts? / share this / like if you agree) — NEVER ask for engagement",

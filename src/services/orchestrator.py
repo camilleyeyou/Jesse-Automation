@@ -233,6 +233,8 @@ class ContentOrchestrator:
         recent_registers: list = []
         recent_length_targets: list = []
         recent_structure_shapes: list = []
+        recent_emotional_temperatures: list = []
+        recent_comedy_moves: list = []
         if self.memory:
             try:
                 recent_registers = self.memory.get_recent_registers(days=7, limit=10)
@@ -242,15 +244,18 @@ class ContentOrchestrator:
                 # Phase C (2026-04-20) + E (2026-04-21): length + structure +
                 # emotional_temperature rotation state.
                 bp_fields = self.memory.get_recent_blueprint_fields(
-                    fields=["length_target", "structure_shape", "emotional_temperature"],
+                    fields=["length_target", "structure_shape",
+                            "emotional_temperature", "comedy_move"],
                     days=7, limit=10,
                 )
                 recent_length_targets = bp_fields.get("length_target", [])
                 recent_structure_shapes = bp_fields.get("structure_shape", [])
                 recent_emotional_temperatures = bp_fields.get("emotional_temperature", [])
+                recent_comedy_moves = bp_fields.get("comedy_move", [])
             except Exception as e:
                 logger.debug(f"Could not fetch recent blueprint fields: {e}")
                 recent_emotional_temperatures = []
+                recent_comedy_moves = []
 
             # Phase E: opening-pattern tracking for eye-catching first-49-chars
             # rotation. Pull the first 15 chars of the last 5 post hooks to
@@ -305,9 +310,11 @@ class ContentOrchestrator:
                 recent_emotional_temperatures=recent_emotional_temperatures,
                 recent_opening_patterns=recent_opening_patterns,
                 recent_contact_beat_frames=recent_contact_beat_frames,
+                recent_comedy_moves=recent_comedy_moves,
                 forced_register=forced_slot.get("register"),
                 forced_emotional_temperature=forced_slot.get("emotional_temperature"),
                 forced_frame=forced_slot.get("frame"),
+                forced_comedy_move=forced_slot.get("comedy_move"),
             )
             # Attach to trend so it flows with the post through generation
             trend.blueprint = blueprint
@@ -488,7 +495,8 @@ class ContentOrchestrator:
             ai_client=ai_client,
         )
         slot_summary = ", ".join(
-            f"#{i+1}={s.get('register','?')[:4]}/{s.get('emotional_temperature','?')[:4]}/{s.get('frame','?')[:8]}"
+            f"#{i+1}={s.get('register','?')[:4]}/{s.get('emotional_temperature','?')[:4]}/"
+            f"{s.get('frame','?')[:8]}/{s.get('comedy_move','?')[:8]}"
             for i, s in enumerate(batch_ctx.slots) if s
         )
         logger.info(f"🎰 BatchContext slots pre-allocated: {slot_summary}")
