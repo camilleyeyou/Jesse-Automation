@@ -19,6 +19,7 @@ from ..agents.content_strategist import ContentGeneratorAgent
 from ..agents.feedback_aggregator import FeedbackAggregatorAgent
 from ..agents.revision_generator import RevisionGeneratorAgent
 from ..agents.validators import SarahChenValidator, MarcusWilliamsValidator, JordanParkValidator
+from .batch_context import BatchContext
 
 try:
     from ..agents.position_extractor import PositionExtractor
@@ -284,6 +285,13 @@ class ContentOrchestrator:
             except Exception as e:
                 logger.debug(f"Could not fetch opening patterns: {e}")
 
+        # Phase H (2026-04-21): pull BatchContext-assigned slot from the
+        # trend. When present, the architect honors it as the forced
+        # register/temp/frame for THIS post — prevents sibling convergence
+        # that rotation gates can't catch (because siblings commit after
+        # architect runs, not before).
+        forced_slot = getattr(trend, "forced_slot", None) or {}
+
         try:
             blueprint = await self.angle_architect.execute(
                 trend_headline=trend.headline,
@@ -297,6 +305,9 @@ class ContentOrchestrator:
                 recent_emotional_temperatures=recent_emotional_temperatures,
                 recent_opening_patterns=recent_opening_patterns,
                 recent_contact_beat_frames=recent_contact_beat_frames,
+                forced_register=forced_slot.get("register"),
+                forced_emotional_temperature=forced_slot.get("emotional_temperature"),
+                forced_frame=forced_slot.get("frame"),
             )
             # Attach to trend so it flows with the post through generation
             trend.blueprint = blueprint
@@ -445,7 +456,15 @@ class ContentOrchestrator:
         return preferred_theme, angle_seed, preferred_format
 
     async def generate_batch(self, num_posts: int = 1, use_video: bool = False) -> BatchResult:
-        """Generate a batch of posts, each with a unique fresh trend."""
+        """Generate a batch of posts, each with a unique fresh trend.
+
+        Phase H (2026-04-21): uses BatchContext for in-batch sibling
+        coordination — fixes the concurrent-batch sibling-blindness bug
+        where 3-of-7 posts landed on the same news event and 6-of-7 used
+        the same compositional frame. Implements STORM/SimpleStrat slot
+        pre-allocation (each post gets pre-assigned register/temp/frame)
+        and LangChain-MMR-style embedding dedup against committed siblings.
+        """
 
         batch_id = str(uuid.uuid4())
         logger.info(f"Starting batch {batch_id[:8]} with {num_posts} posts")
@@ -458,6 +477,21 @@ class ContentOrchestrator:
         # Reset trend tracking for this batch
         if self.trend_service:
             self.trend_service.reset_for_new_batch()
+
+        # Phase H: create the shared batch context (slot pre-allocation +
+        # embedding dedup against siblings). Gracefully degrades if
+        # ai_client doesn't support embeddings — falls back to lexical.
+        ai_client = getattr(self.content_generator, "ai_client", None)
+        batch_ctx = BatchContext.for_batch(
+            batch_id=batch_id,
+            num_posts=num_posts,
+            ai_client=ai_client,
+        )
+        slot_summary = ", ".join(
+            f"#{i+1}={s.get('register','?')[:4]}/{s.get('emotional_temperature','?')[:4]}/{s.get('frame','?')[:8]}"
+            for i, s in enumerate(batch_ctx.slots) if s
+        )
+        logger.info(f"🎰 BatchContext slots pre-allocated: {slot_summary}")
 
         approved_posts = []
         rejected_count = 0
@@ -473,23 +507,63 @@ class ContentOrchestrator:
             # (dashboard "Generate" button) gets the same protections.
             preferred_theme, angle_seed, preferred_format = self._determine_post_context()
 
-            # Fetch curated trend for THIS post (curator respects preferred_theme)
+            # Phase H: topic-dedup retry loop. If the curator picks a
+            # trend already claimed by a sibling (different wording, same
+            # story), reroll up to 3 times. Fixes the 3-of-7 same-story
+            # bug observed in today's batch.
             trend = None
-            if self.news_curator:
-                curator_kwargs = {"post_id": post_id}
-                if preferred_theme:
-                    curator_kwargs["preferred_theme"] = preferred_theme
-                trend = await self.news_curator.execute(**curator_kwargs)
-                if trend:
-                    logger.info(f"📰 Curated trend ({trend.category}): {trend.headline[:70]}...")
-            elif self.trend_service:
-                trend = await self.trend_service.get_one_fresh_trend(post_id=post_id)
-                if trend:
-                    logger.info(f"📰 Trend ({trend.category}): {trend.headline[:70]}...")
+            dedup_reason = None
+            for attempt in range(3):
+                candidate_trend = None
+                if self.news_curator:
+                    curator_kwargs = {"post_id": post_id}
+                    if preferred_theme:
+                        curator_kwargs["preferred_theme"] = preferred_theme
+                    candidate_trend = await self.news_curator.execute(**curator_kwargs)
+                elif self.trend_service:
+                    candidate_trend = await self.trend_service.get_one_fresh_trend(post_id=post_id)
+
+                if not candidate_trend:
+                    break
+
+                # Check topic against already-committed siblings
+                trend_text = (
+                    f"{getattr(candidate_trend, 'headline', '')} "
+                    f"{getattr(candidate_trend, 'summary', '') or ''}"
+                ).strip()
+                is_dup, sim = await batch_ctx.is_topic_duplicate(trend_text)
+                if is_dup:
+                    logger.warning(
+                        f"🚫 Topic dup against sibling (sim={sim:.2f}, attempt={attempt+1}/3): "
+                        f"'{getattr(candidate_trend, 'headline', '')[:70]}...' — rerolling"
+                    )
+                    dedup_reason = f"topic_dup_{sim:.2f}"
+                    continue
+
+                trend = candidate_trend
+                logger.info(
+                    f"📰 Curated trend ({trend.category}) "
+                    f"[sibling_sim={sim:.2f}]: {trend.headline[:70]}..."
+                )
+                break
+
+            if not trend:
+                if dedup_reason:
+                    logger.warning(
+                        f"⚠️  Post {post_number}: curator kept hitting sibling dups "
+                        f"after 3 rerolls — skipping this slot"
+                    )
+                rejected_count += 1
+                continue
+
+            # Phase H: attach the pre-allocated slot to the trend so the
+            # architect can honor it. Architect's rotation code treats
+            # forced_* fields as the decision and logs if it had to deviate.
+            slot = batch_ctx.slot_for(post_number)
+            trend.forced_slot = slot or {}
 
             # Phase 1: architect the angle BEFORE generation
-            if trend:
-                await self._architect_angle(trend, pillar=preferred_theme, post_id=post_id)
+            await self._architect_angle(trend, pillar=preferred_theme, post_id=post_id)
 
             try:
                 post, validation_scores, was_approved = await self._process_single_post_with_memory(
@@ -502,6 +576,20 @@ class ContentOrchestrator:
                 )
 
                 if was_approved and post:
+                    # Phase H: commit to batch context so later siblings
+                    # see this post. Check frame-level dup as a soft signal
+                    # — log but don't reject approved posts (validators
+                    # already blessed them).
+                    body_text = post.content or ""
+                    headline_text = trend.headline if trend else ""
+                    frame_dup, frame_sim = await batch_ctx.is_frame_duplicate(body_text)
+                    if frame_dup:
+                        logger.warning(
+                            f"⚠️  Post {post_number} body frame-similar to sibling "
+                            f"(sim={frame_sim:.2f}) — approved, but flag for review"
+                        )
+                    await batch_ctx.commit(headline_text, body_text)
+
                     approved_posts.append(post)
                     logger.info(f"✅ Post {post_number} APPROVED")
                 else:

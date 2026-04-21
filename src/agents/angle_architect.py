@@ -462,6 +462,9 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         recent_emotional_temperatures: List[str] = None,
         recent_opening_patterns: List[str] = None,
         recent_contact_beat_frames: List[str] = None,
+        forced_register: Optional[str] = None,
+        forced_emotional_temperature: Optional[str] = None,
+        forced_frame: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Produce a blueprint for a post.
 
@@ -502,6 +505,9 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
             recent_emotional_temperatures=recent_emotional_temperatures,
             recent_opening_patterns=recent_opening_patterns,
             recent_contact_beat_frames=recent_contact_beat_frames,
+            forced_register=forced_register,
+            forced_emotional_temperature=forced_emotional_temperature,
+            forced_frame=forced_frame,
         )
 
         try:
@@ -529,16 +535,23 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
                 recent_length_targets=recent_length_targets,
                 recent_structure_shapes=recent_structure_shapes,
                 recent_emotional_temperatures=recent_emotional_temperatures,
+                forced_register=forced_register,
+                forced_emotional_temperature=forced_emotional_temperature,
+                forced_frame=forced_frame,
             )
 
             ec = blueprint.get("emotional_contact", {}) or {}
             ec_mark = "✅" if ec.get("complete") else "⚠️ INCOMPLETE"
+            slot_mark = ""
+            if forced_register or forced_emotional_temperature or forced_frame:
+                slot_mark = " [slot-forced]"
             self.logger.info(
-                f"🏛️  Architect: register={blueprint.get('register')} "
+                f"🏛️  Architect{slot_mark}: register={blueprint.get('register')} "
                 f"temp={blueprint.get('emotional_temperature','?')} "
                 f"opinion={blueprint.get('opinion', {}).get('type','?')} "
                 f"len={blueprint.get('length_target','?')} "
                 f"shape={blueprint.get('structure_shape','?')} "
+                f"frame={blueprint.get('contact_frame','?')} "
                 f"anchor={blueprint.get('anchor_human','?')[:20] if blueprint.get('anchor_human') else '—'} "
                 f"ec={ec_mark}"
             )
@@ -560,6 +573,9 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         recent_emotional_temperatures: List[str] = None,
         recent_opening_patterns: List[str] = None,
         recent_contact_beat_frames: List[str] = None,
+        forced_register: Optional[str] = None,
+        forced_emotional_temperature: Optional[str] = None,
+        forced_frame: Optional[str] = None,
     ) -> str:
         recent_length_targets = recent_length_targets or []
         recent_structure_shapes = recent_structure_shapes or []
@@ -772,6 +788,53 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
             EMOTIONAL_CONTACT_FIELDS["scale_anchor"]
         )
 
+        # Phase H (2026-04-21): forced-slot block — BatchContext pre-allocates
+        # register + temp + frame at batch start to prevent sibling
+        # convergence. When present, these fields override any rotation
+        # the architect would otherwise compute. Slot is the canonical
+        # fix for the concurrent-batch sibling-blindness bug.
+        forced_slot_block = ""
+        if forced_register or forced_emotional_temperature or forced_frame:
+            try:
+                # Import locally to avoid circular import
+                from ..services.batch_context import FRAME_DESCRIPTIONS as _FD
+                frame_desc = _FD.get(forced_frame or "", "")
+            except Exception:
+                frame_desc = ""
+            forced_lines = []
+            if forced_register:
+                forced_lines.append(f"  register = **{forced_register}**  (use this register, not another)")
+            if forced_emotional_temperature:
+                forced_lines.append(f"  emotional_temperature = **{forced_emotional_temperature}**  (use this temperature)")
+            if forced_frame:
+                frame_detail = f" — {frame_desc}" if frame_desc else ""
+                forced_lines.append(f"  contact_beat frame = **{forced_frame}**{frame_detail}")
+            forced_slot_block = f"""
+
+═══════════════════════════════════════════════════════════════════════════════
+🎰 BATCH-ALLOCATED SLOT (Phase H — IN-BATCH DIVERSITY ENFORCEMENT)
+═══════════════════════════════════════════════════════════════════════════════
+
+This post is part of a batch. The BatchContext has PRE-ALLOCATED your
+register + temperature + compositional frame at batch start, so N posts
+in this batch cannot converge on the same voice. DO NOT override these
+picks — they are the canonical decision for this post:
+
+{chr(10).join(forced_lines)}
+
+The rotation blocks below are still informative (they tell you what
+recent history looks like), but the slot above is the MANDATORY pick.
+All other rotation logic (length, structure) is still yours to decide
+as before.
+"""
+            # Short version for the architect to see at the top
+            forced_slot_block_intro = (
+                f"\n\n⚡ SLOT (batch-allocated, mandatory): "
+                f"register={forced_register}, "
+                f"temp={forced_emotional_temperature}, "
+                f"frame={forced_frame}\n"
+            )
+
         # Phase G (2026-04-21): contact-beat frame rotation. Once the 4-field
         # emotional_contact blueprint is working, generators converge on one
         # compositional move ("Somewhere a [role] at [time]...") because
@@ -874,7 +937,7 @@ in, variety out."""
 
 Headline: {trend_headline}
 Summary: {trend_summary}
-{pillar_block}
+{pillar_block}{forced_slot_block}
 
 CURATOR'S RAW ANGLE (starting material — you sharpen it):
 - Observation: {observation}
@@ -1124,10 +1187,18 @@ Return STRICT JSON — no prose, no code fences:
         recent_length_targets: List[str] = None,
         recent_structure_shapes: List[str] = None,
         recent_emotional_temperatures: List[str] = None,
+        forced_register: Optional[str] = None,
+        forced_emotional_temperature: Optional[str] = None,
+        forced_frame: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Coerce the model's output into a safe, normalized blueprint. Never
         raises — bad fields get replaced with sane defaults. The generator
         should be able to read a blueprint whether or not every field is perfect.
+
+        Phase H (2026-04-21): when forced_* params are provided (by
+        BatchContext slot pre-allocation), they override whatever the
+        architect picked. Takes precedence over rotation gates — the slot
+        is the canonical decision for batch diversity.
         """
         recent_length_targets = recent_length_targets or []
         recent_structure_shapes = recent_structure_shapes or []
@@ -1137,10 +1208,22 @@ Return STRICT JSON — no prose, no code fences:
             self.logger.warning(f"Architect returned unknown register '{register}'; defaulting to clinical_diagnostician")
             register = "clinical_diagnostician"
 
+        # Phase H: forced-slot register override (BatchContext pre-allocation)
+        # Takes precedence over rotation — slot is the canonical decision.
+        if forced_register and forced_register in REGISTERS and register != forced_register:
+            self.logger.info(
+                f"🎰 Slot override: architect picked '{register}' → "
+                f"forced to '{forced_register}' (batch slot)"
+            )
+            register = forced_register
+
         # HARD ROTATION GATE — if architect picked a register that's 3+ in
         # last 5 posts, reassign to the least-used non-banned register.
-        # The prompt tells it not to; this enforces.
-        if recent_registers:
+        # The prompt tells it not to; this enforces. Skipped when slot-forced.
+        if forced_register:
+            # Slot took precedence — skip rotation
+            pass
+        elif recent_registers:
             last5 = recent_registers[:5]
             counts5: Dict[str, int] = {}
             for r in last5:
@@ -1305,7 +1388,21 @@ Return STRICT JSON — no prose, no code fences:
             # Default to dry_amused rather than cold_clinical — client
             # explicitly flagged cold as the default-drift failure mode.
             emotional_temperature = "dry_amused"
-        if recent_emotional_temperatures:
+
+        # Phase H: forced-slot temperature override (BatchContext slot)
+        if (forced_emotional_temperature
+                and forced_emotional_temperature in EMOTIONAL_TEMPERATURES
+                and emotional_temperature != forced_emotional_temperature):
+            self.logger.info(
+                f"🎰 Slot override: temperature '{emotional_temperature}' → "
+                f"forced to '{forced_emotional_temperature}' (batch slot)"
+            )
+            emotional_temperature = forced_emotional_temperature
+
+        # Phase H: skip temperature rotation when slot-forced
+        if forced_emotional_temperature:
+            pass
+        elif recent_emotional_temperatures:
             last5_t = recent_emotional_temperatures[:5]
             t_counts: Dict[str, int] = {}
             for t in last5_t:
@@ -1446,11 +1543,17 @@ Return STRICT JSON — no prose, no code fences:
             avoid_raw = []
         avoid = [str(a).strip()[:120] for a in avoid_raw if str(a).strip()][:8]
 
+        # Phase H: persist the batch-allocated compositional frame on the
+        # blueprint. Generator reads this to know which frame family to
+        # use for the contact-beat sentence.
+        contact_frame = (forced_frame or "").strip() or None
+
         blueprint = {
             "register": register,
             "register_reasoning": str(content.get("register_reasoning", "")).strip()[:400],
             "emotional_temperature": emotional_temperature,
             "temperature_reasoning": temperature_reasoning,
+            "contact_frame": contact_frame,
             "anchor_human": anchor_human,
             "contact_beat": contact_beat,
             "emotional_contact": emotional_contact,
@@ -1495,6 +1598,7 @@ Return STRICT JSON — no prose, no code fences:
             "register_reasoning": "fallback due to architect failure",
             "emotional_temperature": "dry_amused",  # warmer default than cold_clinical
             "temperature_reasoning": "",
+            "contact_frame": None,
             "anchor_human": None,
             "contact_beat": "",
             "emotional_contact": {
