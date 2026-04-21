@@ -556,7 +556,7 @@ class AngleArchitectAgent(BaseAgent):
         # compliance (99.7% vs ~96% for 4o) and cheaper input ($1.25 vs
         # $2.50/1M). Architect emits a 15+ field JSON blueprint — schema
         # reliability is load-bearing here.
-        self.model = "gpt-5.1"
+        self.model = "gpt-4o"
         self.temperature = 0.7  # higher than validators — we want creative register picks
         self.max_tokens = 900
 

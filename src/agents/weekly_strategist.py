@@ -225,7 +225,7 @@ class WeeklyStrategistAgent(BaseAgent):
             response = await self.ai_client.generate_with_tools(
                 messages=messages,
                 tools=STRATEGIST_TOOLS,
-                model="gpt-5.1",
+                model="gpt-4o",
                 temperature=0.7,
             )
 
@@ -280,7 +280,7 @@ class WeeklyStrategistAgent(BaseAgent):
             response = await self.ai_client.generate_with_tools(
                 messages=messages,
                 tools=STRATEGIST_TOOLS,
-                model="gpt-5.1",
+                model="gpt-4o",
                 temperature=0.5,
             )
             assistant_message = response.get("message", {})

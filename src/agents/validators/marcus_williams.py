@@ -26,7 +26,7 @@ class MarcusWilliamsValidator(BaseAgent):
         # Marcus's job (quoting weak sentences, flagging broken metaphors,
         # grammar check). Max tokens lowered 900→700 to pre-empt GPT-5.1's
         # known verbosity tendency on critique output.
-        self.model = "gpt-5.1"
+        self.model = "gpt-4o"
         self.temperature = 0.2
         self.max_tokens = 700
 
