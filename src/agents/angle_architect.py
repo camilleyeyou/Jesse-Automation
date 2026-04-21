@@ -678,6 +678,42 @@ Return STRICT JSON — no prose, no code fences:
                         f"(3+ of last 5) — forced to '{register}' (count={least_used[1]})"
                     )
 
+            # Phase D (2026-04-21) — ZERO-REGISTER FORCING.
+            # Client review: prophet + confession stayed at 0 appearances
+            # across 10 consecutive posts. The 3+ ban kept rotating top
+            # registers but architect kept defaulting to another top
+            # register instead of the zero-use ones. Symmetric gate: if
+            # any register has 0 in last 10, MUST pick it (unless all 5
+            # are in rotation — unlikely).
+            # User confirmed 2026-04-21 confession is easier than I'd been
+            # treating it ("we are not hiding Jesse is a bot") — so we
+            # actively prefer confession > prophet when both are at 0.
+            last10 = recent_registers[:10]
+            counts10 = {r: 0 for r in REGISTERS.keys()}
+            for r in last10:
+                if r in counts10:
+                    counts10[r] += 1
+            zero_use = [r for r, c in counts10.items() if c == 0]
+            if zero_use and register not in zero_use:
+                # Prefer confession > prophet > alphabetical (stable).
+                # Skip if the target register is banned in last-5 — can't
+                # violate the 3+ ban just to hit a 0 in last-10.
+                preferred_order = ["confession", "prophet"] + sorted(
+                    [r for r in zero_use if r not in {"confession", "prophet"}]
+                )
+                pick = None
+                for candidate in preferred_order:
+                    if candidate in zero_use and candidate not in banned:
+                        pick = candidate
+                        break
+                if pick:
+                    original = register
+                    register = pick
+                    self.logger.warning(
+                        f"🎯 Zero-register forcing: {zero_use} at 0 in last 10 — "
+                        f"overriding '{original}' → '{register}' to restore rotation"
+                    )
+
         opinion_raw = content.get("opinion") or {}
         if not isinstance(opinion_raw, dict):
             opinion_raw = {}

@@ -415,6 +415,50 @@ NO viable {preferred_theme.replace('_', ' ')} trends exist among the candidates.
                 chosen_index = 0
 
             chosen = candidates[chosen_index]
+
+            # Phase D (2026-04-21) — curator self-correction.
+            # Observed bug 2026-04-21: LLM returned chosen_index=N but its
+            # observation/take/concrete_details describe candidate M. Since
+            # the LLM's analysis is about M but it typed index=N, we
+            # stored the wrong trend headline. Fix: validate that the
+            # observation's entities actually overlap with the chosen
+            # headline's entities; if not, swap to whichever candidate DOES
+            # overlap.
+            try:
+                from ..infrastructure.viral_signals import extract_entities
+                angle_text = (observation + " " + take + " "
+                              + " ".join(concrete_details or [])).strip()
+                if angle_text:
+                    angle_entities = extract_entities(angle_text)
+                    chosen_entities = extract_entities(
+                        (chosen.headline or "") + " " + (chosen.summary or "")
+                    )
+                    overlap = angle_entities & chosen_entities
+                    if not overlap and angle_entities:
+                        # Search pool for best-matching candidate
+                        best_idx = chosen_index
+                        best_overlap_size = 0
+                        for i, c in enumerate(candidates):
+                            c_entities = extract_entities(
+                                (c.headline or "") + " " + (c.summary or "")
+                            )
+                            shared = len(angle_entities & c_entities)
+                            if shared > best_overlap_size:
+                                best_overlap_size = shared
+                                best_idx = i
+                        if best_idx != chosen_index and best_overlap_size > 0:
+                            self.logger.warning(
+                                f"🔀 Curator mismatch detected. Index {chosen_index} "
+                                f"('{chosen.headline[:45]}...') doesn't match angle. "
+                                f"Angle entities overlap best with index {best_idx} "
+                                f"('{candidates[best_idx].headline[:45]}...'). Swapping."
+                            )
+                            chosen_index = best_idx
+                            chosen = candidates[chosen_index]
+            except Exception as e:
+                # Non-blocking — if entity extraction fails, keep original pick
+                self.logger.debug(f"Curator self-correction check failed: {e}")
+
             chosen.jesse_angle = jesse_angle
             # Attach the structured angle — the four-field version the generator consumes directly
             if observation or take or concrete_details or tension:
@@ -643,8 +687,27 @@ HARD REJECT categories (score these 0-3 no matter what):
      niche AI sources — never viral enough for selection)
   ✗ Substack essays / Medium thinkpieces / philosophy (Aeon, Marginalian)
   ✗ Niche wellness / mindfulness content
-  ✗ Regional news specific to a US state or country that isn't the story
   ✗ "Physician burnout", "empathy regulation", "slow living" territory
+
+  ✗ REGIONAL NEWS (2026-04-21 hardening):
+     Stories whose impact / readership is state-specific or city-specific,
+     NOT national. Signals: headline includes a state abbreviation as the
+     frame ("AI drives layoffs in TN"), a specific small-city dateline, a
+     school-district name, a state-level regulation nobody outside that
+     state knows about. A story set IN a state is fine if the impact is
+     national (e.g. a SCOTUS case FROM Louisiana that everyone talks
+     about). What's NOT fine: "Tennessee layoffs" as the whole angle.
+
+  ✗ POLICY-PAPER / ACADEMIC-TITLE FORMAT (2026-04-21):
+     Headlines that read like white paper titles — "The X Case for Y:
+     Evidence from Z", "Implications of A: A Framework for B", "Lessons
+     from the Q: What We Learned About R". These are think-tank outputs
+     dressed as news. Not viral. Not what's trending. Score 0-2.
+
+  ✗ REPORT-REVEALS framing without named org / person:
+     "Study finds...", "Report reveals...", "Networks exposed..." with
+     no big-name source or concrete headline entity → niche research
+     coverage, not a viral moment. Score 0-3.
 
 HARD PREFER categories (cluster_score + recognizability both amplify):
   ✓ Big-name tech companies × specific events (Meta, OpenAI, Google,

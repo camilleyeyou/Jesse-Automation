@@ -190,6 +190,38 @@ Return STRICT JSON:
         q3_pass = bool(q3.get("passes", False)) or legacy_pass or (has_real_pov and not brand_stamped)
         q4_pass = bool(q4.get("found", False))
 
+        # Phase D (2026-04-21): deterministic entity-overlap gate on top of
+        # Sarah's Q4 LLM judgment. Client review 2026-04-21 caught a bug
+        # where the curator stored a mismatched trending_topic (post content
+        # was about Uber/healthcare but headline said "China compute
+        # policy"). This gate catches content-drift AT VALIDATION time even
+        # if the curator fix upstream misses: if zero proper-noun overlap
+        # between the stored trending_topic and the actual post content,
+        # Q4 hard-fails — the post isn't tied to the story.
+        content_trend_mismatch = False
+        trend_entities: set = set()
+        post_entities: set = set()
+        try:
+            trending_topic = getattr(post, "trending_topic", "") if post else ""
+            if not trending_topic and post and getattr(post, "cultural_reference", None):
+                # Some post objects wrap trend under cultural_reference
+                cr = post.cultural_reference
+                trending_topic = getattr(cr, "reference", "") or getattr(cr, "headline", "")
+            if trending_topic and post and post.content:
+                from ...infrastructure.viral_signals import extract_entities
+                trend_entities = extract_entities(trending_topic)
+                post_entities = extract_entities(post.content)
+                # Overlap required when BOTH sides have entities. If the
+                # trend has no proper nouns at all, skip this check — it's
+                # the separate "named_entity_present" curator gate's job.
+                if trend_entities and post_entities:
+                    if not (trend_entities & post_entities):
+                        content_trend_mismatch = True
+                        q4_pass = False  # Hard override
+        except Exception as e:
+            # Non-blocking — if extraction fails, trust the LLM's Q4
+            pass
+
         # Length gate — still structural, still binding
         try:
             word_count = int(content.get("word_count", len(post.content.split()) if post else 0))
@@ -254,7 +286,20 @@ Return STRICT JSON:
                     "Name the specific thing happening and state a sharp opinion about it."
                 )
         if not q4_pass:
-            reasons.append("Q4 story-specific detail: post is floating — no detail ties it to the specific story.")
+            if content_trend_mismatch:
+                trend_sample = sorted(trend_entities)[:4]
+                post_sample = sorted(post_entities)[:4]
+                reasons.append(
+                    f"Q4 HARD GATE — content/trend mismatch. Trend entities: "
+                    f"{trend_sample}. Post entities: {post_sample}. Zero "
+                    f"overlap. The post is about a different story than what "
+                    f"the curator picked. Upstream handoff bug — investigate."
+                )
+            else:
+                reasons.append(
+                    "Q4 story-specific detail: post is floating — no detail "
+                    "ties it to the specific story."
+                )
         if not length_ok:
             reasons.append(f"Length: {word_count} words (must be 40-90).")
 
