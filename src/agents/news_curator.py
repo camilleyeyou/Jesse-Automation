@@ -174,9 +174,26 @@ emotional/cultural heat stories like grief essays or Taylor Swift moments.
 4. SPECIFIC PERSON'S BLOG POST without news hook — Simon Willison musing,
    Ethan Mollick speculating. Good reading; wrong content for Jesse.
 
+5. NON-US LOCAL STORIES — Jesse's LinkedIn audience is US-centric. Local
+   non-US stories (Abuja wedding, India plane oversell, UK tabloid
+   scandal, local African/Asian/European politics or influencer drama)
+   do NOT land with a US audience that has no cultural anchor for them.
+   REJECT these by default. Accept only when:
+     (a) The story is globally-driven-from-US (OpenAI, Anthropic, Google,
+         Meta, Musk/X, Trump, US trade policy, Coachella, NBA/NFL,
+         US-dominated tech events) — these are OK even if reported abroad.
+     (b) The international story has active, major US media coverage
+         and a US-visible angle (not just a headline in a regional feed).
+   Examples to REJECT: "An Abuja wedding stopped the internet,"
+   "IndiGo overbooks flight in Mumbai," "UK influencer scandal,"
+   "Kenyan election result." These can be viral in their home region
+   AND still fail Jesse's US feed because the reader has no hook.
+   If the only candidates are non-US regional stories, prefer SKIP
+   over picking one.
+
 If your candidate set has even one story from these categories sitting next
 to a grief essay, a sports moment, a political scandal, or a viral cultural
-post — PICK THE CULTURAL STORY. Your job is picking what stops a LinkedIn
+post — PICK THE US CULTURAL STORY. Your job is picking what stops a LinkedIn
 thumb, not what's intellectually interesting to someone who reads Hacker News.
 
 RULE OF THUMB: Before choosing, ask yourself — "If I described this story to
@@ -708,6 +725,25 @@ HARD REJECT categories (score these 0-3 no matter what):
      "Study finds...", "Report reveals...", "Networks exposed..." with
      no big-name source or concrete headline entity → niche research
      coverage, not a viral moment. Score 0-3.
+
+  ✗ NON-US LOCAL / REGIONAL INTERNATIONAL STORIES (2026-04-21):
+     Jesse's LinkedIn audience is US-centric. Score 0-2 for stories
+     whose natural frame is a foreign city / country / public sphere
+     with no major US media pickup. Examples to reject:
+       - "An Abuja wedding stopped the internet" (local viral in
+         Nigeria, nothing in US feeds)
+       - "IndiGo overbooks Mumbai flight" (Indian airline, no US angle)
+       - "UK reality star in attempted murder case" (UK tabloid)
+       - "Kenya election result", "Japan PM scandal", "Brazil inflation"
+     EXCEPTIONS (OK to pick):
+       - Globally-driven-from-US stories: OpenAI / Anthropic / Google /
+         Meta / Musk / Tesla / Trump / US trade policy / Coachella /
+         NBA / NFL — even if reported in foreign outlets
+       - International stories with ACTIVE major US media coverage
+         (front page of NYT/WSJ/CNN, not just Reuters wire)
+     If the only candidates are non-US regional, PREFER returning
+     success=false (no viable pick) over forcing an out-of-audience
+     story into the feed.
 
 HARD PREFER categories (cluster_score + recognizability both amplify):
   ✓ Big-name tech companies × specific events (Meta, OpenAI, Google,
