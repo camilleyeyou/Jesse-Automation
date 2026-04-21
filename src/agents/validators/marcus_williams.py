@@ -21,10 +21,14 @@ class MarcusWilliamsValidator(BaseAgent):
 
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="MarcusWilliamsValidator")
-        # GPT-4o (not mini) — stronger at structural critique.
-        self.model = "gpt-4o"
+        # Phase I (2026-04-21): gpt-4o → gpt-5.1. OpenAI reports ~45% fewer
+        # factual errors vs 4o (non-thinking mode) — directly relevant to
+        # Marcus's job (quoting weak sentences, flagging broken metaphors,
+        # grammar check). Max tokens lowered 900→700 to pre-empt GPT-5.1's
+        # known verbosity tendency on critique output.
+        self.model = "gpt-5.1"
         self.temperature = 0.2
-        self.max_tokens = 900
+        self.max_tokens = 700
 
     def get_system_prompt(self) -> str:
         return """You are Marcus Williams, a Creative Director who has seen every copywriting crutch ever invented.

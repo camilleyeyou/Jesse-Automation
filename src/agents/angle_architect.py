@@ -428,10 +428,12 @@ class AngleArchitectAgent(BaseAgent):
 
     def __init__(self, ai_client, config):
         super().__init__(ai_client, config, name="AngleArchitect")
-        # GPT-4o for its structured-output reliability and tendency to
-        # produce sharper opinions than Claude/Haiku under rubric-style prompts.
-        # Cost per call ~$0.01 at current pricing, ~500 tokens output.
-        self.model = "gpt-4o"
+        # Phase I (2026-04-21): migrated gpt-4o → gpt-5.1. OpenAI retired 4o
+        # from ChatGPT Feb 13 2026; GPT-5.1 has stronger structured-output
+        # compliance (99.7% vs ~96% for 4o) and cheaper input ($1.25 vs
+        # $2.50/1M). Architect emits a 15+ field JSON blueprint — schema
+        # reliability is load-bearing here.
+        self.model = "gpt-5.1"
         self.temperature = 0.7  # higher than validators — we want creative register picks
         self.max_tokens = 900
 

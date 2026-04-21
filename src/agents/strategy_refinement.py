@@ -65,7 +65,7 @@ class StrategyRefinementAgent(BaseAgent):
         result = await self.ai_client.generate(
             prompt=prompt,
             system_prompt=system_prompt,
-            model="gpt-4o",
+            model="gpt-5.1",
             response_format="json",
             temperature=0.4,
         )
