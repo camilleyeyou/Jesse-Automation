@@ -356,11 +356,18 @@ content_strategy:
         # Social pulse — Reddit as the "what's going viral on US social media
         # right now" proxy. Free public .json endpoints, no OAuth required.
         # Covers the mainstream cross-subreddit pulse plus news + tech.
+        #
+        # Phase M (2026-04-22): thresholds tightened + 4 new subreddits
+        # added based on research (Techmeme / HN editorial patterns).
+        # The four new subs fill diversity gaps Brave Search can't cover:
+        # corporate absurdism, political-scandal-of-the-day, viral social
+        # moments, and the "real news so absurd it reads satirical" pipeline
+        # that IS literally Jesse's voice as a subreddit (r/nottheonion).
         - name: "Reddit r/popular"
           type: "reddit"
           subreddit: "popular"
           listing: "hot"
-          min_score: 5000
+          min_score: 15000  # Phase M: bumped 5000 → 15000, narrow to peak viral
           enabled: true
         - name: "Reddit r/news (top today)"
           type: "reddit"
@@ -374,7 +381,36 @@ content_strategy:
           subreddit: "technology"
           listing: "top"
           timeframe: "day"
-          min_score: 1500
+          min_score: 3000  # Phase M: bumped 1500 → 3000, filter low-signal rage
+          enabled: true
+        # Phase M additions — diversity-gap coverage
+        - name: "Reddit r/nottheonion (top today)"
+          type: "reddit"
+          subreddit: "nottheonion"
+          listing: "top"
+          timeframe: "day"
+          min_score: 2000
+          enabled: true
+        - name: "Reddit r/OutOfTheLoop (top today)"
+          type: "reddit"
+          subreddit: "OutOfTheLoop"
+          listing: "top"
+          timeframe: "day"
+          min_score: 500
+          enabled: true
+        - name: "Reddit r/PublicFreakout (top today)"
+          type: "reddit"
+          subreddit: "PublicFreakout"
+          listing: "top"
+          timeframe: "day"
+          min_score: 10000
+          enabled: true
+        - name: "Reddit r/politics (top today, top-of-day only)"
+          type: "reddit"
+          subreddit: "politics"
+          listing: "top"
+          timeframe: "day"
+          min_score: 20000  # very high — only peak-of-day politics, not partisan churn
           enabled: true
         # Scrapers (disabled — placeholder)
         - name: "Techmeme"

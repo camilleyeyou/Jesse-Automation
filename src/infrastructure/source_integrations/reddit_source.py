@@ -41,7 +41,13 @@ class RedditSource(BaseSourceIntegration):
 
     # Reddit requires a descriptive User-Agent or returns 429/403.
     # Using a generic bot UA is fine — the endpoints are public.
-    DEFAULT_USER_AGENT = "JesseAutomation/1.0 (trend-discovery; contact via github)"
+    # Phase M (2026-04-22): more specific UA. Reddit has tightened on
+    # generic/bot-shaped UAs and rate-limits them harder. Format matches
+    # Reddit's API docs recommendation: "<platform>:<app ID>:<version>
+    # (by /u/<reddit username>)".
+    DEFAULT_USER_AGENT = (
+        "web:jesse-automation:v1.0 (by github.com/camilleyeyou/Jesse-Automation)"
+    )
 
     def __init__(self, config: Dict[str, Any], tier: int = 3):
         super().__init__(config, tier)

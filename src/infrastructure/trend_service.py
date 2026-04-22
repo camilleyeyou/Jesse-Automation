@@ -133,21 +133,29 @@ class TrendService:
     # New queries target BUZZY events with named entities: specific companies,
     # specific people, specific events. "Trending today", "viral", "breaking"
     # are Brave Search magic words that boost news-cycle-heat results.
+    # Phase M (2026-04-22) rebalance — 4 queries were tech-heavy and
+    # dominated the candidate pool even though only 2 bucket categories.
+    # Replaced breaking_tech (too broad, overlaps ai_news), economic_pulse
+    # (tech-finance overlap), and ai_labor (redundant with ai_news) with
+    # 3 new categories: cultural_moment, scandal_beat, corporate_absurd.
+    # Also tightened ai_news query to reduce corporate-earnings bleed.
+    # Target mix: 30% AI-adjacent, 70% general US cultural heat
+    # (was ~50/50 with tech dominance via phrasing).
     CATEGORY_QUERIES = {
-        # ─── Buzz-seeking (new spine — what's actually hot right now) ────
+        # ─── Buzz-seeking (general US cultural heat — 70%) ────────────────
         "top_us_news": "top news today United States breaking story trending",
         "trending_viral": "viral story everyone talking about today trending",
-        "breaking_tech": "big tech news today Meta OpenAI Google Amazon Microsoft Apple Nvidia",
         "politics_hot": "political news today major scandal breaking Trump Biden Congress",
         "celebrity_moment": "celebrity news trending today Taylor Swift Elon Musk viral moment",
         "sports_moment": "sports news today big game playoff championship viral moment",
         "internet_discourse": "viral tweet twitter TikTok moment broke containment trending",
-        "economic_pulse": "stock market news today layoffs earnings big company",
+        # Phase M additions — coverage for diversity gaps observed in queue
+        "cultural_moment": "viral cultural moment today US social media trending everyone sharing",
+        "scandal_beat": "political scandal federal investigation indictment today United States lawsuit",
+        "corporate_absurd": "company CEO apology backlash viral customer today brand controversy",
 
-        # ─── AI-adjacent (kept but narrower — only when it's news, not
-        # research) ──────────────────────────────────────────────────────
-        "ai_news": "OpenAI Anthropic Meta Google AI announcement news product launch",
-        "ai_labor": "AI layoffs hiring workforce replacement news story",
+        # ─── AI-adjacent (narrower — 30%, was dominating) ─────────────────
+        "ai_news": "OpenAI Anthropic major AI launch product news today breaking",
     }
 
     def __init__(self, db_path: str = "data/automation/queue.db"):
@@ -1207,6 +1215,32 @@ class MultiTierTrendService(TrendService):
                     )
         except Exception as e:
             self.logger.warning(f"Viral-signal annotation failed (non-blocking): {e}")
+
+        # Phase M (2026-04-22): DIVERSITY STRATIFIER.
+        # Before returning the candidate pool to the curator, enforce
+        # topical diversity. Without this, Brave Search's tech-heavy
+        # query pool drowns out Reddit / RSS / cultural sources — and
+        # the curator picks "best" from an 80%-tech menu, always picking
+        # tech. This layer:
+        #   1. Buckets by canonical category (6 buckets)
+        #   2. Hard-filters buckets used in last 2 posts
+        #   3. Round-robin draws one per bucket (Techmeme pattern)
+        #   4. MMR-reranks leftovers (Carbonell & Goldstein 1998)
+        # Preserves all Phase A-L work (voice/register/comedy/validators)
+        # since those operate on the FINAL pick, not the candidate pool.
+        try:
+            from .diversity_stratifier import stratify
+            filtered = stratify(
+                filtered,
+                db_path=str(self.db_path),
+                slate_size=max(count, 5),  # give curator >=5 options
+                avoid_recent=2,
+                lam=0.5,
+            )
+        except Exception as e:
+            self.logger.warning(
+                f"Diversity stratifier failed (non-blocking, keeping raw pool): {e}"
+            )
 
         return filtered[:count]
 
