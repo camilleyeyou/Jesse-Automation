@@ -2539,9 +2539,17 @@ Now write something that makes someone stop scrolling."""
         ("closer_jesse_brand_stamp",
          # "Jesse A. Eisenbalm is ready to rescue your lips..."
          # "Jesse A. Eisenbalm: the balm for the AI age."
+         # "Apply Jesse A. Eisenbalm — because..."  ← Phase L added
          # Full-name brand signoff — different from the "tube of balm"
          # anthropomorphic closer we already ban.
          r"(?mi)\bjesse\s+a\.?\s+eisenbalm\s*[:\-—]?\s*(?:is\s+ready|is\s+the|the\s+balm\s+for|the\s+only\s+balm)\b"),
+        ("closer_apply_jesse_variant",
+         # Phase L (2026-04-22) — "Apply Jesse A. Eisenbalm" variant.
+         # User flagged this slipped through the prior regex because it
+         # doesn't use the "is ready / is the / the balm for" follow-up
+         # patterns. Any imperative-verb form addressed to the reader
+         # referencing the full brand name is LinkedIn-spam shape.
+         r"(?mi)\b(?:apply|try|use|grab|pick\s+up|reach\s+for|trust)\s+(?:a\s+tube\s+of\s+)?jesse\s+a\.?\s+eisenbalm\b"),
     ]
 
     def _build_hard_rule_retry_prompt(self, original_prompt: str, bad_content: str, violations: list) -> str:
@@ -2585,6 +2593,10 @@ Now write something that makes someone stop scrolling."""
                 "Closed with a full 'Jesse A. Eisenbalm is/the balm for...' "
                 "brand signoff — LinkedIn-spam shape. BANNED. End on a "
                 "concrete mundane noun, not a product pitch.",
+            "closer_apply_jesse_variant":
+                "Used 'Apply/Try/Grab/Use Jesse A. Eisenbalm...' imperative "
+                "form addressing the reader — also LinkedIn-spam shape. "
+                "BANNED. No reader-addressing brand calls in post body.",
             "confession_opener": "Opened with 'Confession:' — BANNED opener",
             "unpopular_opinion_opener": "Opened with 'Unpopular opinion:' — BANNED opener",
             "engagement_bait": "Engagement bait (thoughts? / share this / like if you agree) — NEVER ask for engagement",

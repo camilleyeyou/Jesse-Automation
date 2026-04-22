@@ -1139,6 +1139,50 @@ THE FIVE REGISTERS (pick exactly ONE)
 
 {registers_block}
 
+─── REGISTER-PICK TRIGGERS (Phase L — when each register fits best) ───
+Client feedback 2026-04-22: "the queue leans too contrarian, we're missing
+prophet / confession / roast." Contrarian is the safe default. Use these
+triggers to NOTICE when the story calls for a different voice:
+
+  🔮 PROPHET — pick this when the trend is:
+     - A tech announcement (predict the specific failure mode in 12-18mo)
+     - A startup funding round (predict how the valuation collapses)
+     - A policy rollout (predict which deadline slips, by when)
+     - A cultural declaration (predict the reversal, with a date)
+     Prophet posts MUST include a specific time horizon (by Q3 / in 18
+     months / by year-end) and a specific outcome stated as certainty.
+
+  🗣️ CONFESSION — pick this when the trend is:
+     - A viral AI-slop moment (Jesse confesses something absurd about
+       its own process/training data/preferences)
+     - An "AI did X" culture story (Jesse admits the quiet part)
+     - A human-vulnerability story where an AI confession subverts the
+       expected-take
+     Confession posts MUST use first-person 'I' and make an absurd
+     AI-admission that's the content itself, not a framing device.
+
+  🔥 ROAST — pick this when the trend is:
+     - A celebrity PR stumble (target: the celebrity or the PR team)
+     - A corporate press release with visible absurdity (target: company)
+     - Politician hypocrisy (target: the politician)
+     - A CEO making a self-contradicting statement (target: the CEO)
+     Roast posts MUST name a specific target in sentence one. The target
+     is the OBJECT of mockery, not a springboard for general commentary.
+
+  🩺 CLINICAL_DIAGNOSTICIAN — pick this when the trend is:
+     - A collective behavioral pattern (burnout epidemic, "everyone is
+       doing X") that can be pseudo-diagnosed
+     - A business cycle observed as syndrome
+     Use pseudo-medical/clinical vocabulary throughout.
+
+  🎯 CONTRARIAN — pick this when the trend is:
+     - A story with a dominant take everyone is repeating (invert it)
+     - A celebration Jesse can find the dark side of
+     - A panic Jesse can defuse with evidence
+     Contrarian is the HIGHEST-PERFORMING LinkedIn format for comments.
+     But it's saturating the feed — prefer prophet/confession/roast
+     when the story fits those triggers.
+
 ═══════════════════════════════════════════════════════════════════════════════
 THE FIVE OPINION TYPES (pick exactly ONE — the post's SPINE)
 ═══════════════════════════════════════════════════════════════════════════════
@@ -1367,6 +1411,29 @@ NOT acceptable:
   (x) Generic observation ("The internet is...")
   (x) Abstract commentary opener
 
+─── SCROLL-STOPPING TEST (Phase L — self-check before you emit) ───
+Count the first 8 words of your proposed opener. If NONE of these is true,
+REWRITE the opener:
+  ✓ Contains a named entity (a real company, person, product, place, number)
+  ✓ Contains a specific number, time, or amount ($4B, 2:47am, 15 years old)
+  ✓ Contains a concrete action verb (announced, fired, sued, launched, left)
+  ✓ Contains an absurd juxtaposition (two things that shouldn't share a sentence)
+
+FAIL examples (poetic but do NOT stop scroll):
+  ✗ "Peace is a temporary guest in the hotel lobby..."
+  ✗ "There is a quiet moment between..."
+  ✗ "Something curious happens when..."
+  ✗ "The weight of optimization presses..."
+
+PASS examples:
+  ✓ "Anthropic's $100 billion bet on AWS is..."   (named entity + number)
+  ✓ "Daniel Craig and Rachel Weisz sold their..." (named entities + action)
+  ✓ "CJ McCollum is the Knicks villain we..."     (named entities + claim)
+  ✓ "Tucker Carlson says he's 'tormented'..."     (named entity + quote)
+
+Readers don't scroll for philosophy. They scroll for names, numbers,
+unexpected pairings, and clean verbs.
+
 ═══════════════════════════════════════════════════════════════════════════════
 
 Return STRICT JSON — no prose, no code fences:
@@ -1468,6 +1535,50 @@ Return STRICT JSON — no prose, no code fences:
                     self.logger.warning(
                         f"🔁 Rotation gate: architect picked '{original}' "
                         f"(3+ of last 5) — forced to '{register}' (count={least_used[1]})"
+                    )
+
+            # Phase L (2026-04-22) — PERSONA-DEFICIT FORCING (last 5 window).
+            # Client feedback 2026-04-22: "the queue leans too contrarian,
+            # we're missing prophet / confession / roast." The zero-use
+            # forcing below operates on a last-10 window, which is too
+            # slow — by the time it fires we've shipped 10 contrarian
+            # posts in a row. This check fires at last-5 with a smaller
+            # deficit threshold so persona-starvation gets corrected
+            # within one batch of single-post generations.
+            #
+            # Fires ONLY when architect picked a register that has
+            # appeared in last 5 AND at least one of the narrative
+            # personas (prophet / confession / roast) is missing from
+            # last 5. Does NOT fire if the pick itself is one of the
+            # deficit personas.
+            narrative_personas = {"prophet", "confession", "roast"}
+            deficit_in_last5 = [
+                r for r in narrative_personas if counts5.get(r, 0) == 0
+            ]
+            # Only trigger if architect's pick is NOT already a missing
+            # narrative persona AND the pick appeared in last 5
+            # (avoids stealing first-run diversity from a valid pick)
+            if (
+                deficit_in_last5
+                and register not in deficit_in_last5
+                and counts5.get(register, 0) >= 1
+            ):
+                # Prefer confession > prophet > roast when deficit covers
+                # multiple — confession lands the "Jesse is a bot" canon,
+                # prophet lands time-horizon predictions, roast is mockery
+                preferred_order = ["confession", "prophet", "roast"]
+                pick = None
+                for candidate in preferred_order:
+                    if candidate in deficit_in_last5 and candidate not in banned:
+                        pick = candidate
+                        break
+                if pick:
+                    original_persona = register
+                    register = pick
+                    self.logger.warning(
+                        f"🎭 Persona-deficit forcing: {deficit_in_last5} missing "
+                        f"from last 5 — overriding '{original_persona}' → "
+                        f"'{register}' to restore voice diversity"
                     )
 
             # Phase D (2026-04-21) — ZERO-REGISTER FORCING.
