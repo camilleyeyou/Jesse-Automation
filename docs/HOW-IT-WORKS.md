@@ -125,6 +125,146 @@ If the post cleared every stage:
 
 ---
 
+## How the team members talk to each other
+
+They don't "chat." They pass documents.
+
+Think of it like a newsroom where every story idea is on paper. A member of staff picks up the document, writes their contribution, and places it on the next desk. Nobody guesses what the others are thinking — everything is on the page.
+
+Here's the order of documents, using a real post from our most recent batch as an example:
+
+### 📄 Real example: the RFK Jr. hearing post (scored 9.0, shipped)
+
+#### Document 1 — "Story Candidates" sheet
+*From: The Scout → To: The Balancer*
+
+> Today's 20 stories. Example row:
+> ```
+> HEADLINE: "RFK Jr. faces seventh congressional hearing this month"
+> SOURCE: Politico
+> URL: politico.com/...
+> CATEGORY: politics_hot
+> ```
+
+#### Document 2 — "Balanced Slate" sheet
+*From: The Balancer → To: The Story Picker*
+
+> Filtered down to 8 stories, spread across 4 different topic buckets.
+> RFK Jr. survives the filter. Non-US stories dropped. Tech-heavy stories trimmed to 2 of 8.
+
+#### Document 3 — "Story Pick" sheet
+*From: The Story Picker → To: The Strategist*
+
+> ```
+> CHOSEN: RFK Jr. 7th hearing this month
+> OBSERVATION: Congressional hearings have become spectacle, not governance
+> TAKE: The junior staffer waiting outside at 7pm knows this better than anyone
+> CONCRETE DETAILS: ["RFK Jr.", "seventh hearing", "junior staffer"]
+> TENSION: Spectacle vs. the real cost to people downstream of the theater
+> ```
+
+#### Document 4 — "Post Blueprint" (the most important doc)
+*From: The Strategist → To: The Writer*
+
+> ```
+> VOICE: roast  (target is RFK Jr.)
+> COMEDY TECHNIQUE: false_parallel_list
+>   → Pivot on "seven" (the number of hearings) as the list-breaking device
+>
+> EMOTIONAL ANCHOR (all four required):
+>   - WHO:   a junior staffer at the hearing
+>   - WHERE: 7pm, outside the hearing room
+>   - OBJECT: stack of agendas in hand
+>   - SCALE: seven hearings / one missed dinner
+>
+> OPENING TARGET (first 10 words must be a scroll-stopper):
+>   "RFK Jr. is back for his seventh congressional hearing this month."
+>
+> CLOSING TARGET: end on something mundane (anti-climactic diminishment)
+>
+> LENGTH: medium (55-75 words)
+> SHAPE: 4 paragraphs, ski-jump (punch at the end)
+> ```
+
+#### Document 5 — "The Post" (3 drafts, one picked)
+*From: The Writer → To: The 3 Editors (simultaneously)*
+
+> ```
+> RFK Jr. is back for his seventh congressional hearing this month.
+> Seven. The number of dwarfs. The number of deadly sins. A number that,
+> in any functioning workplace, would trigger an HR review.
+>
+> The hearings serve more for spectacle than substance. Everyone knows
+> this. The junior staffer waiting outside the hearing room at 7pm —
+> stack of agendas in hand, missing dinner again — knows this most of all.
+>
+> By the end, even the coffee machine will need a vacation.
+> ```
+
+#### Documents 6, 7, 8 — "Editor Verdicts" (three separate critiques)
+*From: Each Editor → To: The Orchestrator*
+
+> **Sarah's verdict sheet:**
+> ```
+> SCORE: 7.5 / APPROVED
+> NOTES: Strong POV on hearing spectacle. On-brand roast. 4/4 passes.
+> ```
+>
+> **Marcus's verdict sheet:**
+> ```
+> SCORE: 9.0 / APPROVED
+> NOTES: Weakest sentence: none found. No broken metaphors.
+> No voice drift. "Seven. The number of dwarfs..." lands hard.
+> Grammar clean. Emotional contact present: junior staffer detail.
+> 3/3 craft passes.
+> ```
+>
+> **Jordan's verdict sheet:**
+> ```
+> SCORE: 8.5 / APPROVED
+> NOTES: Opener "RFK Jr. is back..." stops scroll. STEPPS: 3/6.
+> Will generate comments. Shareable. 2/3 audience passes.
+> ```
+
+#### Document 9 — "Approval Tally"
+*Computed by The Orchestrator*
+
+> ```
+> APPROVALS: 3 of 3  ✅
+> AVERAGE SCORE: 8.33
+> → Cleared. No revision needed.
+> → Proceed to safety check.
+> ```
+
+#### Document 10 — "Safety Check Report"
+*From: Auto-filter → To: The Orchestrator*
+
+> ```
+> BANNED PATTERNS CHECKED: 25
+> VIOLATIONS FOUND: 0  ✅
+> → Proceed to publish.
+> ```
+
+#### Document 11 — "Archive Record"
+*From: The Orchestrator → To: The Librarian*
+
+> Everything filed permanently for learning: the original story, the pick sheet, the blueprint, the post, all 3 editor verdicts, the engagement data (added later when LinkedIn reports back).
+
+---
+
+### The big point
+
+**Every handoff is a document, not a conversation.** The Strategist doesn't message the Writer — it hands over a filled-in blueprint form. The editors don't confer — each writes a separate verdict sheet.
+
+This is why the system is:
+
+- **Debuggable.** If a bad post ever reaches the queue, we can read every document that led to it and see exactly where it went wrong.
+- **Swappable.** We could replace any single agent without the others noticing, as long as the new agent accepts the same input document and produces the same output document.
+- **Learnable.** Every document is archived. The Sunday Analyst reads thousands of these documents and learns patterns: *"Roast posts with named politicians average 2× more comments than generic criticism."*
+- **Safe.** Because every document is inspectable, there's never a "the AI just did something weird and we don't know why" moment. Every decision is on the page.
+
+---
+
 ## Why three editors instead of one?
 
 One editor has one taste and catches one type of issue. Three editors with narrow mandates catch different things:
