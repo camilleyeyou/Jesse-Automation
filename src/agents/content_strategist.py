@@ -1089,6 +1089,27 @@ phrasing — write a new post in the same voice register."""
             )
             
             self.logger.info(f"✨ Generated post {post_number}: {len(content)} chars")
+
+            # Phase N (2026-04-22) — FINAL HARD-RULE GATE.
+            # Previously hard-rule violations only triggered a retry; if the
+            # retry also failed, the post still shipped to validators where
+            # 2/3 soft approval (Sarah + Jordan) could push it to the queue.
+            # Observed in prod: "Apply Jesse A. Eisenbalm—$8.99..." brand-
+            # stamp reached the queue despite the Phase L+ regex ban. That
+            # was because the regex triggered the retry, retry also failed,
+            # and the original bad content shipped forward.
+            # Now: final check. If content STILL has hard-rule violations
+            # after the retry loop, return None — orchestrator treats this
+            # as generation failure and does NOT add to queue.
+            final_violations = self._check_hard_rule_violations(content)
+            if final_violations:
+                violation_names = [v[0] for v in final_violations]
+                self.logger.warning(
+                    f"🚫 Post {post_number} HARD-RULE BLOCK — retry failed to "
+                    f"fix {violation_names}. Post REJECTED, will not ship to queue."
+                )
+                return None
+
             return post
             
         except Exception as e:

@@ -28,11 +28,99 @@ Technique grounding:
 from __future__ import annotations
 
 import logging
+import re
 import sqlite3
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
+
+
+# Phase N (2026-04-22) — Non-US primary-subject detection.
+# Curator's US-focus prompt keeps letting non-US stories through via LLM
+# rationalization. Observed slippage:
+#   - "Abuja wedding stopped the internet" (Nigerian local)
+#   - "IndiGo oversold a flight" (Indian airline)
+#   - "Lenskart changed dress code" (Indian eyewear chain)
+#   - "₹1 Crore startup" (Indian currency)
+# This pre-filter kills obvious foreign-subject trends before the curator
+# sees them, so LLM rationalization can't bypass US-focus.
+#
+# Heuristic: if foreign marker appears in first 8 words AND no US marker
+# is present in the first 8 words, treat as non-US. Conservative — "Trump
+# meets in Tokyo" stays because "Trump" is a US marker.
+_NON_US_CITY_MARKERS = re.compile(
+    r"\b(?:Mumbai|Delhi|Bangalore|Chennai|Hyderabad|Kolkata|Pune|Ahmedabad|"
+    r"Abuja|Lagos|Nairobi|Kinshasa|Cairo|"
+    r"London|Manchester|Birmingham|Dublin|"
+    r"Paris|Berlin|Munich|Frankfurt|Madrid|Barcelona|Rome|Milan|"
+    r"Tokyo|Osaka|Seoul|Beijing|Shanghai|Shenzhen|Hong Kong|Taipei|"
+    r"Dubai|Abu Dhabi|Riyadh|Doha|Karachi|Islamabad|Dhaka|Jakarta|"
+    r"Manila|Kuala Lumpur|Singapore|Bangkok|Hanoi|Ho Chi Minh|"
+    r"Sydney|Melbourne|Auckland|"
+    r"Toronto|Montreal|Vancouver|"
+    r"Moscow|Istanbul|Tehran|Baghdad|Damascus)\b",
+    re.IGNORECASE,
+)
+_NON_US_COMPANY_MARKERS = re.compile(
+    r"\b(?:Lenskart|IndiGo|Reliance\s+(?:Industries|Jio)|Tata\b|TCS|"
+    r"Infosys|Wipro|Flipkart|Paytm|Zomato|Swiggy|Ola\s+(?:Cabs?)?|"
+    r"Byju'?s|OYO|Nykaa|PhonePe|Zerodha|HCL\s+Tech|Mahindra|"
+    r"Alibaba|Tencent|Baidu|Xiaomi|Huawei|ByteDance|TikTok\s+(?:China)?|"
+    r"Samsung\s+India|Hyundai\s+India|Toyota\s+India|"
+    r"Lenovo\b|Sony\s+India)\b",
+    re.IGNORECASE,
+)
+_NON_US_CURRENCY_MARKERS = re.compile(
+    r"(?:₹|€|£|¥|₩|₽|Rs\.?\s*\d|INR\s*\d|EUR\s*\d|GBP\s*\d|"
+    r"\b(?:crore|lakh|yuan|yen|won|rupee|ruble|peso|real|rand|shilling)s?\b)",
+    re.IGNORECASE,
+)
+_US_MARKERS = re.compile(
+    # US politicians, companies, places, agencies — if present in first
+    # 8 words, exempt the trend even if a foreign marker also appears
+    r"\b(?:Trump|Biden|Harris|Obama|Pelosi|Schumer|McConnell|"
+    r"Musk|Zuckerberg|Bezos|Cook|Pichai|Nadella|Altman|Huang|"
+    r"Meta|OpenAI|Anthropic|Google|Amazon|Microsoft|Apple|Nvidia|"
+    r"Netflix|Tesla|Uber|Airbnb|SpaceX|Twitter|X\s+Corp|"
+    r"NBA|NFL|MLB|NHL|NCAA|WWE|UFC|NASCAR|"
+    r"Democrat|Republican|Congress|Senate|House|SCOTUS|"
+    r"FBI|CIA|NSA|DOJ|SEC|FDA|FTC|IRS|"
+    r"NYC|New\s+York|Los\s+Angeles|LA\b|Chicago|Houston|Boston|"
+    r"Washington|San\s+Francisco|SF\b|Seattle|Atlanta|Miami|"
+    r"Texas|California|Florida|Virginia|"
+    r"Hollywood|Silicon\s+Valley|Wall\s+Street)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_non_us_primary_subject(trend: Any) -> bool:
+    """Heuristic: does this trend's headline center on a non-US subject?
+
+    Checks:
+      - First 8 words of headline for foreign city/company/currency
+      - If found, exempt when US marker also in first 8 words
+
+    Returns:
+        True if trend should be filtered out as non-US primary subject.
+    """
+    headline = (getattr(trend, "headline", "") or "").strip()
+    if not headline:
+        return False
+    first_chunk = " ".join(headline.split()[:12])  # first ~12 words
+
+    has_foreign = bool(
+        _NON_US_CITY_MARKERS.search(first_chunk)
+        or _NON_US_COMPANY_MARKERS.search(first_chunk)
+        or _NON_US_CURRENCY_MARKERS.search(first_chunk)
+    )
+    if not has_foreign:
+        return False
+
+    # Exempt if a US marker is ALSO in the first chunk (e.g., "Trump
+    # threatens Iran" has Trump + Iran — keep it, Trump is the subject)
+    has_us = bool(_US_MARKERS.search(first_chunk))
+    return not has_us
 
 
 # Collapse granular source categories into 6 top-level buckets the
@@ -175,16 +263,19 @@ def stratify(
     slate_size: int = 8,
     avoid_recent: int = 2,
     lam: float = 0.5,
+    sibling_buckets: Optional[List[str]] = None,
 ) -> List[Any]:
     """Return a balanced, deduped, diversity-ranked slate for the curator.
 
     Process:
-        1. Group candidates into 6 canonical buckets
-        2. Hard-filter buckets used in last `avoid_recent` posts
-        3. If filtering empties the pool too much, fall back to soft-penalty
+        1. Pre-filter obvious non-US primary-subject trends (Phase N)
+        2. Group candidates into 6 canonical buckets
+        3. Hard-filter buckets used in last `avoid_recent` posts AND
+           buckets used by in-batch committed siblings (Phase N)
+        4. If filtering empties the pool too much, fall back to soft-penalty
            MMR over everything (don't block the pipeline)
-        4. Round-robin draw one from each surviving bucket (Techmeme)
-        5. MMR-rank the leftover candidates to fill slate_size
+        5. Round-robin draw one from each surviving bucket (Techmeme)
+        6. MMR-rank the leftover candidates to fill slate_size
 
     Args:
         candidates: raw candidate trends from get_candidate_trends()
@@ -193,12 +284,43 @@ def stratify(
         avoid_recent: window for hard-filter (default 2 = avoid buckets
             used in the last 2 committed posts)
         lam: MMR lambda — 0.5 = balance relevance and diversity equally
+        sibling_buckets: buckets already used by in-batch committed
+            siblings. Added to avoid_recent's set to prevent same-batch
+            repeats (Phase N — fixes the Nike+Lenskart both-PR-apology bug).
 
     Returns:
         Up to slate_size candidates, topically balanced.
     """
     if not candidates:
         return []
+
+    # Phase N (2026-04-22) — pre-filter non-US primary-subject trends.
+    # Runs BEFORE bucketing so LLM curator can't rationalize foreign
+    # stories into the pool. See _is_non_us_primary_subject heuristic.
+    non_us_count = 0
+    us_candidates: List[Any] = []
+    for c in candidates:
+        if _is_non_us_primary_subject(c):
+            non_us_count += 1
+            logger.info(
+                f"🌎 Stratifier: dropped non-US primary-subject trend — "
+                f"'{(getattr(c, 'headline', '') or '')[:70]}...'"
+            )
+        else:
+            us_candidates.append(c)
+    if non_us_count:
+        logger.info(
+            f"🌎 Stratifier: filtered {non_us_count} non-US trend(s) — "
+            f"{len(us_candidates)} US-focused candidates remain"
+        )
+    # If filter wipes everything, fall back to raw pool (don't block pipeline)
+    if us_candidates:
+        candidates = us_candidates
+    else:
+        logger.warning(
+            "🌎 Stratifier: all candidates flagged non-US — falling back to "
+            "raw pool (better to ship something than nothing)"
+        )
 
     # Compute entity sets once (we reuse viral_signals — this is the
     # same extractor the curator already uses for entity-overlap checks)
@@ -226,8 +348,18 @@ def stratify(
     logger.info(f"🪣 Stratifier input: {bucket_dist}")
 
     # Hard-filter: drop buckets used in last-N-posts unless this would
-    # leave us with too few candidates
+    # leave us with too few candidates. Phase N: also unions buckets used
+    # by committed siblings in the current batch, so Nike-PR-apology +
+    # Lenskart-PR-apology can't both land in the same batch.
     recent = _recent_buckets(db_path, n=avoid_recent)
+    if sibling_buckets:
+        sibling_set = {b for b in sibling_buckets if b}
+        if sibling_set:
+            logger.info(
+                f"🪣 Stratifier: in-batch sibling buckets added to avoid: "
+                f"{sorted(sibling_set)}"
+            )
+            recent = recent | sibling_set
     filtered_buckets: Dict[str, List[int]] = {
         b: idxs for b, idxs in buckets.items() if b not in recent
     }

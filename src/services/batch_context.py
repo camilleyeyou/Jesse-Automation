@@ -160,6 +160,8 @@ class BatchContext:
         committed_embeddings: embeddings of committed (headline|body) texts
         committed_headlines: raw headlines of accepted siblings
         committed_bodies: raw post bodies of accepted siblings
+        committed_buckets: canonical bucket names of committed siblings
+            (Phase N — lets diversity_stratifier avoid in-batch repeats)
         ai_client: reference to the ai_client for embed_text() calls
     """
     batch_id: str
@@ -167,6 +169,7 @@ class BatchContext:
     committed_embeddings: List[List[float]] = field(default_factory=list)
     committed_headlines: List[str] = field(default_factory=list)
     committed_bodies: List[str] = field(default_factory=list)
+    committed_buckets: List[str] = field(default_factory=list)
     ai_client: Optional[Any] = None
 
     @classmethod
@@ -176,6 +179,7 @@ class BatchContext:
         num_posts: int,
         ai_client: Optional[Any] = None,
         seed: Optional[int] = None,
+        recent_registers: Optional[List[str]] = None,
     ) -> "BatchContext":
         """Build a batch context with pre-allocated slots.
 
@@ -184,13 +188,62 @@ class BatchContext:
         debugging). Returns at most N slots; if num_posts > len(_SLOTS),
         additional posts get None slots (architect falls back to
         rotation-based picking).
+
+        Phase N (2026-04-22): accepts `recent_registers` and biases the
+        slot shuffle toward registers missing from that list. Fixes the
+        "prophet / confession / roast never appear" bug — persona-deficit
+        forcing in the architect was architecturally blocked by slot
+        sovereignty. Now the slot itself respects cross-batch history.
+
+        Bias logic (when recent_registers provided):
+          - Compute last-5-window deficit: which of the 5 registers
+            have 0 or 1 appearances in last 5 posts
+          - Partition _SLOTS into (deficit-register slots, other slots)
+          - Shuffle each partition; concatenate deficit-first, then other
+          - Take first num_posts
+
+        Result: 1-post batches preferentially get deficit-register slots,
+        closing the loop that Phase L couldn't close because slot-forcing
+        takes priority over architect-level persona-deficit forcing.
         """
         if seed is None:
             # Hash the batch_id into a deterministic seed
             seed = hash(batch_id) & 0xFFFFFFFF
         rng = random.Random(seed)
+
         pool = _SLOTS.copy()
-        rng.shuffle(pool)
+
+        # Phase N: bias toward deficit registers from cross-batch history
+        if recent_registers:
+            last5 = [r for r in recent_registers[:5] if r]
+            counts: Dict[str, int] = {}
+            for r in last5:
+                counts[r] = counts.get(r, 0) + 1
+            # "Deficit" = register with ≤ 1 appearance in last 5 posts
+            # (captures both truly-missing and barely-present)
+            all_registers = {s["register"] for s in pool}
+            deficit_regs = {
+                r for r in all_registers if counts.get(r, 0) <= 1
+            }
+            if deficit_regs and deficit_regs != all_registers:
+                deficit_slots = [
+                    s for s in pool if s.get("register") in deficit_regs
+                ]
+                other_slots = [
+                    s for s in pool if s.get("register") not in deficit_regs
+                ]
+                rng.shuffle(deficit_slots)
+                rng.shuffle(other_slots)
+                pool = deficit_slots + other_slots  # deficit first
+                logger.info(
+                    f"🎭 BatchContext: deficit registers {sorted(deficit_regs)} "
+                    f"prioritized (recent_registers={last5})"
+                )
+            else:
+                rng.shuffle(pool)
+        else:
+            rng.shuffle(pool)
+
         slots = pool[:num_posts]
         # If num_posts exceeds pool, pad with empty-slot markers so the
         # index-based lookup in the batch loop always works
@@ -280,19 +333,32 @@ class BatchContext:
                 max_lex = overlap
         return (max_lex >= lex_thresh), max_lex
 
-    async def commit(self, headline: str, body: str) -> None:
-        """Record a sibling's accepted output. Later siblings will see it."""
+    async def commit(
+        self,
+        headline: str,
+        body: str,
+        bucket: Optional[str] = None,
+    ) -> None:
+        """Record a sibling's accepted output. Later siblings will see it.
+
+        Phase N (2026-04-22): now also accepts a canonical bucket name
+        so diversity_stratifier can avoid recycling the same bucket
+        within a single batch.
+        """
         combined = f"{headline} {body[:300]}".strip()
         if not combined:
             return
         self.committed_headlines.append(headline or "")
         self.committed_bodies.append(body or "")
+        if bucket:
+            self.committed_buckets.append(bucket)
         emb = await self._try_embed(combined)
         if emb:
             self.committed_embeddings.append(emb)
         logger.debug(
             f"BatchContext({self.batch_id[:8]}): committed "
-            f"post #{len(self.committed_headlines)} (has_emb={bool(emb)})"
+            f"post #{len(self.committed_headlines)} "
+            f"(bucket={bucket or '?'}, has_emb={bool(emb)})"
         )
 
     async def _try_embed(self, text: str) -> List[float]:

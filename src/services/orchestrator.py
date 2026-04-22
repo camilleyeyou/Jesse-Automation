@@ -488,11 +488,25 @@ class ContentOrchestrator:
         # Phase H: create the shared batch context (slot pre-allocation +
         # embedding dedup against siblings). Gracefully degrades if
         # ai_client doesn't support embeddings — falls back to lexical.
+        # Phase N: pull recent_registers from memory and pass to
+        # BatchContext so slot allocation biases toward deficit registers
+        # (prophet/confession/roast when they've been missing). Closes
+        # the loop that Phase L couldn't close because slot sovereignty
+        # was blocking architect-level persona-deficit forcing.
         ai_client = getattr(self.content_generator, "ai_client", None)
+        batch_recent_registers: list = []
+        if self.memory:
+            try:
+                batch_recent_registers = self.memory.get_recent_registers(
+                    days=7, limit=10
+                )
+            except Exception as e:
+                logger.debug(f"Could not prefetch recent_registers: {e}")
         batch_ctx = BatchContext.for_batch(
             batch_id=batch_id,
             num_posts=num_posts,
             ai_client=ai_client,
+            recent_registers=batch_recent_registers,
         )
         slot_summary = ", ".join(
             f"#{i+1}={s.get('register','?')[:4]}/{s.get('emotional_temperature','?')[:4]}/"
@@ -596,7 +610,22 @@ class ContentOrchestrator:
                             f"⚠️  Post {post_number} body frame-similar to sibling "
                             f"(sim={frame_sim:.2f}) — approved, but flag for review"
                         )
-                    await batch_ctx.commit(headline_text, body_text)
+                    # Phase N (2026-04-22): compute canonical bucket of this
+                    # committed post and (a) pass to BatchContext,
+                    # (b) push to trend_service so stratifier's next call
+                    # can avoid reusing the same bucket within this batch.
+                    trend_bucket = None
+                    try:
+                        from ..infrastructure.diversity_stratifier import _canonical_bucket
+                        trend_bucket = _canonical_bucket(
+                            getattr(trend, "category", None) if trend else None
+                        )
+                        if self.trend_service and trend_bucket:
+                            self.trend_service.add_sibling_bucket(trend_bucket)
+                    except Exception as e:
+                        logger.debug(f"Bucket tracking failed (non-blocking): {e}")
+
+                    await batch_ctx.commit(headline_text, body_text, bucket=trend_bucket)
 
                     approved_posts.append(post)
                     logger.info(f"✅ Post {post_number} APPROVED")

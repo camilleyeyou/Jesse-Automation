@@ -919,11 +919,24 @@ class TrendService:
     def reset_batch_tracking(self):
         """Reset batch-level tracking (call at start of new batch)"""
         self.batch_used_headlines.clear()
+        # Phase N (2026-04-22): reset sibling-bucket tracker so stratifier
+        # avoids in-batch topic repeats
+        self.current_batch_sibling_buckets: List[str] = []
         self.logger.info("🔄 Reset batch tracking")
 
     def reset_for_new_batch(self):
         """Alias for reset_batch_tracking (used by orchestrator)"""
         self.reset_batch_tracking()
+
+    def add_sibling_bucket(self, bucket: str) -> None:
+        """Register the canonical bucket of a committed sibling so the
+        stratifier can avoid reusing it in the same batch. Called from
+        the orchestrator after each post lands in BatchContext.
+        """
+        if not hasattr(self, "current_batch_sibling_buckets"):
+            self.current_batch_sibling_buckets = []
+        if bucket:
+            self.current_batch_sibling_buckets.append(bucket)
 
     def get_recent_topics(self, limit: int = 20) -> List[Dict]:
         """Get recently used topics (session picks + DB) for curator + debugging.
@@ -1230,12 +1243,14 @@ class MultiTierTrendService(TrendService):
         # since those operate on the FINAL pick, not the candidate pool.
         try:
             from .diversity_stratifier import stratify
+            sibling_buckets = getattr(self, "current_batch_sibling_buckets", None) or []
             filtered = stratify(
                 filtered,
                 db_path=str(self.db_path),
                 slate_size=max(count, 5),  # give curator >=5 options
                 avoid_recent=2,
                 lam=0.5,
+                sibling_buckets=sibling_buckets,
             )
         except Exception as e:
             self.logger.warning(
