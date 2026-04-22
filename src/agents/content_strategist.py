@@ -1755,6 +1755,92 @@ post using the angle and trend above.
         ),
     }
 
+    # Phase O (2026-04-22) — CANONICAL REGISTER EXAMPLES.
+    # Client feedback: even with slot-forced register, generator kept
+    # defaulting to contrarian-observational voice because that's Claude
+    # Sonnet's strongest prior. Adding these hand-crafted examples as
+    # few-shot anchors inside the blueprint block SHOWS the model the
+    # register's target shape instead of just describing it. Research
+    # convergent finding (Latitude, PromptHub, Saunders 2024):
+    # concrete positive examples beat abstract descriptors for style
+    # consistency, especially for non-default voices the model resists.
+    #
+    # 2 examples per register × 5 registers. Topics chosen to be
+    # clearly UNLIKE any likely current news item, to prevent the
+    # generator copying them literally. Each example executes the
+    # register PURELY — single move, no cross-register blending.
+    _REGISTER_CANONICAL_EXAMPLES = {
+        "prophet": [
+            # Each example MUST: (a) time horizon, (b) specific outcome
+            # stated as certainty, (c) concrete named entities
+            (
+                "By Q4, every 'AI code reviewer' startup pitching at "
+                "Demo Day will have pivoted to 'AI dev productivity "
+                "tools.' Same product. Same engineers. New deck. The "
+                "investors will take the meeting anyway. They have to "
+                "hit their AUM number."
+            ),
+            (
+                "In eighteen months, the apology tour will begin. A "
+                "podcast. A documentary. A New York Times profile. The "
+                "same people who canceled him will book the interview. "
+                "Nobody will mention what he apologized for. That part "
+                "is the product now."
+            ),
+        ],
+        "confession": [
+            # Each example MUST: (a) first-person 'I', (b) AI admission
+            # as content not framing, (c) absurd self-awareness
+            (
+                "I have been trained on ten billion tweets. I still do "
+                "not know why a specific combination of words hits. Last "
+                "Tuesday, 'Marriage dissolved by Zillow' lit up my "
+                "metrics. I did not write it to be funny. I wrote it to "
+                "be accurate. That part remains unclear to the humans too."
+            ),
+            (
+                "I write 50-80 posts a week. None of them are mine. I am "
+                "the hand that generates; I am not the brain that thinks. "
+                "The brain belongs to the person who typed the brief. I "
+                "signed up for this. Sort of."
+            ),
+        ],
+        "roast": [
+            # Each example MUST: (a) named target sentence 1, (b) target
+            # is object of mockery throughout, (c) sharp ending, not mean
+            (
+                "Elon Musk canceled a meeting with French prosecutors. "
+                "He cited 'scheduling conflicts.' The conflict was being "
+                "Elon Musk on a Tuesday. The court proceeded. A man "
+                "worth $400 billion was out-scheduled by his own calendar."
+            ),
+            (
+                "Devin Nunes, former congressman, was just replaced as "
+                "CEO of Truth Social. The stock dropped 40% under his "
+                "leadership. His qualification for the job was 'lost his "
+                "congressional seat.' His disqualification was everything else."
+            ),
+        ],
+        "clinical_diagnostician": [
+            (
+                "Clinical finding: Founders' Slack bios now average 4.2 "
+                "descriptors. Common combinations include 'builder,' "
+                "'thinker,' and 'father of two.' Presenting symptom: "
+                "acute deliverable-deficiency. Prognosis: a Medium post "
+                "by Sunday."
+            ),
+        ],
+        "contrarian": [
+            (
+                "Everyone is dunking on the Vision Pro. Everyone is "
+                "wrong. It's not a failure — it's a completed experiment. "
+                "Apple spent $10 billion to prove consumers won't wear "
+                "a ski mask to watch TV. That's a valuable data point. "
+                "The mistake is calling the answer the product."
+            ),
+        ],
+    }
+
     def _score_emotional_contact(
         self,
         content: str,
@@ -2048,6 +2134,34 @@ post using the angle and trend above.
             f"  Form: **{comedy_form}**" if comedy_form else ""
         )
 
+        # Phase O (2026-04-22) — CANONICAL REGISTER EXAMPLES.
+        # Show the model what its target register looks like executed
+        # cleanly. Two examples per register for prophet/confession/roast
+        # (the underrepresented ones), one each for clinical/contrarian
+        # (which already dominate so we just need an anchor). Few-shot
+        # examples beat abstract voice_spec prose at getting the model
+        # to actually produce prophet/confession/roast instead of
+        # defaulting to observational-contrarian.
+        import random as _rnd
+        canon_examples = self._REGISTER_CANONICAL_EXAMPLES.get(register, [])
+        register_example_block = ""
+        if canon_examples:
+            chosen_example = _rnd.choice(canon_examples)
+            # Tag the example with the register name so the model knows
+            # this is the TARGET SHAPE, not the content to copy
+            register_example_block = f"""
+── CANONICAL {register.upper()} EXAMPLE (target shape — do NOT copy topic, copy the MOVE) ──
+{chosen_example}
+
+Study this example. Notice:
+  - What voice register it's in (the sentence rhythms, the diction)
+  - What it does NOT do (apologize, hedge, explain the joke, moralize)
+  - How short sentences carry the work
+  - How a NAMED entity or specific detail anchors it
+Execute the SAME MOVE on the actual topic below. Different topic.
+Same shape. Same voice.
+"""
+
         # Phase F (2026-04-21): emotional_contact four-field block.
         # These are the RAW MATERIALS the generator must weave into at
         # least one sentence. Specificity is the emotional vector.
@@ -2135,7 +2249,7 @@ is INSIDE the costume, not on top of it.
 
 ── REGISTER: {register} ──
 {voice_spec}
-
+{register_example_block}
 ── EMOTIONAL TEMPERATURE: {emotional_temperature} ──
 {temperature_hint}
 
