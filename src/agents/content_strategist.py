@@ -2529,6 +2529,19 @@ Now write something that makes someone stop scrolling."""
          # "The algorithm saw it / noticed it / didn't catch it" —
          # AI-vs-human observation contrast
          r"(?mi)\bthe\s+algorithm\s+(?:saw|noticed|caught|missed|flagged|didn'?t)\b"),
+        # Phase K+ (2026-04-22) — banned-pattern tightening from queue review.
+        # Two new variants that slipped past earlier Phase J bans.
+        ("engine_ai_doesnt_doesnt_triplet",
+         # "The AI doesn't freeze up... Doesn't reread... Doesn't delete."
+         # — Jesse-as-AI-contrast engine in triplet form (different from the
+         # Zero X. Zero Y. Zero Z. variant we already ban)
+         r"(?mi)\b(?:the\s+ai|the\s+bots?|the\s+machine|the\s+model)\s+doesn'?t\s+\w+[\s\S]{0,180}?doesn'?t\s+\w+[\s\S]{0,120}?doesn'?t\b"),
+        ("closer_jesse_brand_stamp",
+         # "Jesse A. Eisenbalm is ready to rescue your lips..."
+         # "Jesse A. Eisenbalm: the balm for the AI age."
+         # Full-name brand signoff — different from the "tube of balm"
+         # anthropomorphic closer we already ban.
+         r"(?mi)\bjesse\s+a\.?\s+eisenbalm\s*[:\-—]?\s*(?:is\s+ready|is\s+the|the\s+balm\s+for|the\s+only\s+balm)\b"),
     ]
 
     def _build_hard_rule_retry_prompt(self, original_prompt: str, bad_content: str, violations: list) -> str:
@@ -2564,6 +2577,14 @@ Now write something that makes someone stop scrolling."""
             "engine_the_algorithm_saw_did_not":
                 "Used 'The algorithm [verbed]' AI-vs-human observation "
                 "frame — BANNED rhetorical engine.",
+            "engine_ai_doesnt_doesnt_triplet":
+                "Used 'The AI/bots/machine doesn't X. Doesn't Y. Doesn't Z.' "
+                "triplet — another form of the Jesse-as-AI-contrast engine. "
+                "BANNED. The form/structure is the engine, not Jesse's AI-ness.",
+            "closer_jesse_brand_stamp":
+                "Closed with a full 'Jesse A. Eisenbalm is/the balm for...' "
+                "brand signoff — LinkedIn-spam shape. BANNED. End on a "
+                "concrete mundane noun, not a product pitch.",
             "confession_opener": "Opened with 'Confession:' — BANNED opener",
             "unpopular_opinion_opener": "Opened with 'Unpopular opinion:' — BANNED opener",
             "engagement_bait": "Engagement bait (thoughts? / share this / like if you agree) — NEVER ask for engagement",
