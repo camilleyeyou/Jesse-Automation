@@ -393,8 +393,8 @@ class ContentOrchestrator:
         return frames
 
     def _determine_post_context(self):
-        """Decide today's (theme, angle_seed, format) — the editorial guidance
-        that travels with a generation.
+        """Decide today's (theme, angle_seed, format, calendar_entry) — the
+        editorial guidance that travels with a generation.
 
         Same logic the scheduled 'generate_and_post_now' flow runs, extracted
         here so the batch / manual 'generate-content' path gets IDENTICAL
@@ -402,17 +402,24 @@ class ContentOrchestrator:
         override and the weekly strategist's calendar entry. Without this,
         the dashboard's Generate button skipped all the supervisor protections.
 
+        Phase P (2026-04-27) — BUGFIX: now also returns calendar_entry.
+        Previously the scheduled flow at line 1218 referenced calendar_entry
+        but it was a local variable in this function, never returned.
+        Resulted in NameError that killed every scheduled post for ≥4 days
+        ("name 'calendar_entry' is not defined" in dashboard history).
+
         Returns: (preferred_theme: Optional[str], angle_seed: Optional[str],
-                  preferred_format: Optional[str])
+                  preferred_format: Optional[str], calendar_entry: Optional[Dict])
         """
         from datetime import datetime as _dt
 
         preferred_theme = None
         angle_seed = None
         preferred_format = None
+        calendar_entry = None
 
         if not self.memory:
-            return preferred_theme, angle_seed, preferred_format
+            return preferred_theme, angle_seed, preferred_format, calendar_entry
 
         try:
             # Calendar — weekly strategist's editorial guidance
@@ -460,7 +467,7 @@ class ContentOrchestrator:
         except Exception as e:
             logger.warning(f"Calendar/context check failed: {e}")
 
-        return preferred_theme, angle_seed, preferred_format
+        return preferred_theme, angle_seed, preferred_format, calendar_entry
 
     async def generate_batch(self, num_posts: int = 1, use_video: bool = False) -> BatchResult:
         """Generate a batch of posts, each with a unique fresh trend.
@@ -527,7 +534,9 @@ class ContentOrchestrator:
             # pillar rotation, starvation override. This was previously only
             # run in the scheduled live-post flow; now batch/manual generation
             # (dashboard "Generate" button) gets the same protections.
-            preferred_theme, angle_seed, preferred_format = self._determine_post_context()
+            # Phase P (2026-04-27) — _determine_post_context now also returns
+            # calendar_entry (was unreachable from scheduled flow → NameError).
+            preferred_theme, angle_seed, preferred_format, _calendar_entry = self._determine_post_context()
 
             # Phase H: topic-dedup retry loop. If the curator picks a
             # trend already claimed by a sibling (different wording, same
@@ -1133,7 +1142,12 @@ Don't create generic content. Don't summarize the headline. Find YOUR angle and 
                 self.memory.start_session(f"live_{uuid.uuid4().hex[:8]}")
 
             # Step 1: Determine post context (calendar + pillar starvation override)
-            preferred_theme, angle_seed, preferred_format = self._determine_post_context()
+            # Phase P (2026-04-27) — BUGFIX: now unpacks calendar_entry too.
+            # Previously calendar_entry was referenced ~80 lines below at the
+            # 'mark posted' step, but it lived only inside _determine_post_context
+            # and never crossed the function boundary. NameError killed every
+            # scheduled post for ≥4 days (4/23-4/27 dashboard history).
+            preferred_theme, angle_seed, preferred_format, calendar_entry = self._determine_post_context()
 
             # Step 2: Reset trend tracking for fresh selection
             if self.trend_service:
