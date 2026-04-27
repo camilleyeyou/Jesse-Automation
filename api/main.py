@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional, List
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
@@ -157,12 +157,54 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Jesse A. Eisenbalm Automation API...")
 
     # Auto-detect persistent storage (Railway volume mounted at /data)
+    # Phase Q (2026-04-27): added LOUD warning when running in production
+    # without a persistent volume — this is the cause of "all plans/strategy
+    # wiped on every deploy". Railway containers are ephemeral; without
+    # /data mounted, the SQLite file lives in the container filesystem
+    # and dies with each redeploy, taking the editorial calendar,
+    # strategy_insights, content_memory, and gold_standard_posts with it.
+    is_production = (
+        os.getenv("RAILWAY_ENVIRONMENT")
+        or os.getenv("RAILWAY_PROJECT_ID")
+        or os.getenv("RENDER")
+        or os.getenv("FLY_APP_NAME")
+        or os.getenv("ENVIRONMENT", "").lower() == "production"
+    )
     if os.path.isdir("/data"):
         DB_PATH = "/data/queue.db"
-        logger.info(f"📂 Railway volume detected — using persistent DB: {DB_PATH}")
+        logger.info(f"📂 Persistent volume detected — using DB: {DB_PATH}")
     else:
         DB_PATH = "data/automation/queue.db"
-        logger.info(f"📂 Local mode — using DB: {DB_PATH}")
+        if is_production:
+            logger.critical("=" * 70)
+            logger.critical(
+                "🚨 PRODUCTION WITHOUT PERSISTENT VOLUME — DB WILL BE WIPED ON DEPLOY"
+            )
+            logger.critical(
+                "    Detected production environment but no /data mount found."
+            )
+            logger.critical(
+                "    The SQLite DB lives in ephemeral container storage."
+            )
+            logger.critical(
+                "    Editorial calendar, strategy_insights, content_memory,"
+            )
+            logger.critical(
+                "    and gold_standard_posts will be LOST on every redeploy."
+            )
+            logger.critical("")
+            logger.critical(
+                "    FIX: In Railway, attach a Volume to this service at /data."
+            )
+            logger.critical(
+                "    Settings → Variables → Add Volume → mount path: /data"
+            )
+            logger.critical(
+                "    Then redeploy ONCE; subsequent deploys will preserve state."
+            )
+            logger.critical("=" * 70)
+        else:
+            logger.info(f"📂 Local mode — using DB: {DB_PATH}")
     
     # Initialize config
     config = get_config()
@@ -1029,6 +1071,85 @@ async def requeue_failed_posts():
     """Move all failed posts back to pending status"""
     count = queue_manager.requeue_failed()
     return {"success": True, "requeued": count}
+
+
+# ============== DB Backup / Restore (Phase Q) ==============
+
+@app.get("/api/automation/db/info")
+async def get_db_info():
+    """Show DB path + size + persistent-volume status. Use this to verify
+    Railway volume mount is working before relying on data persistence."""
+    import os as _os
+    persistent = _os.path.isdir("/data")
+    size_bytes = 0
+    try:
+        size_bytes = _os.path.getsize(DB_PATH)
+    except Exception:
+        pass
+    return {
+        "db_path": DB_PATH,
+        "persistent_volume": persistent,
+        "size_bytes": size_bytes,
+        "size_mb": round(size_bytes / 1024 / 1024, 3),
+        "warning": (
+            "DB will be WIPED on next deploy — attach a Railway volume at /data"
+            if not persistent and (
+                _os.getenv("RAILWAY_ENVIRONMENT") or _os.getenv("ENVIRONMENT", "").lower() == "production"
+            )
+            else None
+        ),
+    }
+
+
+@app.get("/api/automation/db/backup")
+async def download_db_backup():
+    """Download the current SQLite DB file. Use as a manual backup before
+    deploys if the persistent volume isn't configured yet. Returns the raw
+    .db file as an attachment."""
+    from fastapi.responses import FileResponse
+    import os as _os
+    if not _os.path.exists(DB_PATH):
+        raise HTTPException(404, f"DB not found at {DB_PATH}")
+    from datetime import datetime as _dt
+    filename = f"queue-backup-{_dt.utcnow().strftime('%Y%m%d-%H%M%S')}.db"
+    return FileResponse(
+        DB_PATH,
+        media_type="application/octet-stream",
+        filename=filename,
+    )
+
+
+@app.post("/api/automation/db/restore")
+async def upload_db_restore(file: UploadFile = File(...)):
+    """Restore a previously-downloaded SQLite DB file. Overwrites the
+    current DB. Use after a deploy wiped state and you have a backup.
+    REQUIRES restart to pick up the restored DB."""
+    import os as _os
+    if not file.filename.endswith(".db"):
+        raise HTTPException(400, "File must end with .db")
+    # Backup current DB first as paranoia
+    if _os.path.exists(DB_PATH):
+        backup_path = DB_PATH + ".pre-restore"
+        try:
+            import shutil as _sh
+            _sh.copy2(DB_PATH, backup_path)
+        except Exception as e:
+            logger.warning(f"Pre-restore backup failed: {e}")
+    # Write uploaded bytes
+    contents = await file.read()
+    with open(DB_PATH, "wb") as f:
+        f.write(contents)
+    size_mb = round(len(contents) / 1024 / 1024, 3)
+    logger.warning(
+        f"🔄 DB RESTORED from upload ({size_mb} MB). "
+        f"Restart the service to pick up the restored DB."
+    )
+    return {
+        "success": True,
+        "size_mb": size_mb,
+        "restored_to": DB_PATH,
+        "note": "Restart the service to pick up the restored DB",
+    }
 
 
 # ============== History Endpoints ==============

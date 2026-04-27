@@ -592,6 +592,8 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         forced_emotional_temperature: Optional[str] = None,
         forced_frame: Optional[str] = None,
         forced_comedy_move: Optional[str] = None,
+        active_client_reviews: Optional[List[Dict[str, Any]]] = None,
+        active_strategy_insights: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """Produce a blueprint for a post.
 
@@ -638,6 +640,8 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
             forced_emotional_temperature=forced_emotional_temperature,
             forced_frame=forced_frame,
             forced_comedy_move=forced_comedy_move,
+            active_client_reviews=active_client_reviews,
+            active_strategy_insights=active_strategy_insights,
         )
 
         try:
@@ -711,6 +715,8 @@ RESPOND WITH STRICT JSON. No markdown, no prose, no code fences."""
         forced_emotional_temperature: Optional[str] = None,
         forced_frame: Optional[str] = None,
         forced_comedy_move: Optional[str] = None,
+        active_client_reviews: Optional[List[Dict[str, Any]]] = None,
+        active_strategy_insights: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
         recent_length_targets = recent_length_targets or []
         recent_structure_shapes = recent_structure_shapes or []
@@ -1119,11 +1125,68 @@ in, variety out."""
                     "clinical post if it's already dominated the rotation."
                 )
 
+        # Phase Q (2026-04-27) — ACTIVE GUIDANCE BLOCK.
+        # Client reviews and strategy insights now apply IMMEDIATELY at
+        # every post, not after the Sunday weekly refinement (which used
+        # to delay any new directive by up to 6 days).
+        active_guidance_block = ""
+        guidance_lines: List[str] = []
+
+        if active_client_reviews:
+            guidance_lines.append(
+                "📌 **CLIENT REVIEWS (unaddressed) — HIGHEST PRIORITY**"
+            )
+            guidance_lines.append(
+                "These are direct human directives from the client. Honor them "
+                "in this post even if no insight has been formally codified yet."
+            )
+            for r in active_client_reviews[:6]:  # cap at 6 to keep prompt sane
+                review_text = (r.get("review_text") or r.get("comment") or "").strip()
+                if review_text:
+                    guidance_lines.append(f"  • {review_text[:280]}")
+
+        if active_strategy_insights:
+            guidance_lines.append("")
+            guidance_lines.append(
+                "📊 **STRATEGY INSIGHTS (recent learnings, ranked by confidence)**"
+            )
+            for ins in active_strategy_insights[:6]:
+                obs = (ins.get("observation") or "").strip()
+                conf = ins.get("confidence", 0)
+                if obs:
+                    # Strip JSON-blob insights (portfolio_qc serializes to JSON)
+                    if obs.startswith("{") and obs.endswith("}"):
+                        try:
+                            import json as _j
+                            parsed = _j.loads(obs)
+                            obs = (
+                                parsed.get("summary")
+                                or parsed.get("observation")
+                                or obs[:200]
+                            )
+                        except Exception:
+                            pass
+                    guidance_lines.append(
+                        f"  • [conf {conf:.1f}] {obs[:240]}"
+                    )
+
+        if guidance_lines:
+            active_guidance_block = (
+                "\n\n═══════════════════════════════════════════════════════════════════════════════\n"
+                "🎯 ACTIVE EDITORIAL GUIDANCE (apply to THIS post — Phase Q)\n"
+                "═══════════════════════════════════════════════════════════════════════════════\n"
+                + "\n".join(guidance_lines)
+                + "\n\nThese directives are LIVE — they were submitted by the client "
+                "or learned by the system since the last weekly refinement. They "
+                "should shape this post's blueprint immediately. Where guidance "
+                "conflicts with rotation rules, guidance wins (note in your reasoning)."
+            )
+
         return f"""TREND TO ARCHITECT:
 
 Headline: {trend_headline}
 Summary: {trend_summary}
-{pillar_block}{forced_slot_block}
+{pillar_block}{forced_slot_block}{active_guidance_block}
 
 CURATOR'S RAW ANGLE (starting material — you sharpen it):
 - Observation: {observation}

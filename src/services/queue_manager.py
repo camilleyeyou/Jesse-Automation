@@ -277,37 +277,105 @@ class PostQueueManager:
         }, status)
     
     def get_published_history(self, days: int = 30, limit: int = 100) -> List[Dict[str, Any]]:
-        """Get published posts history"""
+        """Get published posts history.
+
+        Phase Q (2026-04-27) — now UNIONs published_posts with content_memory
+        entries that have linkedin_post_urn set. Previously only the first
+        table was queried, so:
+          - Manual queue → LinkedIn posts (which DO call record_published)
+            were visible
+          - But scheduled posts during the calendar_entry NameError window
+            (4/23-4/27) had no published_posts entry — yet content_memory
+            recorded them
+          - And posts published via direct LinkedIn API on success had
+            mixed coverage
+        Union catches all paths so history shows every post that ever
+        actually published, regardless of which code path got it there.
+        """
 
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
-            cursor.execute("""
-                SELECT * FROM published_posts
-                WHERE published_at >= datetime('now', ?)
-                ORDER BY published_at DESC
-                LIMIT ?
-            """, (f'-{days} days', limit))
+            results: List[Dict[str, Any]] = []
+            seen_post_ids: set = set()
 
-            results = []
-            for row in cursor.fetchall():
-                data = dict(row)
-                # Parse metadata and expose AI reasoning at top level
-                if data.get("metadata"):
-                    try:
-                        metadata = json.loads(data["metadata"])
-                        data["metadata"] = metadata
-                        if metadata.get("creative_reasoning"):
-                            data["creative_reasoning"] = metadata["creative_reasoning"]
-                        if metadata.get("why_this_works"):
-                            data["why_this_works"] = metadata["why_this_works"]
-                        if metadata.get("media_type"):
-                            data["media_type"] = metadata["media_type"]
-                    except (json.JSONDecodeError, TypeError):
-                        data["metadata"] = {}
-                results.append(data)
-            return results
+            # Source 1 — published_posts (success + failure rows)
+            try:
+                cursor.execute("""
+                    SELECT * FROM published_posts
+                    WHERE published_at >= datetime('now', ?)
+                    ORDER BY published_at DESC
+                    LIMIT ?
+                """, (f'-{days} days', limit))
+
+                for row in cursor.fetchall():
+                    data = dict(row)
+                    if data.get("metadata"):
+                        try:
+                            metadata = json.loads(data["metadata"])
+                            data["metadata"] = metadata
+                            if metadata.get("creative_reasoning"):
+                                data["creative_reasoning"] = metadata["creative_reasoning"]
+                            if metadata.get("why_this_works"):
+                                data["why_this_works"] = metadata["why_this_works"]
+                            if metadata.get("media_type"):
+                                data["media_type"] = metadata["media_type"]
+                        except (json.JSONDecodeError, TypeError):
+                            data["metadata"] = {}
+                    data["_source"] = "published_posts"
+                    results.append(data)
+                    pid = data.get("post_id")
+                    if pid:
+                        seen_post_ids.add(pid)
+            except Exception:
+                pass
+
+            # Source 2 — content_memory entries with linkedin_post_urn set.
+            # Catches posts that were published successfully but for whatever
+            # reason didn't get a published_posts row (pipeline edge case
+            # or a route that bypassed record_published).
+            try:
+                cursor.execute("""
+                    SELECT post_id, content, created_at, linkedin_post_urn,
+                           pillar, format, average_score
+                    FROM content_memory
+                    WHERE linkedin_post_urn IS NOT NULL
+                      AND linkedin_post_urn != ''
+                      AND created_at >= datetime('now', ?)
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                """, (f'-{days} days', limit))
+
+                for row in cursor.fetchall():
+                    data = dict(row)
+                    pid = data.get("post_id")
+                    if pid in seen_post_ids:
+                        continue  # already in published_posts table
+                    # Map content_memory shape → published_posts-like shape
+                    results.append({
+                        "id": pid,
+                        "post_id": pid,
+                        "linkedin_post_id": data.get("linkedin_post_urn"),
+                        "content": data.get("content"),
+                        "status": "success",
+                        "error_message": None,
+                        "published_at": data.get("created_at"),
+                        "metadata": {
+                            "pillar": data.get("pillar"),
+                            "format": data.get("format"),
+                            "average_score": data.get("average_score"),
+                        },
+                        "_source": "content_memory",
+                    })
+            except Exception:
+                pass
+
+            # Sort union by timestamp DESC and apply final limit
+            def _ts(d):
+                return d.get("published_at") or d.get("created_at") or ""
+            results.sort(key=_ts, reverse=True)
+            return results[:limit]
     
     def get_queue_stats(self) -> Dict[str, Any]:
         """Get queue statistics"""

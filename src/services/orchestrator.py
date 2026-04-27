@@ -297,6 +297,33 @@ class ContentOrchestrator:
         # architect runs, not before).
         forced_slot = getattr(trend, "forced_slot", None) or {}
 
+        # Phase Q (2026-04-27) — ACTIVE GUIDANCE pulled per-post.
+        # Previously client_reviews + strategy_insights only applied via
+        # the Sunday StrategyRefinement agent → 6-day delay before any
+        # new directive took effect. Now: read both at every post and
+        # pass to the architect so guidance lands on the NEXT post.
+        active_client_reviews: list = []
+        active_strategy_insights: list = []
+        if self.memory:
+            try:
+                # Unaddressed reviews — direct user feedback; highest priority
+                active_client_reviews = self.memory.get_client_reviews(
+                    limit=10, unaddressed_only=True
+                )
+            except Exception as e:
+                logger.debug(f"Could not fetch client_reviews: {e}")
+            try:
+                # Top strategy insights by confidence — accumulated learnings
+                active_strategy_insights = self.memory.get_strategy_insights(top=8)
+            except Exception as e:
+                logger.debug(f"Could not fetch strategy_insights: {e}")
+            if active_client_reviews or active_strategy_insights:
+                logger.info(
+                    f"📌 Active guidance pulled: "
+                    f"{len(active_client_reviews)} client review(s), "
+                    f"{len(active_strategy_insights)} strategy insight(s)"
+                )
+
         try:
             blueprint = await self.angle_architect.execute(
                 trend_headline=trend.headline,
@@ -315,6 +342,8 @@ class ContentOrchestrator:
                 forced_emotional_temperature=forced_slot.get("emotional_temperature"),
                 forced_frame=forced_slot.get("frame"),
                 forced_comedy_move=forced_slot.get("comedy_move"),
+                active_client_reviews=active_client_reviews,
+                active_strategy_insights=active_strategy_insights,
             )
             # Attach to trend so it flows with the post through generation
             trend.blueprint = blueprint
