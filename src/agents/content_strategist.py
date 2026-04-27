@@ -2250,6 +2250,19 @@ is INSIDE the costume, not on top of it.
 ── REGISTER: {register} ──
 {voice_spec}
 {register_example_block}
+
+── 🥤 LIQUID DEATH STAMP (Phase R — applies even within {register}) ──
+This post must combine {register} with Liquid Death tone:
+  • Sarcastic, dry humor — never earnest, never preachy
+  • Absurdist + WEIRDLY SPECIFIC — invented details, off-kilter pairings
+  • Comprehensible on first read — weird ≠ confusing
+  • Deadpan delivery is THE joke (not a setup for the joke)
+
+If a sentence reads like a corporate apology, an inspirational LinkedIn
+post, or generic ChatGPT prose — kill it and rewrite. The Liquid Death
+test: would a metal-band water-can copywriter write this sentence? If
+no, rewrite until yes.
+
 ── EMOTIONAL TEMPERATURE: {emotional_temperature} ──
 {temperature_hint}
 
