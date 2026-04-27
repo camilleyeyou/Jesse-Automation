@@ -483,9 +483,18 @@ class CommentQueueManager:
 _comment_queue_manager: Optional[CommentQueueManager] = None
 
 
-def get_comment_queue_manager() -> CommentQueueManager:
-    """Get or create the singleton CommentQueueManager"""
+def get_comment_queue_manager(db_path: str = None) -> CommentQueueManager:
+    """Get or create the singleton CommentQueueManager.
+
+    Phase Q+1 (2026-04-27): accepts db_path so api/main.py can route to
+    /data/comments/comment_queue.db when the Railway volume is mounted.
+    Previously hard-coded to data/comments/comment_queue.db (ephemeral),
+    so all comment queue history was wiped on every redeploy.
+    """
     global _comment_queue_manager
     if _comment_queue_manager is None:
-        _comment_queue_manager = CommentQueueManager()
+        if db_path:
+            _comment_queue_manager = CommentQueueManager(db_path=db_path)
+        else:
+            _comment_queue_manager = CommentQueueManager()
     return _comment_queue_manager

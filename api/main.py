@@ -208,10 +208,26 @@ async def lifespan(app: FastAPI):
     
     # Initialize config
     config = get_config()
-    
+
+    # Phase Q+1 (2026-04-27) — CRITICAL FIX: bind the AgentMemory singleton
+    # to the resolved DB_PATH BEFORE any agent that touches memory is
+    # instantiated. The image_generator/orchestrator/etc. all call
+    # get_memory() in their __init__ — and get_memory() is a singleton
+    # that locks to whatever path was passed on FIRST call. If they go
+    # first, the singleton binds to the default ephemeral path
+    # (data/automation/queue.db) — and even after the volume mount,
+    # editorial_calendar / strategy_insights / content_memory / client_reviews
+    # KEEP getting written to the ephemeral location. Production logs
+    # 2026-04-27 confirmed this exact failure: queue_manager wrote to
+    # /data/queue.db but AgentMemory wrote to data/automation/queue.db.
+    # Binding here forces the singleton to the persistent volume.
+    from src.infrastructure.memory import get_memory as _bind_memory
+    _bind_memory(DB_PATH)
+    logger.info(f"✅ AgentMemory singleton bound to: {DB_PATH}")
+
     # Initialize AI client
     ai_client = OpenAIClient(config)
-    
+
     # NEW: Initialize image generator
     image_generator = ImageGeneratorAgent(ai_client, config)
     logger.info("✅ ImageGeneratorAgent initialized")
@@ -247,8 +263,16 @@ async def lifespan(app: FastAPI):
     logger.info("✅ CommentGeneratorAgent initialized")
     
     # Initialize Comment Queue Manager
-    comment_queue_manager = get_comment_queue_manager()
-    logger.info("✅ Comment Queue Manager initialized")
+    # Phase Q+1: route to persistent volume when /data is mounted, else
+    # falls back to local ephemeral path (for dev). Without this, comment
+    # queue history wipes on every Railway redeploy.
+    if os.path.isdir("/data"):
+        os.makedirs("/data/comments", exist_ok=True)
+        comment_db_path = "/data/comments/comment_queue.db"
+    else:
+        comment_db_path = "data/comments/comment_queue.db"
+    comment_queue_manager = get_comment_queue_manager(db_path=comment_db_path)
+    logger.info(f"✅ Comment Queue Manager initialized at {comment_db_path}")
     
     # Initialize LinkedIn Comment Service
     linkedin_org_urn = os.getenv("LINKEDIN_ORG_URN")
