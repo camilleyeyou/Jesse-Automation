@@ -2647,21 +2647,27 @@ Now write something that makes someone stop scrolling."""
         # (casual version). Both land as profound wisdom — both fail.
         ("closer_is_the_whole_thing",
          r"(?mi)\b(?:it\s+is|that(?:'s|\s+is))\s+the\s+whole\s+thing\b"),
-        # "Let us examine [X]" — roast opener that became a tic. Fine in
-        # small doses; flagged when used as a post opener so the generator
-        # varies the roast voice. Client flag: appeared as opener in 2 of
-        # 8 posts in the same batch.
+        # "Let us examine [X]" — roast opener that became a tic.
+        # Phase S+ (2026-04-29): converted from line-start anchor to
+        # ANYWHERE-IN-POST. Mid-post usage observed in Post 3 of
+        # 2026-04-29 queue ("...Let us examine the decision tree...")
+        # — slipped past line-start regex. The phrase is saturated as a
+        # motif whether it opens or not.
         ("opener_let_us_examine",
-         r"(?mi)^\s*[\"\u201c]?\s*let\s+us\s+examine\b"),
+         r"(?mi)\blet\s+us\s+examine\b"),
 
         # Phase J (2026-04-21) — BANNED RHETORICAL ENGINES.
         # Client diagnosis: Jesse-as-AI-admits-limits engine appeared in
         # 5 of 7 posts, which IS the formula. Ban the opener/engine
         # patterns so next drafts pick genuinely different engines.
+        # Phase S+ (2026-04-29): converted from line-start anchor to
+        # ANYWHERE-IN-POST. Mid-post usage observed in Post 4 of
+        # 2026-04-29 queue ("...I have processed every federal
+        # indictment since 1970...") — slipped past line-start regex.
         ("engine_ai_processed_opener",
          # "I have processed N billion words" / "I processed the setlists
-         # in 0.004 seconds" — the canonical AI-admits-limits setup
-         r"(?mi)^\s*[\"\u201c]?\s*i\s+(?:have\s+)?processed\b"),
+         # in 0.004 seconds" / mid-post "I have processed every X"
+         r"(?mi)\bi\s+(?:have\s+)?processed\s+(?:every|all|approximately|about|roughly|over|more\s+than|the\s+entire|nearly|\d|some|a\s+(?:billion|million|trillion|thousand|hundred))"),
         ("engine_ai_have_not_ai_did_not",
          # "I have processed X. I have not gone viral." contrast engine
          r"(?mi)\bi\s+have\s+not\s+(?:gone\s+viral|felt|been|experienced|loved|cried|slept|grieved)\b"),

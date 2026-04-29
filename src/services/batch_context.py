@@ -136,14 +136,15 @@ def _lexical_overlap(a: str, b: str) -> float:
 
 
 # Similarity thresholds — LangChain MMR / sentence-transformers short-text
-# conventions. 0.80 for "same story" (topic rejection), 0.72 for "same
-# compositional shape" (frame warning). Lexical fallback uses slightly
-# higher thresholds because word-overlap is a stricter signal than
-# embeddings for short texts.
-TOPIC_SIM_THRESHOLD = 0.80
-FRAME_SIM_THRESHOLD = 0.72
-LEXICAL_TOPIC_THRESHOLD = 0.55
-LEXICAL_FRAME_THRESHOLD = 0.40
+# conventions. Phase S+ (2026-04-29): tightened topic threshold 0.80 → 0.72
+# after observed failure: two posts on James Comey/seashells slipped
+# through 7 minutes apart. Embeddings are 'this story is similar' → if
+# Comey + seashells + indictment shares 70% of meaning, that IS the same
+# story for our purposes. Lexical fallback also tightened.
+TOPIC_SIM_THRESHOLD = 0.72  # was 0.80 — caught Comey/seashells dup
+FRAME_SIM_THRESHOLD = 0.65  # was 0.72 — paired tightening
+LEXICAL_TOPIC_THRESHOLD = 0.45  # was 0.55
+LEXICAL_FRAME_THRESHOLD = 0.35  # was 0.40
 
 
 @dataclass
