@@ -59,7 +59,20 @@ _NON_US_CITY_MARKERS = re.compile(
     r"Manila|Kuala Lumpur|Singapore|Bangkok|Hanoi|Ho Chi Minh|"
     r"Sydney|Melbourne|Auckland|"
     r"Toronto|Montreal|Vancouver|"
-    r"Moscow|Istanbul|Tehran|Baghdad|Damascus)\b",
+    r"Moscow|Istanbul|Tehran|Baghdad|Damascus|"
+    # Phase S+++ (2026-04-29) — country-name markers. Caught a "South
+    # India beach vlogger" post that slipped through because no Indian
+    # city was named. Country-level markers + regional sub-markers
+    # (South India, North India, etc.) close the gap.
+    r"South\s+India|North\s+India|"
+    r"India|Pakistan|Bangladesh|Nepal|Sri\s+Lanka|"
+    r"Nigeria|Kenya|Ghana|Ethiopia|Uganda|Tanzania|"
+    r"Indonesia|Vietnam|Thailand|Philippines|Malaysia|"
+    r"Egypt|Morocco|Algeria|Tunisia|"
+    r"Iran|Iraq|Syria|Yemen|Afghanistan|"
+    r"Ukraine|Belarus|Kazakhstan|"
+    r"Argentina|Chile|Colombia|Peru|Venezuela|"
+    r"Myanmar|Cambodia|Laos)\b",
     re.IGNORECASE,
 )
 _NON_US_COMPANY_MARKERS = re.compile(
@@ -231,7 +244,7 @@ def _recent_buckets(db_path: str, n: int = 5) -> Set[str]:
         return set()
 
 
-def _saturated_entities(db_path: str, n: int = 5, min_occurrences: int = 2) -> Set[str]:
+def _saturated_entities(db_path: str, n: int = 10, min_occurrences: int = 2) -> Set[str]:
     """Phase S++ (2026-04-29) — extract named entities from last N
     committed posts and return any that appear in `min_occurrences`+ posts.
 
@@ -239,6 +252,12 @@ def _saturated_entities(db_path: str, n: int = 5, min_occurrences: int = 2) -> S
     (Comey, Trump, Musk, Apple, etc.) saturating the recent feed should
     block new candidates featuring that same subject — even when the
     headlines are different stories about them.
+
+    Phase S+++ (2026-04-29) — bumped default window 5 → 10 posts +
+    extended timestamp filter from 3 days → 7 days. Comey appeared in
+    4 of last 8 days but Phase S++'s 5-post window let him slip back
+    in once a busy day pushed him out. 10-post / 7-day window catches
+    sustained-subject saturation across slower news days.
 
     Returns a set of saturated entity strings (lowercase). Caller filters
     candidates whose entity set intersects this saturated set.
@@ -254,7 +273,7 @@ def _saturated_entities(db_path: str, n: int = 5, min_occurrences: int = 2) -> S
             try:
                 rows = cursor.execute(
                     "SELECT content, trending_topic FROM content_memory "
-                    "WHERE created_at >= datetime('now', '-3 days') "
+                    "WHERE created_at >= datetime('now', '-7 days') "
                     "ORDER BY created_at DESC LIMIT ?",
                     (n,),
                 ).fetchall()
@@ -422,7 +441,9 @@ def stratify(
     # again."
     try:
         from .viral_signals import extract_entities as _extract_ents
-        saturated = _saturated_entities(db_path, n=5, min_occurrences=2)
+        # Phase S+++ — widened window 5 → 10 posts + 3 days → 7 days
+        # to catch sustained-subject saturation (Comey across batches)
+        saturated = _saturated_entities(db_path, n=10, min_occurrences=2)
         if saturated:
             entity_dropped = 0
             entity_kept: List[Any] = []

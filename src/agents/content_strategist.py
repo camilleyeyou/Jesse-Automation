@@ -2715,9 +2715,32 @@ Now write something that makes someone stop scrolling."""
         # Scene saturation: "3am phone scrolling" appeared in 4 of 6 posts
         # (drift insight conf=0.9). Ban the SEMANTIC cluster, not just
         # the literal phrase: any "{2|3|4}am" + phone/screen/scrolling
-        # within 60 chars triggers.
+        # within 80 chars triggers.
+        #
+        # Phase S+++ (2026-04-29) — bidirectional + implicit-time markers.
+        # Earlier regex only fired when time_marker came BEFORE the screen
+        # word and required an explicit AM/midnight token. Live slips:
+        #   - Post 1: "scrolling this at midnight" — screen → time, fixed
+        #     by adding the reverse direction
+        #   - Post 6: "glowing phone screen in a dimly lit living room" —
+        #     no AM/midnight; "dimly lit" + "glowing screen" is the same
+        #     scene cluster, fixed by adding implicit time markers
+        # Now matches in EITHER direction with explicit OR implicit time.
         ("scene_3am_phone_saturated",
-         r"(?mi)\b(?:[12345]\s*[:.]?\s*\d*\s*am|midnight)\b[\s\S]{0,80}?\b(?:phone|screen|scroll(?:ing|ed)?|laptop)\b"),
+         r"(?mi)("
+         # Direction 1: time_marker → screen_word
+         r"\b(?:"
+         r"[12345]\s*[:.]?\s*\d*\s*am|midnight|"
+         r"dimly\s+lit|late\s+(?:at\s+)?(?:night|evening)|hours?\s+ago|"
+         r"glow(?:ing)?\s+(?:phone|screen|laptop|monitor|display)"
+         r")\b[\s\S]{0,80}?\b(?:phone|screen|scroll(?:ing|ed)?|laptop|monitor)\b"
+         r"|"
+         # Direction 2: screen_word → time_marker
+         r"\b(?:phone|screen|scroll(?:ing|ed)?|laptop|monitor)\b[\s\S]{0,80}?\b(?:"
+         r"[12345]\s*[:.]?\s*\d*\s*am|midnight|"
+         r"dimly\s+lit|late\s+(?:at\s+)?(?:night|evening)|hours?\s+ago"
+         r")\b"
+         r")"),
 
         # "Sticky note on the monitor" — drift insight conf=0.7, used 2/6
         # then again in posts 1 and 5 of latest queue. Specific prop has
