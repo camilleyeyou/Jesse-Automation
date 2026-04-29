@@ -2698,6 +2698,54 @@ Now write something that makes someone stop scrolling."""
          # patterns. Any imperative-verb form addressed to the reader
          # referencing the full brand name is LinkedIn-spam shape.
          r"(?mi)\b(?:apply|try|use|grab|pick\s+up|reach\s+for|trust)\s+(?:a\s+tube\s+of\s+)?jesse\s+a\.?\s+eisenbalm\b"),
+
+        # ─── Phase S (2026-04-29) — promote drift-supervisor findings to
+        # HARD bans. The QualityDrift supervisor was catching these every
+        # day, writing them to strategy_insights, but the architect only
+        # saw them as "informative guidance" — generator kept producing
+        # them anyway. Now: regex hard-rejection. Posts that violate are
+        # blocked at the FINAL hard-rule gate (Phase N), not just retried.
+
+        # Scene saturation: "3am phone scrolling" appeared in 4 of 6 posts
+        # (drift insight conf=0.9). Ban the SEMANTIC cluster, not just
+        # the literal phrase: any "{2|3|4}am" + phone/screen/scrolling
+        # within 60 chars triggers.
+        ("scene_3am_phone_saturated",
+         r"(?mi)\b(?:[12345]\s*[:.]?\s*\d*\s*am|midnight)\b[\s\S]{0,80}?\b(?:phone|screen|scroll(?:ing|ed)?|laptop)\b"),
+
+        # "Sticky note on the monitor" — drift insight conf=0.7, used 2/6
+        # then again in posts 1 and 5 of latest queue. Specific prop has
+        # become its own template.
+        ("prop_sticky_note_monitor",
+         r"(?mi)\b(?:a\s+|the\s+)?sticky\s+note\s+(?:on|stuck\s+on|sat\s+on|sitting\s+on)\s+(?:the|a|her|his|their)?\s*(?:monitor|laptop|screen|computer)\b"),
+
+        # Demographic-target slop: "the [group] base" / "the [group]
+        # supporters" punching at half the country = generic comedy-club
+        # material, not Liquid Death sharp targeting. User flagged the
+        # "Diagnosis: Acute Tweet Sensitivity Syndrome / patient: the
+        # MAGA base" post 2026-04-28 as not-funny.
+        ("target_partisan_demographic",
+         r"(?mi)\bthe\s+(?:MAGA|trump|biden|harris|obama|democrat|democratic|republican|gop|liberal|conservative|leftist|right[\-\s]wing|left[\-\s]wing|woke|anti[\-\s]?woke)\s+(?:base|supporters?|crowd|voters?|wing|movement|faithful)\b"),
+
+        # Clinical template catchphrases — clinical_diagnostician's
+        # canonical lines have become a template stamp. "Presenting
+        # symptom:" / "Note to chart:" / "Prognosis: chronic" — recycle
+        # the FORM but never the specific word, or the form stops being
+        # a costume and becomes a uniform.
+        ("clinical_template_presenting_symptom",
+         r"(?mi)(?:^|[\.\?!]\s+)Presenting\s+symptom:"),
+        ("clinical_template_note_to_chart",
+         r"(?mi)(?:^|[\.\?!]\s+)Note\s+to\s+chart:"),
+        ("clinical_template_prognosis_chronic",
+         r"(?mi)(?:^|[\.\?!]\s+)Prognosis:\s+(?:chronic|terminal|stage\s+\d|unknown)"),
+
+        # Abstract Latinate closers — "operational" / "unprecedented" /
+        # "categorical" / "manifest" as the FINAL noun violates Phase J's
+        # anti_climactic_diminishment principle (final noun must be
+        # mundane and concrete). User flagged "the meltdown remains
+        # operational" 2026-04-28.
+        ("closer_abstract_latinate",
+         r"(?mi)\b(?:remains|stays|continues)\s+(?:operational|unprecedented|categorical|manifest|prevailing|pervasive|categorical|inevitable|imminent)[.!]?\s*$"),
     ]
 
     def _build_hard_rule_retry_prompt(self, original_prompt: str, bad_content: str, violations: list) -> str:
@@ -2745,6 +2793,41 @@ Now write something that makes someone stop scrolling."""
                 "Used 'Apply/Try/Grab/Use Jesse A. Eisenbalm...' imperative "
                 "form addressing the reader — also LinkedIn-spam shape. "
                 "BANNED. No reader-addressing brand calls in post body.",
+            "scene_3am_phone_saturated":
+                "Used the '3am + phone/screen/scrolling' scene cluster — "
+                "this template appeared in 4 of last 6 posts. Pick a "
+                "DIFFERENT private scene: the parking lot, Thanksgiving "
+                "dinner, the bathroom at work, a child's birthday party, "
+                "a hospital waiting room. Anything that isn't 3am + a phone.",
+            "prop_sticky_note_monitor":
+                "Used 'sticky note on the monitor' prop — saturated. "
+                "Pick a different photographable noun: a cracked mug, a "
+                "yellow legal pad, a printed boarding pass, a worn-out "
+                "guitar pick, a half-eaten sandwich, a Post-it on the fridge.",
+            "target_partisan_demographic":
+                "Targeted a demographic group ('the MAGA base', 'the GOP "
+                "voters', 'the woke left', etc.) — this is generic "
+                "comedy-club material, not Liquid Death sharp targeting. "
+                "Liquid Death names INDIVIDUALS doing SPECIFIC things. "
+                "Pick one named person and one specific action.",
+            "clinical_template_presenting_symptom":
+                "Used 'Presenting symptom:' — clinical template "
+                "catchphrase, used 12+ times. The FORM of clinical_diagnostician "
+                "is fine; the specific phrase is overused. Invent fresh "
+                "clinical jargon instead.",
+            "clinical_template_note_to_chart":
+                "Used 'Note to chart:' — clinical template catchphrase, "
+                "used 8+ times. Same problem as above.",
+            "clinical_template_prognosis_chronic":
+                "Used 'Prognosis: chronic' — clinical's most worn-out "
+                "closer. Pick a different prognosis OR a different closer "
+                "shape entirely.",
+            "closer_abstract_latinate":
+                "Closed on 'remains operational/unprecedented/categorical/"
+                "manifest' or similar abstract Latinate word. "
+                "anti_climactic_diminishment requires a CONCRETE MUNDANE "
+                "noun: 'a half-eaten sandwich', 'three unopened bills', "
+                "'his beige sweater'. Not corporate-speak abstractions.",
             "confession_opener": "Opened with 'Confession:' — BANNED opener",
             "unpopular_opinion_opener": "Opened with 'Unpopular opinion:' — BANNED opener",
             "engagement_bait": "Engagement bait (thoughts? / share this / like if you agree) — NEVER ask for engagement",

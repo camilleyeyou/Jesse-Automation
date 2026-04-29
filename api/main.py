@@ -504,12 +504,16 @@ def _schedule_all_jobs():
         logger.info("📊 Sunday 6:00 AM: Performance Ingestion")
 
     if strategy_refinement:
-        scheduler.schedule_weekly_job(
+        # Phase S (2026-04-29): client directive — refinement runs DAILY,
+        # not weekly. Drift supervisor catches issues every day; insights
+        # need to be refreshed every day so the architect sees new
+        # findings within 24h instead of waiting until Sunday.
+        scheduler.schedule_daily_job(
             job_func=weekly_refinement_job,
-            day_of_week="sun", hour=6, minute=30, timezone=timezone,
-            job_id="weekly_refinement", job_name="Weekly Strategy Refinement",
+            hour=6, minute=15, timezone=timezone,
+            job_id="daily_refinement", job_name="Daily Strategy Refinement",
         )
-        logger.info("📈 Sunday 6:30 AM: Strategy Refinement")
+        logger.info("📈 Daily 06:15 PT: Strategy Refinement")
 
     if weekly_strategist:
         scheduler.schedule_weekly_job(
