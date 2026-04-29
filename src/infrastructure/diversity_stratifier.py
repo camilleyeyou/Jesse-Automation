@@ -71,6 +71,29 @@ _NON_US_COMPANY_MARKERS = re.compile(
     r"Lenovo\b|Sony\s+India)\b",
     re.IGNORECASE,
 )
+# Phase S++ (2026-04-29) — non-US sports leagues + cricket/non-Western
+# sports context. Slipped through Phase N filter: IPL 2026 cricket post
+# about Vaibhav Sooryavanshi (16yo Indian cricketer) reached the queue.
+# Cricket as primary sports context = non-US audience for Jesse's US
+# LinkedIn followers. NBA/NFL/MLB/NHL stay exempt (US leagues).
+_NON_US_SPORTS_MARKERS = re.compile(
+    r"\b(?:"
+    # Cricket leagues / governing bodies
+    r"IPL\b|Indian\s+Premier\s+League|BCCI|PSL\b|Pakistan\s+Super\s+League|"
+    r"BBL\b|Big\s+Bash\s+League|CPL\b|Caribbean\s+Premier\s+League|"
+    r"T20\s+World\s+Cup|ICC\s+(?:World\s+Cup|Trophy)|"
+    # Cricket as a sport (when primary subject)
+    r"cricket\s+(?:match|game|league|player|team|tournament|series|World\s+Cup)|"
+    # Non-US football (soccer-as-football for non-US audiences) + leagues
+    r"Premier\s+League\s+(?:football|match|player|club)|EPL\b|La\s+Liga|"
+    r"Bundesliga|Serie\s+A\s+football|Ligue\s+1|"
+    # Olympics events that center non-US athletes (rare to flag here, but
+    # included for completeness when the headline frames a non-US athlete)
+    # Rugby leagues (mostly non-US)
+    r"Six\s+Nations|Premiership\s+Rugby|Super\s+Rugby"
+    r")\b",
+    re.IGNORECASE,
+)
 _NON_US_CURRENCY_MARKERS = re.compile(
     r"(?:₹|€|£|¥|₩|₽|Rs\.?\s*\d|INR\s*\d|EUR\s*\d|GBP\s*\d|"
     r"\b(?:crore|lakh|yuan|yen|won|rupee|ruble|peso|real|rand|shilling)s?\b)",
@@ -105,14 +128,22 @@ def _is_non_us_primary_subject(trend: Any) -> bool:
         True if trend should be filtered out as non-US primary subject.
     """
     headline = (getattr(trend, "headline", "") or "").strip()
+    summary = (getattr(trend, "summary", "") or "").strip()
     if not headline:
         return False
     first_chunk = " ".join(headline.split()[:12])  # first ~12 words
+
+    # Phase S++ — also scan summary for sports markers. Some headlines
+    # don't contain the league name (e.g. "Nauman Niaz jokes about AI chip
+    # in Vaibhav Sooryavanshi's bat") but the summary always has IPL/cricket
+    # context. The non-US sports filter sees the league name in EITHER field.
+    sports_text = headline + " " + summary[:300]
 
     has_foreign = bool(
         _NON_US_CITY_MARKERS.search(first_chunk)
         or _NON_US_COMPANY_MARKERS.search(first_chunk)
         or _NON_US_CURRENCY_MARKERS.search(first_chunk)
+        or _NON_US_SPORTS_MARKERS.search(sports_text)
     )
     if not has_foreign:
         return False
@@ -197,6 +228,65 @@ def _recent_buckets(db_path: str, n: int = 5) -> Set[str]:
         return {_canonical_bucket(r[0]) for r in rows if r and r[0]}
     except Exception as e:
         logger.debug(f"_recent_buckets lookup failed: {e}")
+        return set()
+
+
+def _saturated_entities(db_path: str, n: int = 5, min_occurrences: int = 2) -> Set[str]:
+    """Phase S++ (2026-04-29) — extract named entities from last N
+    committed posts and return any that appear in `min_occurrences`+ posts.
+
+    Solves the 'Comey 3 batches in a row' problem: a named subject
+    (Comey, Trump, Musk, Apple, etc.) saturating the recent feed should
+    block new candidates featuring that same subject — even when the
+    headlines are different stories about them.
+
+    Returns a set of saturated entity strings (lowercase). Caller filters
+    candidates whose entity set intersects this saturated set.
+    """
+    try:
+        from .viral_signals import extract_entities
+    except ImportError:
+        return set()
+
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                rows = cursor.execute(
+                    "SELECT content, trending_topic FROM content_memory "
+                    "WHERE created_at >= datetime('now', '-3 days') "
+                    "ORDER BY created_at DESC LIMIT ?",
+                    (n,),
+                ).fetchall()
+            except sqlite3.OperationalError:
+                return set()
+
+        # Count entity appearances across recent posts
+        entity_post_count: Dict[str, int] = {}
+        for row in rows:
+            content = row[0] or ""
+            trending = row[1] or ""
+            text = f"{trending} {content[:200]}"  # focus on headline + opener
+            ents = extract_entities(text) or set()
+            # Each entity counts ONCE per post (set conversion already does this)
+            for e in ents:
+                e_lower = e.lower().strip()
+                if not e_lower or len(e_lower) < 3:
+                    continue
+                entity_post_count[e_lower] = entity_post_count.get(e_lower, 0) + 1
+
+        saturated = {
+            e for e, count in entity_post_count.items()
+            if count >= min_occurrences
+        }
+        if saturated:
+            logger.info(
+                f"🎯 Saturated entities (≥{min_occurrences}/{n} recent posts): "
+                f"{sorted(saturated)}"
+            )
+        return saturated
+    except Exception as e:
+        logger.debug(f"_saturated_entities failed: {e}")
         return set()
 
 
@@ -321,6 +411,49 @@ def stratify(
             "🌎 Stratifier: all candidates flagged non-US — falling back to "
             "raw pool (better to ship something than nothing)"
         )
+
+    # Phase S++ (2026-04-29) — entity-saturation filter.
+    # Solves the 'Comey 3 batches in a row' problem. If a named entity
+    # (Comey, Trump, Musk, etc.) has appeared as primary subject in
+    # ≥2 of the last 5 committed posts, drop new candidates featuring
+    # that entity. The bucket-rotation gate doesn't catch this because
+    # multiple Comey stories can land in different buckets (politics,
+    # social_viral, corporate_absurd) — but readers still see "Comey
+    # again."
+    try:
+        from .viral_signals import extract_entities as _extract_ents
+        saturated = _saturated_entities(db_path, n=5, min_occurrences=2)
+        if saturated:
+            entity_dropped = 0
+            entity_kept: List[Any] = []
+            for c in candidates:
+                ent_text = f"{getattr(c, 'headline', '')} {getattr(c, 'summary', '') or ''}"
+                cand_ents = {e.lower().strip() for e in (_extract_ents(ent_text) or set())}
+                # Drop if ANY of the candidate's entities is saturated
+                overlap = cand_ents & saturated
+                if overlap:
+                    entity_dropped += 1
+                    logger.info(
+                        f"🎯 Entity-saturation drop: '{(getattr(c, 'headline', '') or '')[:60]}...'"
+                        f" — saturated entity: {sorted(overlap)}"
+                    )
+                else:
+                    entity_kept.append(c)
+            # Don't wipe pool entirely — fall back if filter empties everything
+            if entity_kept:
+                candidates = entity_kept
+                if entity_dropped:
+                    logger.info(
+                        f"🎯 Entity-saturation: filtered {entity_dropped} candidate(s) "
+                        f"featuring saturated subjects"
+                    )
+            elif entity_dropped:
+                logger.warning(
+                    "🎯 Entity-saturation: would empty pool — keeping raw "
+                    "(better to ship a saturated subject than nothing)"
+                )
+    except Exception as e:
+        logger.debug(f"Entity-saturation filter failed (non-blocking): {e}")
 
     # Compute entity sets once (we reuse viral_signals — this is the
     # same extractor the curator already uses for entity-overlap checks)
