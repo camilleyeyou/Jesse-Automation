@@ -1163,6 +1163,31 @@ class AgentMemory:
             )
             return [row[0] for row in cursor.fetchall() if row[0]]
 
+    def get_recent_openers(self, days: int = 3, limit: int = 5) -> List[str]:
+        """Phase T (2026-04-29) — return the first ~80 chars of the last N
+        committed posts, used for cross-day opener-saturation checks.
+
+        Solves the 'Diagnosis: ... two days in a row' problem. The HARD_RULE
+        regex bans match within a single post; this provides cross-post
+        history so a new draft can be rejected when its opener echoes
+        yesterday's. Caller fingerprints (first word, register-marker pattern)
+        and compares.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT content FROM content_memory
+                WHERE content IS NOT NULL
+                  AND created_at >= datetime('now', ?)
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (f"-{days} days", limit),
+            )
+            rows = cursor.fetchall()
+        return [(row[0] or "")[:120].strip() for row in rows if row and row[0]]
+
     def get_recent_blueprint_fields(
         self, fields: List[str], days: int = 7, limit: int = 10,
     ) -> Dict[str, List[str]]:

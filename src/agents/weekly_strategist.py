@@ -612,13 +612,24 @@ PLANNING PRINCIPLES:
    insecure about lacking lips. Absurdist Modern Luxury, not trying-hard funny.
 6. Always plan exactly 5 slots (Monday through Friday)
 7. Double satire lens — each angle_seed should hint at the AI-vs-human-lips irony
-8. THE DRY COMEDY ENGINE — schedule at least 1 clinical diagnostician post per week.
-   These use pseudo-scientific language, invented conditions ("Hyper-Arid Social
-   Desiccation"), dryness scores, and prescriptions. Jesse diagnoses the world
-   and prescribes relief. Example angle_seed: "CLINICAL ASSESSMENT of [topic] —
-   invent a medical condition for the trend, assign a dryness score, prescribe balm."
-9. Voice modifier variety — rotate through clinical_diagnostician, desert_relief_expert,
-   and thirst_detector alongside existing voice modifiers. Don't cluster them.
+8. OPENER ROTATION (Phase T — non-negotiable) — across the 5-day week, NO TWO
+   DAYS may use the same opener style. Specifically: clinical / diagnostic
+   labels (Diagnosis: / Classification: / Patient: / Presenting symptom: /
+   Prognosis: / Clinical assessment: / Thirst Quotient: / Dryness Score:)
+   may appear AT MOST ONCE per week, and never on consecutive days.
+   The same applies to other label-style openers (Confession: / Unpopular
+   opinion: / Breaking: / Update: / Observation:). Each angle_seed should
+   hint at a DIFFERENT opener shape: declarative-news, scene-establishment,
+   character-monologue, interrogation, list, contradiction, anecdote.
+9. CLINICAL DIAGNOSTICIAN CAP — clinical_diagnostician is ONE useful voice
+   among many, NOT a default. Use it AT MOST ONCE per week. The other 4 days
+   should use distinct voice modifiers (contrarian, prophet, confession,
+   roast, observer, scene-painter, anecdotalist). When you DO schedule a
+   clinical post, do not encode 'CLINICAL ASSESSMENT' or 'Diagnosis:' in
+   the angle_seed — let the writer find the form. Just say what topic the
+   day covers and which voice register applies.
+10. Voice modifier variety — rotate registers across days. Don't cluster
+    diagnostic, prophetic, or confession registers together.
 
 WORKFLOW:
 1. Call get_recent_performance to see what's been working
@@ -661,9 +672,36 @@ will be empty and no content will be generated. ALWAYS end by calling the tool."
             f"  - {d.strftime('%A')}: {d.isoformat()}"
             for d in week_dates
         )
+
+        # Phase T (2026-04-29) — surface recent openers so the planner
+        # can SEE what to avoid. Without this, the planner has no idea
+        # last week's posts opened with 'Diagnosis:' two days in a row.
+        recent_openers_block = ""
+        if self.memory:
+            try:
+                recents = self.memory.get_recent_openers(days=7, limit=7) or []
+                if recents:
+                    bullets = "\n".join(
+                        f"  - {(text or '').splitlines()[0][:90]}"
+                        for text in recents
+                    )
+                    recent_openers_block = (
+                        "\n\nLAST WEEK'S POST OPENERS (the first ~90 chars of each):\n"
+                        f"{bullets}\n\n"
+                        "PRINCIPLE 8 ENFORCEMENT: identify the opener style of each "
+                        "above (clinical-label / declarative / scene / etc.) and ensure "
+                        "your 5-day plan does NOT prime the writer to repeat any "
+                        "opener style that appeared in the last 3 days. If you see "
+                        "'Diagnosis:' / 'Classification:' / 'Patient:' / 'Presenting "
+                        "symptom:' anywhere in the last 3 entries, do NOT schedule "
+                        "clinical_diagnostician this week — pick a different voice."
+                    )
+            except Exception:
+                pass
+
         return f"""Plan the editorial calendar for this upcoming week.
 
 Dates to fill:
-{dates_str}
+{dates_str}{recent_openers_block}
 
 Start by gathering data with the available tools, then write the weekly brief."""

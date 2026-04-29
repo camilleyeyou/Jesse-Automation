@@ -2933,6 +2933,16 @@ Now write something that makes someone stop scrolling."""
                 "'[Target] just announced [thing]. They are not okay.' / "
                 "Start by naming the target action directly — no 'let us examine' framing."
             ),
+            "opener_saturated_cross_day": (
+                "OPENER REPEATED ACROSS DAYS — your draft opens with the same template "
+                "label (Diagnosis: / Classification: / Patient: / Confession: / etc.) "
+                "as one of the last 3 published posts. Two days in a row with the "
+                "same pseudo-clinical label is the formula the client called out. "
+                "Drop the label entirely. Start with a CONCRETE DECLARATIVE sentence "
+                "naming the trend — no preamble, no colon-frame, no register tag. "
+                "Examples: 'Apple shipped a feature that does X.' / "
+                "'Three senators just tried to ban Y.' / 'A man in Ohio paid Z for W.'"
+            ),
         }
         for name, matched in violations:
             human = human_rule_names.get(name, name)
@@ -2992,6 +3002,79 @@ Now write something that makes someone stop scrolling."""
                 pass
         return None
 
+    def _opener_fingerprint(self, content: str) -> Optional[str]:
+        """Phase T (2026-04-29) — extract a stable opener fingerprint for
+        cross-day saturation checks.
+
+        Returns a short canonical key like 'diagnosis_colon', 'classification_colon',
+        'patient_colon', 'confession_colon', 'unpopular_opinion', or None when
+        the opener is not a recognizable template. The fingerprint is
+        intentionally template-level — two posts that BOTH open with
+        'Diagnosis: Acute X Syndrome' produce the same fingerprint regardless
+        of the X.
+        """
+        import re as _re
+        if not content:
+            return None
+        head = content.lstrip().lstrip("\"\u201c'").lstrip()[:140]
+        head_lower = head.lower()
+        # Pseudo-clinical templates (the user's specific complaint)
+        if _re.match(r"^diagnos(?:is|ed)\s*[:\-—]", head_lower):
+            return "diagnosis_label"
+        if _re.match(r"^classification\s*[:\-—]", head_lower):
+            return "classification_label"
+        if _re.match(r"^patient\s*[:\-—]", head_lower):
+            return "patient_label"
+        if _re.match(r"^presenting\s+(?:symptom|complaint|condition)s?\s*[:\-—]", head_lower):
+            return "presenting_symptom_label"
+        if _re.match(r"^prognosis\s*[:\-—]", head_lower):
+            return "prognosis_label"
+        if _re.match(r"^clinical\s+(?:assessment|finding|note|observation)\s*[:\-—]", head_lower):
+            return "clinical_assessment_label"
+        if _re.match(r"^thirst\s+quotient\s*[:\-—]", head_lower):
+            return "thirst_quotient_label"
+        if _re.match(r"^dryness\s+(?:score|index|level)\s*[:\-—]", head_lower):
+            return "dryness_score_label"
+        # Other template openers
+        if _re.match(r"^confession\s*[:\-—]", head_lower):
+            return "confession_label"
+        if _re.match(r"^unpopular\s+opinion\s*[:\-—]", head_lower):
+            return "unpopular_opinion_label"
+        if _re.match(r"^breaking\s*[:\-—]", head_lower):
+            return "breaking_label"
+        if _re.match(r"^update\s*[:\-—]", head_lower):
+            return "update_label"
+        if _re.match(r"^observation\s*[:\-—]", head_lower):
+            return "observation_label"
+        return None
+
+    def _check_opener_saturation(self, content: str):
+        """Phase T (2026-04-29) — cross-day opener-saturation check.
+
+        User flagged 'two days in a row started with Diagnosis:' on
+        2026-04-29. The HARD_RULE regex bans match patterns within a
+        single post; this method consults memory to reject a draft whose
+        opener fingerprint matches ANY of the last 3 committed posts.
+
+        Returns a list of (rule_name, matched_text) tuples — same shape as
+        _check_hard_rule_violations so callers can merge results.
+        """
+        if not self.memory:
+            return []
+        fp = self._opener_fingerprint(content)
+        if not fp:
+            return []
+        try:
+            recent = self.memory.get_recent_openers(days=3, limit=3) or []
+        except Exception:
+            return []
+        recent_fps = {self._opener_fingerprint(text) for text in recent}
+        recent_fps.discard(None)
+        if fp in recent_fps:
+            head = content.lstrip()[:60]
+            return [("opener_saturated_cross_day", f"{fp}: {head!r}")]
+        return []
+
     def _check_hard_rule_violations(self, content: str):
         """Return a list of (rule_name, matched_text) for any hard rules the content violates."""
         import re as _re
@@ -3000,6 +3083,8 @@ Now write something that makes someone stop scrolling."""
             m = _re.search(pattern, content)
             if m:
                 violations.append((name, m.group(0).strip()))
+        # Phase T (2026-04-29) — cross-day opener-saturation check.
+        violations.extend(self._check_opener_saturation(content))
         return violations
 
     def _clean_content(self, content: str) -> str:
