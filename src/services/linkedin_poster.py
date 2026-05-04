@@ -89,43 +89,71 @@ class LinkedInPoster:
         return bool(self.access_token)
     
     def test_connection(self) -> Dict[str, Any]:
-        """Test the LinkedIn connection"""
-        
+        """Test the LinkedIn connection.
+
+        Phase T+ (2026-05-04) — switched from /v2/userinfo to /v2/organizationAcls.
+        /userinfo requires OIDC scopes (openid/profile/email) the production
+        token does not request. This produced false 403s on the dashboard's
+        'Test LinkedIn' button while posting was actually working fine. The
+        org-admin endpoint is the meaningful health check — it confirms the
+        rw_organization_admin scope (which posting depends on) and returns
+        the org we post against.
+        """
         if not self.access_token:
             return {
                 "success": False,
                 "error": "No access token configured"
             }
-        
+
         try:
             headers = {
                 "Authorization": f"Bearer {self.access_token}",
                 "X-Restli-Protocol-Version": "2.0.0"
             }
-            
+
             response = requests.get(
-                f"{self.api_base}/userinfo",
+                f"{self.api_base}/organizationAcls"
+                f"?q=roleAssignee&role=ADMINISTRATOR"
+                f"&projection=(elements*(organization~(localizedName,id,vanityName)))",
                 headers=headers,
-                timeout=10
+                timeout=10,
             )
-            
+
             if response.status_code == 200:
-                data = response.json()
-                self.user_id = data.get("sub")
+                data = response.json() or {}
+                elements = data.get("elements") or []
+                orgs = []
+                for el in elements:
+                    org = el.get("organization~") or {}
+                    orgs.append({
+                        "id": str(org.get("id")) if org.get("id") is not None else None,
+                        "name": org.get("localizedName"),
+                        "vanity_name": org.get("vanityName"),
+                    })
+                # Confirm the configured company_id is actually administered
+                cfg_company_id = self.company_id
+                admin_match = None
+                if cfg_company_id:
+                    for o in orgs:
+                        if o.get("id") == str(cfg_company_id):
+                            admin_match = o
+                            break
                 return {
                     "success": True,
-                    "user_id": self.user_id,
-                    "name": data.get("name"),
-                    "email": data.get("email"),
-                    "company_id": self.company_id
+                    "endpoint": "organizationAcls",
+                    "admin_orgs": orgs,
+                    "company_id": cfg_company_id,
+                    "configured_org_is_admin": admin_match is not None,
+                    "configured_org_name": (admin_match or {}).get("name"),
                 }
             else:
                 return {
                     "success": False,
+                    "endpoint": "organizationAcls",
                     "error": f"API returned {response.status_code}",
-                    "details": response.text
+                    "details": response.text[:500],
                 }
-                
+
         except Exception as e:
             logger.error(f"LinkedIn connection test failed: {e}")
             return {
